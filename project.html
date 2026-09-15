@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project — 3D-Printing Spider Bot | Stephen</title>
+<meta name="description" content="Concept for a truss-climbing 3D printer robot for building megastructures in space." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="stars"></div>
+
+<nav class="site-nav">
+  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="project.html" class="active">Project</a></li>
+    <li><a href="lab.html">Lab Notes</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="container">
+    <p class="eyebrow" style="color:var(--accent-2); letter-spacing:0.2em; text-transform:uppercase; font-size:0.8rem;">Concept &middot; In Progress</p>
+    <h1 class="page-title">The 3D-Printing Spider Bot</h1>
+    <p class="subtitle">
+      A concept for a 3D printer that moves along the very structure it prints,
+      using robotic arms to climb, anchor, and extrude &mdash; enabling a small
+      satellite to build megastructures far larger than itself.
+    </p>
+
+    <div class="truss-wrap">
+      <p class="truss-hint">The bot in action (conceptually) &mdash; click it.</p>
+      <div id="truss-container"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The problem</h3>
+      <p>
+        Traditional space structures are limited by the size of a rocket's payload
+        fairing. Anything big &mdash; solar arrays, antennas, habitats, truss backbones
+        for space stations &mdash; has to be folded, packed, launched, and unfolded, or
+        assembled piece-by-piece by astronauts or teleoperated arms. That caps how
+        large and how cheap "big" can be.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The idea</h3>
+      <p>
+        Instead of launching the whole structure, launch a small robot that
+        <em>prints</em> the structure in orbit, then walks along what it just
+        printed to keep printing more. Picture an inchworm: it anchors its rear
+        feet, extends a printhead-tipped arm forward to extrude the next segment
+        of truss, then grips that new segment and pulls the rest of its body
+        forward &mdash; repeating indefinitely.
+      </p>
+      <p>
+        Because the robot never needs to be bigger than a single truss bay,
+        a satellite far smaller than the final structure could, in principle,
+        print a truss kilometers long &mdash; solar farms, telescope backbones,
+        habitat frames &mdash; using local or launched feedstock.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">How it would work</h3>
+      <ol class="step-list">
+        <li><strong>Anchor.</strong> Rear gripper locks onto the last printed truss node.</li>
+        <li><strong>Extrude.</strong> A forward arm, tipped with an extrusion head, lays down the next truss segment &mdash; beams, nodes, and diagonals.</li>
+        <li><strong>Cure.</strong> The freshly printed segment sets (thermally, chemically, or via UV) enough to bear the robot's own weight.</li>
+        <li><strong>Advance.</strong> The front gripper clamps the new segment; the rear releases and the body arches forward, inchworm-style.</li>
+        <li><strong>Repeat.</strong> The cycle continues, growing the truss one bay at a time, in any direction the mission needs.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Why it matters</h3>
+      <p>
+        This approach decouples structure size from launch vehicle size. A single
+        small, reusable printer-robot could, over time, build structures orders
+        of magnitude larger than itself &mdash; the same way a spider spins a web far
+        bigger than its own body. That could make space-based solar power,
+        large-aperture telescopes, and orbital habitats dramatically more
+        feasible.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Open questions I'm chasing</h3>
+      <div class="tag-list">
+        <span class="tag">Feedstock in vacuum &amp; microgravity</span>
+        <span class="tag">Cure time vs. crawl speed</span>
+        <span class="tag">Gripper reliability over 1000s of cycles</span>
+        <span class="tag">Structural accuracy without gravity datum</span>
+        <span class="tag">Power &amp; thermal budget for a small bot</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <a href="index.html" class="btn btn-secondary">&larr; Back home</a>
+      <a href="lab.html" class="btn btn-primary">Lab notes &rarr;</a>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+  <div class="egg-note">the bot remembers where it stopped, even after a wave.</div>
+</footer>
+
+<script src="js/stars.js"></script>
+<script src="js/truss.js"></script>
+</body>
+</html>

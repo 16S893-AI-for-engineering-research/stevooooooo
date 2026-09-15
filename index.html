@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stephen — In-Space Manufacturing</title>
+<meta name="description" content="Portfolio of Stephen, Aero/Astro Master's student researching in-space manufacturing at the MIT Media Lab." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="stars"></div>
+
+<nav class="site-nav">
+  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="project.html">Project</a></li>
+    <li><a href="lab.html">Lab Notes</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="container hero">
+    <p class="eyebrow">Aero Astro &middot; MIT Media Lab</p>
+    <h1 class="page-title">Building things that build things in space.</h1>
+    <p class="subtitle">
+      Stephen is my name. In-Space Manufacturing is my game. I am an Aero Astro
+      Master's student working with Professor Wood out of the Media Lab. My
+      main research interest is making anything in space.
+    </p>
+    <div class="btn-row">
+      <a href="project.html" class="btn btn-primary">See the project</a>
+      <a href="lab.html" class="btn btn-secondary">Lab notes</a>
+    </div>
+  </div>
+
+  <div class="container" style="padding-top:0;">
+    <div class="truss-wrap">
+      <p class="truss-hint">A robot is crawling across the truss below &mdash; try clicking it.</p>
+      <div id="truss-container"></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="grid-cards">
+      <div class="card">
+        <h3>Who I am</h3>
+        <p>Master's student in Aeronautics &amp; Astronautics, working at the intersection of robotics and space structures inside the MIT Media Lab.</p>
+      </div>
+      <div class="card">
+        <h3>What I study</h3>
+        <p>In-space manufacturing &mdash; how to build, repair, and grow structures beyond Earth using autonomous machines.</p>
+      </div>
+      <div class="card">
+        <h3>Current build</h3>
+        <p>A truss-climbing 3D-printing "spider bot" that prints the structure it walks on. Details on the Project page.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+  <div class="egg-note">psst — the robot on the truss doesn't just crawl.</div>
+</footer>
+
+<script src="js/stars.js"></script>
+<script src="js/truss.js"></script>
+</body>
+</html>
