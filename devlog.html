@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dev Log | Stephen</title>
+<meta name="description" content="Development log for Stephen's portfolio site, including agent session activity and notes." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="stars"></div>
+
+<nav class="site-nav">
+  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="project.html">Project</a></li>
+    <li><a href="lab.html">Lab Notes</a></li>
+    <li><a href="devlog.html" class="active">Dev Log</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="container">
+    <h1 class="page-title">Dev Log</h1>
+    <p class="subtitle">
+      Notes on building this site with the <code>pi</code> coding agent —
+      what worked, what didn't, and how the session activity broke down.
+    </p>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Agent session activity</h3>
+      <p>
+        Across the sessions I used to build this site, here's how the user
+        messages I typed compared to the tool calls the agent made on its
+        own to read, write, and test code:
+      </p>
+      <img src="assets/session-activity.png" alt="Bar chart comparing user messages typed versus agent tool calls across three pi agent sessions" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — Getting the animation right</h3>
+      <p>
+        Found that Claude struggled taking the prompt and making something
+        physical (the animation) using just words. It clearly understood
+        what I wanted but need extra coaching about what was wrong to
+        recognize and fix the mistakes. Either that or it was simply taking
+        shortcuts. I also feel as though I'm not using the terminal in the
+        best way. I'd like an easier way to add files and share information
+        with the model.
+      </p>
+    </div>
+
+    <div class="btn-row">
+      <a href="lab.html" class="btn btn-secondary">&larr; Lab notes</a>
+      <a href="index.html" class="btn btn-primary">Home</a>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+  <div class="egg-note">every bug is a lesson, every lesson is a log entry.</div>
+</footer>
+
+<script src="js/stars.js"></script>
+<script src="js/truss.js"></script>
+</body>
+</html>
