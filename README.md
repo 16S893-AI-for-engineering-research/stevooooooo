@@ -16,7 +16,7 @@ Requirements:
 ```
 index.html      Home — who I am
 project.html    Project outline — truss-climbing 3D-printing "spider bot"
-lab.html        Lab notes — research context
+devlog.html     Dev log — agent session notes and activity
 css/style.css   Deep-space theme, shared across all pages
 js/stars.js     Twinkling starfield background
 js/truss.js     Builds the truss + animates the inchworm robot (crawl + wave easter egg)
