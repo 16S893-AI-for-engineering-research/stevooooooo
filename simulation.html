@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simulation Recreation — Free-Flying Satellite 3D Printing | Stephen</title>
+<meta name="description" content="Recreating the free-flying satellite additive manufacturing simulation from Jonckers et al. (2022) in Python, and validating it against the paper's published error statistics." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .sim-fig { margin: 0 0 1.5rem; background: rgba(10,10,28,0.45);
+    border: 1px solid var(--panel-border); border-radius: 12px; padding: 0.85rem; }
+  .sim-fig img { display: block; width: 100%; border-radius: 8px; }
+  .sim-fig figcaption { margin-top: 0.7rem; font-size: 0.85rem;
+    color: var(--text-dim); line-height: 1.5; }
+  table.sim-table { width: 100%; border-collapse: collapse; margin-top: 1rem;
+    font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  table.sim-table th, table.sim-table td { text-align: right;
+    padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(124,92,255,0.15); }
+  table.sim-table th { color: var(--accent-2); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; }
+  table.sim-table td:first-child, table.sim-table th:first-child { text-align: left; }
+  table.sim-table tr.is-key td { color: var(--text); font-weight: 500; }
+  .tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 4px;
+    border: 1px solid currentColor; margin-right: 0.35rem; }
+  .tag-paper { color: #57e3a0; }
+  .tag-inferred { color: #ffc857; }
+  .tag-derived { color: var(--accent-2); }
+  .callout { border-left: 3px solid var(--accent); padding: 0.85rem 1.1rem;
+    background: rgba(124,92,255,0.07); border-radius: 0 8px 8px 0;
+    margin: 1.25rem 0; font-size: 0.92rem; }
+  code.inline { background: rgba(76,201,240,0.1); padding: 0.1rem 0.35rem;
+    border-radius: 4px; font-size: 0.88em; color: var(--accent-2); }
+  pre.sim-pre { background: rgba(5,5,15,0.7); border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 1rem; overflow-x: auto; font-size: 0.78rem;
+    line-height: 1.5; color: var(--text-dim); }
+  .eq { text-align: center; padding: 0.6rem 0; color: var(--text);
+    font-size: 0.95rem; letter-spacing: 0.02em; }
+</style>
+</head>
+<body>
+<div id="stars"></div>
+
+<nav class="site-nav">
+  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="project.html">Project</a></li>
+    <li><a href="simulation.html" class="active">Simulation</a></li>
+    <li><a href="devlog.html">Dev Log</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="container">
+    <p class="eyebrow" style="color:var(--accent-2); letter-spacing:0.2em; text-transform:uppercase; font-size:0.8rem;">Paper Recreation &middot; Python</p>
+    <h1 class="page-title">Rebuilding a Free-Flying 3D Printer</h1>
+    <p class="subtitle">
+      I took a 2022 paper on satellites that 3D-print structures larger than
+      themselves, rebuilt its simulation from scratch in Python, and checked
+      whether my version reproduces the numbers they published. It does &mdash;
+      16 out of 16 reported quantities land within tolerance.
+    </p>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The paper</h3>
+      <p>
+        Jonckers, Tauscher, Thakur &amp; Maywald (2022),
+        <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying
+        Satellites&rdquo;</em>, <em>Frontiers in Space Technologies</em> 3:879542.
+        Institut f&uuml;r Raumfahrtsysteme, TU Braunschweig.
+        <a href="https://doi.org/10.3389/frspt.2022.879542">doi:10.3389/frspt.2022.879542</a>
+      </p>
+      <p>
+        The idea is a neat inversion of normal 3D printing. Instead of a fixed
+        printer building something inside its own volume, a free-flying satellite
+        carries a robotic arm with an extruder and prints a structure
+        <em>segment by segment</em>, repositioning itself between segments. The
+        output can be arbitrarily long &mdash; far bigger than the satellite or
+        its launch fairing.
+      </p>
+      <p>
+        They tested it on the ELISSA air bearing table at TU Braunschweig: a
+        20.2&nbsp;kg robot floating on an 80&nbsp;&micro;m air cushion over a
+        4&nbsp;&times;&nbsp;7&nbsp;m table, which gives frictionless motion in
+        3&nbsp;degrees of freedom and stands in for the free-floating conditions
+        of orbit. It printed a 775&nbsp;mm truss from 7 overlapping segments.
+      </p>
+
+      <div class="callout">
+        <strong>The core problem.</strong> A free-flying satellite cannot hold
+        position well &mdash; thruster deadbands and table tilt leave it drifting
+        by a couple of millimetres. The nozzle sits 400&nbsp;mm from the body
+        centre, so any rotation of the body swings the nozzle further still,
+        up to 5.5&nbsp;mm. With a 1.2&nbsp;mm nozzle, that is fatal: the print
+        simply fails. Their fix is elegant &mdash; don't fight the drift with
+        thrusters, just let the <em>arm</em> absorb it, continuously
+        re-aiming so the nozzle lands where the world frame wants it.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">What the model contains</h3>
+      <p>
+        Roughly 1,500 lines of Python across nine modules, <code class="inline">numpy</code>
+        only. The physics runs on a 2&nbsp;ms step, the pose controller at
+        50&nbsp;Hz, and the arm command loop at the paper's stated 60&nbsp;ms.
+      </p>
+      <ul>
+        <li><strong>Rigid-body dynamics</strong> &mdash; planar 3-DoF body,
+          semi-implicit integration.</li>
+        <li><strong>Thruster allocation</strong> &mdash; the paper's
+          <span class="eq">u&nbsp;=&nbsp;M&nbsp;f&nbsp;&nbsp;&nbsp;and&nbsp;&nbsp;&nbsp;f&nbsp;=&nbsp;2&nbsp;M<sup>&dagger;</sup>u</span>
+          where the factor of 2 compensates for the thrusters being
+          unidirectional, plus a PWM deadband and 8-bit quantisation for the
+          propeller drive.</li>
+        <li><strong>Three PID controllers</strong> (x, y, yaw) with anti-windup,
+          fed by a simulated optical tracking system: noisy pose, velocity by
+          finite differencing then moving-average filtering.</li>
+        <li><strong>Disturbances</strong> &mdash; residual gravity from table
+          tilt (up to 9.6&nbsp;mm/s&sup2;, slowly varying in space and
+          direction), aerodynamic noise, air-bearing drag, and nozzle contact
+          friction.</li>
+        <li><strong>G-code interpolation</strong> &mdash; the paper's
+          intermediate-point scheme, which subdivides each move into
+          ~0.2&nbsp;mm steps and extends the final interval so no command
+          violates the 60&nbsp;ms minimum period.</li>
+        <li><strong>The compensation algorithm</strong> &mdash; their Equations
+          3&ndash;5, predicting the arm base pose one step ahead and solving for
+          the arm goal in its own base frame.</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Results</h3>
+      <p>
+        The paper's key experiment is a 2&times;2: dry run versus real printing,
+        each with and without arm compensation. Here is my recreation against
+        their published figures.
+      </p>
+
+      <figure class="sim-fig">
+        <img src="assets/sim/summary_errors.svg" alt="Bar chart comparing simulated and published mean and maximum nozzle error across four experiment conditions, on a logarithmic scale." />
+        <figcaption>
+          Simulated (coloured) versus published (grey) nozzle error, log scale.
+          The span is nearly three orders of magnitude: uncompensated printing
+          drifts by tens of millimetres, while compensated printing holds
+          roughly a quarter of a millimetre.
+        </figcaption>
+      </figure>
+
+      <table class="sim-table">
+        <thead>
+          <tr><th>Condition</th><th>Paper mean</th><th>Sim mean</th><th>Paper max</th><th>Sim max</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Dry run, no compensation</td><td>0.77</td><td>0.80</td><td>2.35</td><td>2.50</td></tr>
+          <tr><td>Dry run, compensated</td><td>0.26</td><td>0.21</td><td>1.53</td><td>0.82</td></tr>
+          <tr class="is-key"><td>Printing, no compensation</td><td>8.42</td><td>8.70</td><td>55.45</td><td>48.05</td></tr>
+          <tr class="is-key"><td>Printing, compensated</td><td>0.27</td><td>0.25</td><td>2.89</td><td>1.52</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.8rem; color:var(--text-dim); margin-top:0.5rem;">
+        All values in mm. The compensation algorithm cuts mean printing error by
+        97% in both the paper and the recreation.
+      </p>
+
+      <figure class="sim-fig" style="margin-top:1.75rem;">
+        <img src="assets/sim/fig9_printing.svg" alt="Two side-by-side plots of nozzle path while printing. Without compensation the achieved path wanders several millimetres from the desired truss zigzag; with compensation it tracks it closely." />
+        <figcaption>
+          <strong>Recreation of the paper's Figure 9.</strong> Printing a truss
+          segment, desired path in white, achieved nozzle path in pink.
+          <em>Left:</em> without compensation, friction between nozzle and
+          substrate shoves the free-flyer around and the truss shape is lost
+          entirely &mdash; the paper's words are &ldquo;no recognisable structure
+          could be produced.&rdquo; <em>Right:</em> with the arm correcting, the
+          path is recovered.
+        </figcaption>
+      </figure>
+
+      <figure class="sim-fig">
+        <img src="assets/sim/fig8_dry_run.svg" alt="Two side-by-side plots of nozzle path during a dry run, without and with compensation." />
+        <figcaption>
+          <strong>Recreation of Figure 8.</strong> The same comparison for a dry
+          run, with the printhead disabled and the platform removed, so there is
+          no contact friction &mdash; only free-flyer pose error. The errors are
+          an order of magnitude smaller than while printing, which is precisely
+          how the paper isolates friction as the dominant disturbance.
+        </figcaption>
+      </figure>
+
+      <figure class="sim-fig">
+        <img src="assets/sim/fig4_station_keeping.svg" alt="Time series of free-flyer body and nozzle deviation in x and y over 120 seconds of station keeping." />
+        <figcaption>
+          <strong>Recreation of Figure 4.</strong> 120&nbsp;s of station keeping.
+          The nozzle (pink) always deviates more than the body (blue), because
+          the 400&nbsp;mm offset converts body rotation into nozzle
+          displacement. This gap is the entire motivation for the correction
+          algorithm.
+        </figcaption>
+      </figure>
+
+      <figure class="sim-fig">
+        <img src="assets/sim/truss_775mm.svg" alt="Plan view of a 775 mm truss built from seven overlapping colour-coded segments." />
+        <figcaption>
+          <strong>The headline capability.</strong> Seven segments, each printed
+          with the free-flyer stationary and each fitting inside the arm's
+          workspace, overlapped into a single 775&nbsp;mm truss &mdash; a
+          structure several times larger than the workspace that made it.
+          Colour indicates print order.
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Where the numbers came from</h3>
+      <p>
+        This is the part I care most about being honest regarding. A paper is
+        never a complete specification, and the gaps are where a recreation
+        quietly becomes fiction. Every parameter in the model carries a
+        provenance tag:
+      </p>
+      <p>
+        <span class="tag tag-paper">paper</span> stated explicitly &mdash; mass
+        20.2&nbsp;kg, eight thrusters, 400&nbsp;mm TCP offset, 3.33&nbsp;mm/s
+        print speed, 60&nbsp;ms command period, 1.2&nbsp;mm nozzle, 0.8&nbsp;mm
+        layer height, 180&nbsp;&deg;C, 9.6&nbsp;mm/s&sup2; residual gravity,
+        110&nbsp;mm segment, 7 segments, 775&nbsp;mm total.
+      </p>
+      <p>
+        <span class="tag tag-derived">derived</span> computed from those &mdash;
+        e.g. the 0.1998&nbsp;mm interpolation step is just speed &times; period,
+        and the 110.71&nbsp;mm segment advance is 775&nbsp;/&nbsp;7.
+      </p>
+      <p>
+        <span class="tag tag-inferred">inferred</span> not in the paper at all:
+        PID gains, yaw inertia, thruster saturation and time constant, tracking
+        noise, and &mdash; most significantly &mdash; the nozzle friction force.
+      </p>
+
+      <div class="callout">
+        <strong>The friction caveat.</strong> The paper identifies nozzle
+        friction as the cause of the large uncompensated printing error but never
+        quantifies it. So I calibrated it against their <em>reported outcome</em>
+        (the 8.42&nbsp;mm mean error) rather than against a measured input. That
+        makes the uncompensated printing result partly circular, and I would not
+        claim otherwise. The compensated result, the dry runs, the axis
+        asymmetry and the station-keeping envelope are all independent of that
+        calibration.
+      </div>
+
+      <p>
+        Two details I could recover from the paper's own arithmetic rather than
+        guess, which was satisfying:
+      </p>
+      <ul>
+        <li>
+          <strong>Which way the arm points.</strong> The paper never dimensions
+          the arm mounting direction, but it reports mean errors of 0.68&nbsp;mm
+          in x versus 0.28&nbsp;mm in y. Yaw error displaces the nozzle
+          <em>perpendicular</em> to the mounting offset, so for the error to
+          land in x, the arm must be mounted along the body y axis. Getting this
+          backwards initially gave me a symmetric 0.69/0.62 split &mdash; the
+          asymmetry is the fingerprint of the geometry.
+        </li>
+        <li>
+          <strong>The error budget closes.</strong> Their &plusmn;2&nbsp;mm
+          position envelope plus 0.5&deg; of yaw at a 400&nbsp;mm lever gives
+          2.0&nbsp;+&nbsp;3.49&nbsp;=&nbsp;5.49&nbsp;mm, against the
+          &ldquo;up to 5.5&nbsp;mm in the x direction&rdquo; they quote. And
+          &radic;(0.68&sup2;&nbsp;+&nbsp;0.28&sup2;)&nbsp;=&nbsp;0.735&nbsp;mm
+          recovers their 0.77&nbsp;mm total. Those consistency checks let me tune
+          the attitude loop to match their <em>performance</em> rather than
+          simply making it as accurate as possible.
+        </li>
+      </ul>
+
+      <p>
+        I also think there is a small transposition in their Equation 3. As
+        printed, it composes base-to-TCP from world-to-TCP and world-to-base with
+        the inverse on the right; for non-commuting rigid transforms that does
+        not type-check, and it only coincides when yaw is zero. Almost certainly
+        a notation slip rather than a bug in their code, since their results
+        could not have come out otherwise. The model implements the composition
+        that actually works and the test suite documents why.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Testing</h3>
+      <p>
+        122 tests, built around <code class="inline">hypothesis</code> for
+        property-based testing. The distinction that mattered: rather than
+        asserting specific numbers, assert the <em>invariants</em> that must hold
+        for any input.
+      </p>
+      <ul>
+        <li>Thruster allocation round-trips: <code class="inline">M(2M<sup>&dagger;</sup>u) = u</code>
+          for any wrench, and forces are never negative (the thrusters can't pull).</li>
+        <li>Transform inverses round-trip; rotations stay orthonormal; distances
+          are preserved.</li>
+        <li>Interpolated moves <em>always</em> respect the 60&nbsp;ms floor, and
+          the subdivided distances always sum exactly to the move length.</li>
+        <li>Compensation never makes nozzle accuracy worse, for any free-flyer
+          pose error &mdash; the paper's central claim, as a property.</li>
+        <li>Truss geometry always respects the 5.5&nbsp;mm height and 45&deg;
+          angle limits imposed by nozzle geometry, for any segment count.</li>
+      </ul>
+      <p>
+        Two of these caught real bugs. One found that friction torque vanishes
+        when travel is parallel to the lever arm &mdash; correct physics, so my
+        test was wrong, not the code. Another exposed that my print was
+        accidentally centred on the free-flyer's own centre of rotation, which
+        cancelled the 400&nbsp;mm lever to zero and silently deleted the whole
+        effect the paper is about.
+      </p>
+      <pre class="sim-pre">16/16 quantities within tolerance
+
+dry run, no compensation   mean error          0.77mm -&gt; 0.80mm     3.4%
+print, no compensation     mean error          8.42mm -&gt; 8.70mm     3.3%
+print, compensated         mean error          0.27mm -&gt; 0.25mm     9.1%
+dry run, no compensation   mean error, X axis  0.68mm -&gt; 0.69mm     1.0%
+dry run, no compensation   mean error, Y axis  0.28mm -&gt; 0.29mm     2.7%
+compensation benefit       print mean reduction   97%  -&gt; 97.2%     0.2%
+multi-segment truss        total length         775mm -&gt; 775.0mm    0.0%</pre>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Honest limitations</h3>
+      <ul>
+        <li>
+          <strong>3 DoF, not 6.</strong> This matches the paper &mdash; ELISSA is
+          a planar table and they say so explicitly. But it means the model
+          cannot address what they flag as the real risk in orbit: out-of-plane
+          error reducing layer height, increasing friction, and making
+          everything worse.
+        </li>
+        <li>
+          <strong>The arm is kinematically ideal.</strong> No inverse
+          kinematics, no joint limits, no singularities &mdash; just a
+          first-order lag toward the commanded pose. The Meca500's 5&nbsp;&micro;m
+          repeatability is negligible next to millimetre-scale errors, so this is
+          defensible, but a real 6-axis arm near a singularity would not behave
+          this way.
+        </li>
+        <li>
+          <strong>No thermal or material model.</strong> Nothing about cooling
+          rate, layer bonding or extrusion dynamics. The paper's own conclusion
+          is that PLA is unsuitable for space and that bonding at these
+          temperatures was weak &mdash; all of which lives outside this
+          simulation.
+        </li>
+        <li>
+          <strong>Segment joining is open-loop.</strong> Like the paper, the
+          model assumes each previous segment was printed perfectly and the
+          free-flyer moves a known distance. They note this assumption may not
+          hold in orbit, where you would want computer vision to find the real
+          structure.
+        </li>
+        <li>
+          <strong>Maximum errors are consistently under-predicted</strong>
+          (1.52 vs 2.89&nbsp;mm compensated; 48 vs 55&nbsp;mm uncompensated). My
+          disturbances are probably too smooth &mdash; real hardware has
+          transients my model lacks, which is exactly what the paper hints at
+          when it attributes residual maximum error to &ldquo;sudden changes in
+          the free-flyer pose, which the compensation algorithm struggles to
+          correct for.&rdquo;
+        </li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Running it</h3>
+      <pre class="sim-pre">cd sim
+uv sync --extra dev        # or: python3 tools/run_tests.py
+uv run pytest              # 122 tests
+uv run python -m ffam.experiments   # validation report
+uv run python tools/make_figures.py # regenerate these figures</pre>
+      <p style="font-size:0.85rem; color:var(--text-dim);">
+        Built with <code class="inline">uv</code> for dependency management. The
+        sandbox I developed in had no PyPI access, so there is a small vendored
+        pytest/hypothesis shim that lets the suite run offline; with network
+        access the real libraries are used instead. The figures are hand-emitted
+        SVG for the same reason &mdash; which turned out better for the web
+        anyway, at 5&ndash;33&nbsp;KB each and infinitely scalable.
+      </p>
+    </div>
+
+    <div class="btn-row" style="margin-top:2rem;">
+      <a href="project.html" class="btn btn-secondary">&larr; Project</a>
+      <a href="devlog.html" class="btn btn-primary">Dev Log &rarr;</a>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+  <div class="egg-note">the 400 mm lever arm is why nothing lines up on the first try.</div>
+</footer>
+
+<script src="js/stars.js"></script>
+</body>
+</html>

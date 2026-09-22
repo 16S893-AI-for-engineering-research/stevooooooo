@@ -17,6 +17,7 @@
   <ul class="nav-links">
     <li><a href="index.html">Home</a></li>
     <li><a href="project.html">Project</a></li>
+    <li><a href="simulation.html">Simulation</a></li>
     <li><a href="devlog.html" class="active">Dev Log</a></li>
   </ul>
 </nav>
@@ -42,6 +43,73 @@
         own to read, write, and test code:
       </p>
       <img src="assets/session-activity.png" alt="Bar chart comparing user messages typed versus agent tool calls across three pi agent sessions" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — Recreating a paper's simulation from scratch</h3>
+      <p>
+        Asked the agent to rebuild the simulation from Jonckers et al. (2022),
+        <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying
+        Satellites&rdquo;</em> &mdash; a free-flying satellite that 3D-prints
+        trusses longer than itself. Full write-up and plots on the
+        <a href="simulation.html">Simulation</a> page. It reproduces 16 of 16
+        published quantities within tolerance.
+      </p>
+      <p>
+        The clarify-before-build skill earned its keep immediately. Before
+        writing anything the agent asked six questions, and two of them changed
+        the build: whether to model the robotic arm's full inverse kinematics
+        (no &mdash; the paper treats it as an ideal follower) and how to handle
+        the nozzle friction the paper never quantifies. I said "just use what
+        they used" for friction, and it came back and told me plainly that the
+        paper contains no friction number at all &mdash; only
+        <code>&mu; &lt; 10<sup>-5</sup></code> for the air bearing, which is a
+        different thing entirely. So it calibrated against their reported
+        8.42&nbsp;mm outcome instead and labelled it as calibrated rather than
+        quietly presenting an invented number as a paper value. That is the
+        behaviour I wanted: pushing back instead of fabricating.
+      </p>
+      <p>
+        It also pushed back on my 6-DoF question. I said if the paper used
+        6&nbsp;DoF and it was needed for the plot, we had to do it. The agent
+        checked and said no &mdash; ELISSA is a planar air-bearing table, the
+        paper is explicitly 3&nbsp;DoF, and 6&nbsp;DoF appears only as future
+        work. Saved a large amount of pointless effort.
+      </p>
+      <p>
+        Two things it found that I would have missed entirely. First, the
+        paper's Figure 5 never dimensions which way the robotic arm is mounted,
+        but the reported error split (0.68&nbsp;mm in x versus 0.28&nbsp;mm in
+        y) only works if the arm points along the body y axis, because yaw error
+        displaces the nozzle <em>perpendicular</em> to the mounting offset. It
+        had the geometry backwards at first, got a symmetric error split, and
+        used that mismatch to diagnose the orientation. Second, it thinks
+        Equation 3 in the paper has a transposition &mdash; the matrix inverse
+        is on the wrong side to compose correctly &mdash; and implemented the
+        version that actually works while documenting the discrepancy rather
+        than silently "fixing" it.
+      </p>
+      <p>
+        The hypothesis property tests paid off in a way example-based tests
+        would not have. One test asserted that nozzle friction always produces a
+        torque; hypothesis found a counterexample where travel is parallel to
+        the lever arm and the torque is genuinely zero &mdash; correct physics,
+        wrong test. Another exposed a real bug: the print was accidentally
+        centred on the free-flyer's own centre of rotation, which cancelled the
+        400&nbsp;mm lever arm to exactly zero and silently deleted the entire
+        effect the paper is about. The simulation had been quietly reporting
+        errors that were far too good.
+      </p>
+      <p>
+        Friction point worth recording: the sandbox had no PyPI access, so
+        <code>uv add pytest hypothesis</code> failed outright. Rather than hand
+        me an unrunnable test suite, the agent wrote a small vendored shim
+        implementing just enough of both APIs to execute the real tests
+        unmodified, plus a runner that uses the genuine libraries when the
+        network allows. Same reason the figures are hand-emitted SVG instead of
+        matplotlib &mdash; which ended up better for the site anyway, at
+        5&ndash;33&nbsp;KB each and perfectly scalable.
+      </p>
     </div>
 
     <div class="panel">
@@ -75,7 +143,7 @@
     </div>
 
     <div class="btn-row">
-      <a href="project.html" class="btn btn-secondary">&larr; Project</a>
+      <a href="simulation.html" class="btn btn-secondary">&larr; Simulation</a>
       <a href="index.html" class="btn btn-primary">Home</a>
     </div>
   </div>

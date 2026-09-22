@@ -1,3 +1,16 @@
 .DS_Store
 *.log
 node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.uvcache/
+sim/out/
+
+# scratch
+.figs/
+t.txt
+papers/paper.txt
+papers/*.Identifier
