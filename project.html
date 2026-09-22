@@ -45,6 +45,12 @@
         assembled piece-by-piece by astronauts or teleoperated arms. That caps how
         large and how cheap "big" can be.
       </p>
+      <p>
+        More broadly, what's needed is a manufacturing system for space and the
+        Moon that is <strong>autonomous</strong>, <strong>universal</strong> (capable
+        of making any structure, irrespective of complexity or size), and still
+        small and efficient enough to launch affordably.
+      </p>
     </div>
 
     <div class="panel">
@@ -63,6 +69,35 @@
         print a truss kilometers long &mdash; solar farms, telescope backbones,
         habitat frames &mdash; using local or launched feedstock.
       </p>
+      <p>
+        By integrating attachment points directly into the printed structure,
+        the same cycle of <em>print, then move</em> repeats indefinitely, which
+        effectively makes the printer's build volume infinite. Anchoring to
+        features it just printed also avoids the much harder problem of gripping
+        a structure with a free-floating robot.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Concept media</h3>
+      <p>
+        Early concept diagram and crawl-cycle animations from the initial
+        proposal write-up.
+      </p>
+      <div class="media-row">
+        <figure class="figure">
+          <img src="assets/megastructure-concept-diagram.png" alt="Diagram of the 3D-printing inchworm robot concept, showing the robot printing and anchoring to truss structure as it advances" />
+          <figcaption>Concept diagram: the inchworm robot prints truss segments and anchors to the attachment points it just printed, advancing one bay at a time.</figcaption>
+        </figure>
+        <figure class="figure">
+          <img src="assets/inchworm-crawl-cycle.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, first pass" />
+          <figcaption>Crawl-cycle animation, pass 1: anchor &rarr; extrude &rarr; advance.</figcaption>
+        </figure>
+        <figure class="figure">
+          <img src="assets/inchworm-crawl-cycle-2.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, second pass" />
+          <figcaption>Crawl-cycle animation, pass 2: the same cycle repeating to grow the truss further.</figcaption>
+        </figure>
+      </div>
     </div>
 
     <div class="panel">
@@ -86,6 +121,16 @@
         large-aperture telescopes, and orbital habitats dramatically more
         feasible.
       </p>
+      <p>
+        Pushed further, the same principle underpins a lot of the more
+        science-fiction-flavored goals that motivate this work:
+      </p>
+      <div class="tag-list">
+        <span class="tag">Space sustainability &amp; a circular space economy</span>
+        <span class="tag">Moving manufacturing off-planet to protect Earth's environment</span>
+        <span class="tag">Mega-structures &mdash; Dyson-sphere elements, habitats, spaceships</span>
+        <span class="tag">Self-replicating robots (the "replicator")</span>
+      </div>
     </div>
 
     <div class="panel">
@@ -97,6 +142,15 @@
         <span class="tag">Structural accuracy without gravity datum</span>
         <span class="tag">Power &amp; thermal budget for a small bot</span>
       </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Next step</h3>
+      <p>
+        From here, the plan is to either build a simulation of the robot or a
+        working terrestrial prototype &mdash; whichever lets me validate the
+        anchor/extrude/advance cycle fastest. See the Dev Log for how that's going.
+      </p>
     </div>
 
     <div class="btn-row">

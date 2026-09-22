@@ -198,6 +198,43 @@ main {
 
 .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem; }
 
+.media-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.figure {
+  margin: 0;
+  background: rgba(10, 10, 28, 0.4);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.figure img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.figure figcaption {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 0.6rem;
+  line-height: 1.4;
+}
+
+.devlog-entry-empty {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+.devlog-entry-empty p {
+  font-style: italic;
+}
+
 .btn {
   display: inline-block;
   padding: 0.75rem 1.5rem;
