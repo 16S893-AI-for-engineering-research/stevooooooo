@@ -411,6 +411,62 @@ blockquote.bio {
 
 .step-list li:last-child { border-left: none; }
 
+/* ---------- Interactive CAD viewer ---------- */
+.cad-viewer {
+  margin: 1.5rem 0 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 35%, rgba(76, 201, 240, 0.14), rgba(5, 5, 15, 0.92) 68%);
+}
+
+model-viewer {
+  display: block;
+  width: 100%;
+  height: min(62vw, 560px);
+  min-height: 340px;
+  background: transparent;
+  --progress-bar-color: var(--accent-2);
+  --progress-bar-height: 3px;
+}
+
+.cad-viewer figcaption {
+  padding: 0.75rem 1rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.cad-download {
+  margin: 1rem 0 0;
+}
+
+.cad-download a {
+  color: var(--accent-2);
+}
+
+.cad-feature h2 {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--accent-2);
+  font-family: var(--font-head);
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+}
+
+.cad-feature > p:not(.eyebrow) {
+  margin: 0 0 1rem;
+  color: var(--text-dim);
+}
+
+.cad-feature model-viewer {
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 35%, rgba(76, 201, 240, 0.14), rgba(5, 5, 15, 0.92) 68%);
+}
+
+.cad-feature-links {
+  margin-top: 1rem;
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   text-align: center;
@@ -430,4 +486,6 @@ blockquote.bio {
   .site-nav { padding: 1rem; }
   .nav-links { gap: 1rem; }
   #truss-svg { height: 160px; }
+  model-viewer { min-height: 280px; }
+  .panel { padding: 1.25rem; }
 }
