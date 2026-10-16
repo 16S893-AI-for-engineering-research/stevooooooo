@@ -4,7 +4,7 @@ title: Embed self-hosted robot CAD viewer
 status: Done
 assignee: []
 created_date: '2026-10-15 19:40'
-updated_date: '2026-10-15 22:30'
+updated_date: '2026-10-16 15:27'
 labels: []
 dependencies: []
 type: feature
@@ -28,7 +28,7 @@ The robot assembly is available in the repository only as a STEP file, which bro
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Reconvert the committed STEP assembly using coarser tessellation and merged faces to dramatically reduce draw calls. 2. Compress the replacement GLB to a 2–5 MB web target, replacing the existing full-detail generated viewer asset while retaining the original STEP download. 3. Validate GLB structure, file size, and browser loading and camera interaction on both pages.
+1. Apply a 180-degree display orientation to the model-viewer embeds on the home page and Dev Log without altering the GLB or STEP source files. 2. Verify both pages retain local model loading and interactive camera controls. 3. Push the orientation correction.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -41,10 +41,14 @@ Browser validation: served the site locally and used Playwright Chromium to load
 Reopened at the user's request to optimize the browser model. Confirmed scope: replace the existing GLB on both pages; prioritize integrated-graphics interaction; target 2–5 MB; do not retain the full-detail GLB; retain the original STEP download.
 
 Optimization result: replaced the 24,777,212-byte GLB with a 1,612,240-byte GLB (93.5% smaller). Coarser 2.0-unit tessellation and face merging reduced the source conversion from 42,424 primitives to 673; glTF optimization then merged the web asset to one mesh and one primitive, with Meshopt compression. Added a self-hosted Meshopt initialization signal for model-viewer. Structural validation reported 0 errors and 0 warnings (one expected informational note: validator does not implement EXT_meshopt_compression). Playwright loaded both pages using the local GLB and local Meshopt setup script with HTTP 200; drag rotation and wheel zoom passed without browser errors.
+
+Reopened at the user's request to correct the initial upside-down display orientation. Confirmed approach: rotate the displayed model by 180 degrees in both viewers; leave the GLB and downloadable STEP unchanged.
+
+Applied orientation="0deg 0deg 180deg" to the model viewer in both index.html and devlog.html. Playwright verified that both pages load the local model, expose the configured 180-degree orientation, and retain drag rotation without browser errors. HTML parsing and git diff whitespace checks passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Replaced the viewer model with a 1.61 MB web-optimized GLB, down from 24.78 MB (93.5% reduction). The model now renders as one mesh/primitive rather than 42,424 primitives, with coarser tessellation, merged geometry, and Meshopt compression. Verified structural validity and local browser loading, rotation, and zoom on both pages.
+Corrected the initial CAD display orientation by applying a 180-degree model rotation in both embedded viewers. The GLB and original STEP remain unchanged; browser verification confirmed the corrected configuration loads and remains interactive.
 <!-- SECTION:FINAL_SUMMARY:END -->
