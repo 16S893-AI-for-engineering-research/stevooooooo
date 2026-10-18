@@ -4,7 +4,7 @@ title: Embed self-hosted robot CAD viewer
 status: Done
 assignee: []
 created_date: '2026-10-15 19:40'
-updated_date: '2026-10-16 15:27'
+updated_date: '2026-10-18 01:59'
 labels: []
 dependencies: []
 type: feature
@@ -28,7 +28,7 @@ The robot assembly is available in the repository only as a STEP file, which bro
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Apply a 180-degree display orientation to the model-viewer embeds on the home page and Dev Log without altering the GLB or STEP source files. 2. Verify both pages retain local model loading and interactive camera controls. 3. Push the orientation correction.
+1. Replace the prior Z-axis display rotation with a 180-degree X-axis rotation in both CAD viewer embeds. 2. Verify both pages load the local model and retain interactive controls. 3. Push the corrected orientation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -45,10 +45,14 @@ Optimization result: replaced the 24,777,212-byte GLB with a 1,612,240-byte GLB 
 Reopened at the user's request to correct the initial upside-down display orientation. Confirmed approach: rotate the displayed model by 180 degrees in both viewers; leave the GLB and downloadable STEP unchanged.
 
 Applied orientation="0deg 0deg 180deg" to the model viewer in both index.html and devlog.html. Playwright verified that both pages load the local model, expose the configured 180-degree orientation, and retain drag rotation without browser errors. HTML parsing and git diff whitespace checks passed.
+
+Reopened at the user's request because the Z-axis rotation did not resolve the visual inversion. Confirmed approach: use a 180-degree X-axis rotation in both viewers.
+
+Replaced the unsuccessful Z-axis display rotation with orientation="180deg 0deg 0deg" in both viewers. Playwright verified that each page loaded the local model with the configured X-axis orientation and no browser errors; HTML parsing and git diff whitespace checks passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Corrected the initial CAD display orientation by applying a 180-degree model rotation in both embedded viewers. The GLB and original STEP remain unchanged; browser verification confirmed the corrected configuration loads and remains interactive.
+Replaced the prior Z-axis rotation with a 180-degree X-axis rotation in both CAD viewers to correct the actual model inversion. The model asset and STEP download remain unchanged; both embeds load successfully.
 <!-- SECTION:FINAL_SUMMARY:END -->
