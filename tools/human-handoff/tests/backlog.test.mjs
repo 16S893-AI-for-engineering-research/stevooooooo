@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Handoffs, backlog, fingerprint } from '../core.mjs';
+
+test('real Backlog CLI persists acceptance, checkpoint, ready outcome and verification', { timeout: 90000 }, async t => {
+  const repo = await mkdtemp(join(tmpdir(), 'handoff-backlog-e2e-'));
+  t.after(() => rm(repo, { recursive: true, force: true }));
+  await backlog(repo, ['init', 'Handoff test', '--defaults', '--no-git', '--integration-mode', 'none', '--task-prefix', 'HT']);
+  await backlog(repo, ['task', 'create', 'Parent test task', '--plain']);
+  const parent = JSON.parse(await backlog(repo, ['task', 'list', '--json'])).tasks[0].id;
+  const store = new Handoffs(join(repo, 'private-state'));
+  const p = { title: 'Test-only label observation', parent, category: 'physical-access', reason: 'Isolated test of a physical observation request.', alternatives: 'Test fixture has no camera.', outcome: 'Test evidence is recorded', preparation: 'No real hardware or human action required; automated fixture only.', minutes: 1, steps: [{ action: 'Report the fixture label', expected: 'Fixture label is TEST', verification: 'Compare with known fixture text', stop: 'This is not the isolated test fixture' }] };
+  const proposed = await store.propose(repo, p, 'test-origin');
+  assert.equal(proposed.state.phase, 'proposed');
+  const hash = fingerprint(proposed.task);
+  await store.decide(repo, proposed.task.id, 'accept', hash);
+  await store.startNext();
+  await store.checkpoint(1, 'Fixture label is TEST', 'automated', 'backlog.test.mjs known fixture', true);
+  const ready = await store.finish('Fixture completed; no real person assigned', hash);
+  assert.equal(ready.state.phase, 'ready');
+  assert.equal((await store.item(repo, proposed.task.id)).state.evidence.length, 1);
+  const restarted = new Handoffs(store.home);
+  assert.equal((await restarted.list(repo))[0].state.summary, ready.state.summary);
+  await store.verify(repo, proposed.task.id, 'Automated fixture assertion passed.');
+  assert.equal((await store.get(repo, proposed.task.id)).status, 'Done');
+  assert.equal((await store.get(repo, parent)).status, 'To Do');
+});
