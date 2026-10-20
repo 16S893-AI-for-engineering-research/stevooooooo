@@ -14,3 +14,17 @@ sim/out/
 t.txt
 papers/paper.txt
 papers/*.Identifier
+
+# secrets — never commit
+.parley.env
+*.env
+
+# Windows download metadata
+*:Zone.Identifier
+*Zone.Identifier
+
+# robot session artifacts (logs, frames, datasets, checkpoints)
+robot/sessions/
+robot/out/
+robot/datasets/
+robot/checkpoints/
