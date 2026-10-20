@@ -27,8 +27,9 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 ## Robot project: read before implementing any task
 
-This repository contains the inchworm print-crawl robot (two SO-101 arms + a Rotrics DexArm on a fixed chassis, moving a printed tube). Before implementing, planning, or finalizing any robot task, read both:
+This repository contains the inchworm print-crawl robot (two SO-101 arms + a Rotrics DexArm on a fixed chassis, moving a printed tube). Before implementing, planning, or finalizing any robot task, read these three specs in order:
 
+- `backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md` — **read this first.** Live state: what is in flight, what is blocked, what is uncertain, and the next action. If its "Last verified" date looks stale, trust `backlog task list --plain` and `git log` over its prose.
 - `backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md` — the single source of truth for hardware, geometry, and system constraints. Take hardware facts from here; never assume them. If you measure a contradicting value, correct doc-1 via `backlog doc update doc-1` in the same task.
 - `backlog/docs/specs/doc-2 - Agent-Working-Agreement-—-Requirements-Stability-and-Change-Control.md` — change-control rules.
 
@@ -39,5 +40,6 @@ Non-negotiable without explicit owner approval:
 3. **Do not weaken a tolerance, limit, or safety check, and do not delete or skip a test, to make something pass.**
 4. **Safety invariants always hold:** one camera streaming at a time (shared USB 2.0); never both grippers unlocked while the tube is attached; the gripper servo is commanded only by the AA-17 state machine and never by the learned policy; the laser is off on every exit path; joint limits and collision checks are enforced inside the motion layer.
 5. **Dry-run first.** Use dry-run mode before any first powered motion on a new path, and ask the owner to supervise the first live execution.
+6. **Keep doc-3 current.** When you finish a task, clear a blocker, or make a decision, update `doc-3` via `backlog doc update doc-3` in the same session. A stale doc-3 invites confident action on wrong information.
 
 </CRITICAL_INSTRUCTION>
