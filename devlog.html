@@ -33,22 +33,22 @@
     <div class="panel">
       <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Agent session activity</h3>
       <p>
-        Across the sessions I used to build this site, here's how the user
-        messages I typed compared to the tool calls the agent made on its
-        own to read, write, and test code:
+        Across every persisted pi session for this repository through today,
+        here are the user messages, agent tool calls, and recorded model cost.
+        Activity counts and cost use separate scales so the comparison remains readable.
       </p>
-      <img src="assets/session-activity.png" alt="Bar chart comparing user messages typed versus agent tool calls across three pi agent sessions" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
+      <img src="assets/session-activity.svg" alt="Charts showing daily totals from all persisted pi sessions in this repository: user messages, agent tool calls, and recorded model cost in US dollars" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/19/26</h3>
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/19/26 — Human-only task handoffs</h3>
       <p>
         I added a workflow for assigning me tasks that only I can complete. The agent now has to justify why a task genuinely needs physical access, identity, authorization, or personal judgment, and it is supposed to minimize those requests rather than offload routine work. When a task is necessary, I explicitly accept a clear Backlog procedure with step-by-step actions, expected results, verification, and stop conditions. A single dedicated walkthrough tab can then guide me through accepted tasks one at a time, answer questions, record evidence, and return the result to the main agent for verification before work continues.
       </p>
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/15/26</h3>
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/15/26 — Robot hardware development</h3>
       <p>
         Thus far, I've been using my own personal AI to do a lot of the component selection, tradeoff management, and planning for my robot. I have now chosen parts, designed, ordered, and assembled the entire robot. Part of the reason for using my own personal AI was to prevent muddying up Pi context and because a lot of my descriptions of the idea were already in Claude. I understand this means you can't monitor my AI use which makes it look like I haven't been doing much. At this point, it is about the time when I will be switching from hardware development to software development and plan to integrate AI much more heavily outside of just component selection, tradeoff management, and planning using parley. I have included the CAD of the current system in the repo.
       </p>

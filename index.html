@@ -44,19 +44,6 @@
     </div>
   </div>
 
-  <div class="container" style="padding-top:0;">
-    <section class="panel cad-feature" aria-labelledby="cad-feature-title">
-      <p class="eyebrow">Current system</p>
-      <h2 id="cad-feature-title">Robot CAD</h2>
-      <p>Explore the current assembled robot in 3D. Drag to rotate, and scroll or pinch to zoom.</p>
-      <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
-      <div class="btn-row cad-feature-links">
-        <a href="devlog.html" class="btn btn-secondary">Read the Dev Log</a>
-        <a href="CAD/Assembly%201.step" class="btn btn-primary" download>Download STEP</a>
-      </div>
-    </section>
-  </div>
-
   <div class="container">
     <div class="grid-cards">
       <div class="card">
@@ -80,8 +67,6 @@
   <div class="egg-note">psst — the robot on the truss doesn't just crawl.</div>
 </footer>
 
-<script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
-<script type="module" src="js/model-viewer.min.js"></script>
 <script src="js/stars.js"></script>
 <script src="js/truss.js"></script>
 </body>

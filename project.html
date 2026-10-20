@@ -32,10 +32,15 @@
       satellite to build megastructures far larger than itself.
     </p>
 
-    <div class="truss-wrap">
-      <p class="truss-hint">The bot in action (conceptually) &mdash; click it.</p>
-      <div id="truss-container"></div>
-    </div>
+    <section class="panel cad-feature" aria-labelledby="cad-feature-title">
+      <p class="eyebrow">Current system</p>
+      <h2 id="cad-feature-title">Robot CAD</h2>
+      <p>Explore the current assembled robot in 3D. Drag to rotate, and scroll or pinch to zoom.</p>
+      <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
+      <div class="btn-row cad-feature-links">
+        <a href="CAD/Assembly%201.step" class="btn btn-primary" download>Download STEP</a>
+      </div>
+    </section>
 
     <div class="panel">
       <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The problem</h3>
@@ -166,7 +171,8 @@
   <div class="egg-note">the bot remembers where it stopped, even after a wave.</div>
 </footer>
 
+<script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
+<script type="module" src="js/model-viewer.min.js"></script>
 <script src="js/stars.js"></script>
-<script src="js/truss.js"></script>
 </body>
 </html>
