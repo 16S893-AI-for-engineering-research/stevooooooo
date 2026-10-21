@@ -41,7 +41,37 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/19/26 — Human-only task handoffs</h3>
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/20/26 &mdash; Planning the robot software, and four bugs in a row</h3>
+      <p>
+        This was the switch from hardware to software I mentioned in the last entry. I described the robot to Pi as the orchestrator &mdash; two SO-101 arms that grip attachment points spaced 183.676&nbsp;mm apart, a Rotrics DexArm carrying the print head and a line-laser scanner, everything on a fixed chassis with the printed tube being the thing that actually moves &mdash; and asked it to break the work into tasks small enough to hand to sub-agents.
+      </p>
+      <p>
+        It came back with 33 tasks across 7 milestones, carrying 227 acceptance criteria between them, ordered by dependency. Two of my own constraints changed the shape of the plan: the crawl cycle can't really be tested until the learned insertion works, so the real cycle depends on the policy task and a tube-free dry rehearsal comes first; and DexArm repeatability gets measured <em>before</em> the laser calibration, so the arm's own positioning error doesn't get quietly absorbed into the optical calibration and misattributed later.
+      </p>
+      <p>
+        Before writing any of it, Pi probed the machine instead of assuming: no <code>/dev/ttyUSB*</code> or <code>/dev/video*</code> in WSL, both arm adapters showing in <code>usbipd</code> as previously bound but not currently connected, and a 4&nbsp;GB VRAM budget that constrains how the insertion policy can be trained. It also tried an actual <code>usbipd attach</code>, which failed on the permission check, which is how the one human-only task got justified rather than guessed at.
+      </p>
+      <h4 style="color:var(--accent-2); font-family:var(--font-head); margin-bottom:0.3rem;">Keeping agents from quietly rewriting the requirements</h4>
+      <p>
+        I asked how we stop sub-agents from drifting &mdash; widening a tolerance, deleting a failing test, or ticking an acceptance criterion because the code looks about right. Checking turned up two real gaps: the project had no Definition of Done configured at all, and nothing told sub-agents not to edit criteria. Both are now closed. Every new task inherits six completion rules, including that criteria need evidence rather than code inspection and that criteria must not be altered to match whatever got built. Those rules live in a working-agreement spec and are wired into <code>AGENTS.md</code>, so any agent session loads them without being told.
+      </p>
+      <p>
+        There are now three specs: hardware truth, change control, and a live state-and-handoff doc. That last one exists because session transcripts are machine-local, lossy under compaction, and invisible to sub-agents &mdash; so the real memory has to live in the repo. A cold session reads three documents and knows where things stand, instead of replaying a long conversation.
+      </p>
+      <h4 style="color:var(--accent-2); font-family:var(--font-head); margin-bottom:0.3rem;">Four bugs stacked behind one symptom</h4>
+      <p>
+        Then I accepted the hardware task and the walkthrough tab wouldn't open. It took four fixes, because each failure was hiding the next one: the guide launches with extensions disabled, which also unregistered the model provider, so the model couldn't resolve; then the launcher used <code>wsl.exe --exec</code>, which skips shell init, so the API key exported from <code>.bashrc</code> was missing; then the first crash had written a session entry with the provider recorded as literally <code>"unknown"</code>, and because the runner resumes with <code>--continue</code>, every retry faithfully reloaded that poisoned session and died again; and finally the fallback script I was handed omitted the environment variable the extension uses to recognize a guide process, so <code>/walk</code> refused to run.
+      </p>
+      <p>
+        Worth recording honestly: Pi shipped three of those fixes without verifying the thing I actually cared about. It kept testing whether <code>pi</code> would start rather than whether the guide worked, and the real error only surfaced once it ran the guide command directly and captured stderr. It said as much afterward, and the last fix was verified end-to-end by asking the guide to read its own task queue before handing it back to me. It also corrected one of its earlier recommendations after testing proved it impossible &mdash; dropping the model flag couldn't work, because with extensions off there's no authenticated provider at all.
+      </p>
+      <p>
+        All of it is covered by 18 passing tests, plus documentation of the two startup failures that look identical but aren't. A side effect caught during staging: my Parley API key was sitting untracked in a repo that pushes to GitHub, one careless <code>git add -A</code> from being published. It's now ignored, along with the session artifacts and model checkpoints the robot work will start producing.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/19/26 &mdash; Human-only task handoffs</h3>
       <p>
         I added a workflow for assigning me tasks that only I can complete. The agent now has to justify why a task genuinely needs physical access, identity, authorization, or personal judgment, and it is supposed to minimize those requests rather than offload routine work. When a task is necessary, I explicitly accept a clear Backlog procedure with step-by-step actions, expected results, verification, and stop conditions. A single dedicated walkthrough tab can then guide me through accepted tasks one at a time, answer questions, record evidence, and return the result to the main agent for verification before work continues.
       </p>

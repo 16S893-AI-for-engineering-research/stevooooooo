@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-10-20 21:15'
-updated_date: '2026-10-21 01:34'
+updated_date: '2026-10-21 01:57'
 labels:
   - human-action
   - human-key-82c2d849e0ff6e02
@@ -135,7 +135,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "82c2d849e0ff6e02d332c0d99ab9f781728389e46288ceb0eb17c7a990db591d",
-  "phase": "active",
+  "phase": "paused",
   "createdAt": "2026-10-20T21:15:28.287Z",
   "origin": "01a15b09-5f50-755d-bad8-87a487c943cc",
   "step": 0,
@@ -144,6 +144,11 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
     {
       "action": "accept",
       "at": "2026-10-21T01:22:46.619Z",
+      "hash": "38e9a3b39fdd071a20ee3d62e8b5808223cc3cba6224d3a0e819f2f9d82b5fd6"
+    },
+    {
+      "action": "accept",
+      "at": "2026-10-21T01:52:29.799Z",
       "hash": "38e9a3b39fdd071a20ee3d62e8b5808223cc3cba6224d3a0e819f2f9d82b5fd6"
     }
   ],
