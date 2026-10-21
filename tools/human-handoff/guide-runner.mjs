@@ -3,6 +3,7 @@
 // The outer flock waits on the same PID for the whole interactive Pi lifetime.
 import { join } from 'node:path';
 import { readJSON, saveJSON, now } from './core.mjs';
+import { harvestShellCredentials } from './launcher.mjs';
 const home = process.argv[2];
 if (!home) throw new Error('Missing private handoff state directory');
 if (typeof process.execve !== 'function') throw new Error('Walkthrough runner requires Node >=22.15 with process.execve');
@@ -26,6 +27,9 @@ args.push(
 if (config.model && (config.providerExtension || !config.model.includes('/'))) args.push('--model', config.model);
 const env = { ...process.env, PATH: config.path, PI_HUMAN_GUIDE: '1', PI_HUMAN_STATE_HOME: home };
 for (const key of ['PI_SESSION_ID', 'PI_SESSION_FILE', 'PI_PROVIDER', 'PI_MODEL', 'PI_REASONING_LEVEL']) delete env[key];
+// wsl.exe --exec skips shell init, so credentials exported from ~/.bashrc are
+// missing here. Recover them in-memory only; they are never persisted.
+Object.assign(env, await harvestShellCredentials(env));
 process.chdir(config.repo);
 await saveJSON(join(home, 'launch.json'), { ...config, status: 'running', pid: process.pid, startedAt: now() });
 // guide.lock, not the last-written launch status, is authoritative after shutdown/crash.

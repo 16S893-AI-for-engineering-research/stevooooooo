@@ -38,6 +38,34 @@ export async function resolveProviderExtension(model, packagesDir = join(homedir
   }
   return null;
 }
+// The guide is launched through `wsl.exe --exec`, which does not run shell
+// initialization, so provider credentials exported from ~/.bashrc or ~/.profile
+// are absent and pi reports "No API key found for the selected model". Harvest
+// only the missing credential-shaped variables from an interactive login shell,
+// in-memory, so nothing is copied into launch.json on disk.
+const CREDENTIAL_VAR = /(?:_API_KEY|_BASE_URL|_AUTH_TOKEN|_OAUTH_TOKEN)$/;
+export async function harvestShellCredentials(currentEnv = process.env, shell = '/bin/bash') {
+  let stdout;
+  try {
+    ({ stdout } = await exec(shell, ['-ic', 'env -0'], { timeout: 10000, maxBuffer: 1 << 20 }));
+  } catch (e) {
+    // A missing or non-cooperative shell must not stop the guide from starting.
+    if (!e.stdout) return {};
+    stdout = e.stdout;
+  }
+  const found = {};
+  for (const pair of String(stdout).split('\0')) {
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    const name = pair.slice(0, eq);
+    if (!CREDENTIAL_VAR.test(name)) continue;
+    if (currentEnv[name]?.trim()) continue; // never override what is already set
+    const value = pair.slice(eq + 1);
+    if (value.trim()) found[name] = value;
+  }
+  return found;
+}
+
 export function terminalArgs(config, home, node = process.execPath, runner = join(HERE, 'guide-runner.mjs')) {
   // No shell string interpolation. Window 0 is WT's most recently used window, not necessarily the originating window.
   return ['-w', config.window, 'new-tab', '--title', 'Pi Walkthrough', 'wsl.exe', '-d', config.distro, '--exec', '/usr/bin/flock', '-n', join(home, 'guide.lock'), node, runner, home];

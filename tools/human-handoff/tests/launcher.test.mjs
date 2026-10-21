@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openGuide, resolveProviderExtension } from '../launcher.mjs';
+import { openGuide, resolveProviderExtension, harvestShellCredentials } from '../launcher.mjs';
 import { readJSON, saveJSON } from '../core.mjs';
 
 async function fixture(t) {
@@ -80,4 +80,44 @@ test('launch records the provider extension so a restart does not lose model res
   const unresolved = { model: 'MIT-parley/bedrock/claude-opus-5', providerExtension: null };
   if (unresolved.model && (unresolved.providerExtension || !unresolved.model.includes('/'))) bare.push('--model', unresolved.model);
   assert.deepEqual(bare, ['--no-extensions']);
+});
+
+test('shell credentials are harvested because wsl.exe --exec skips shell init', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'handoff-cred-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  // Stand-in for an interactive login shell that exports a credential.
+  const shell = join(root, 'fakeshell');
+  await writeFile(shell, `#!${process.execPath}\nprocess.stdout.write([
+    'PARLEY_API_KEY=sk-test-value',
+    'MIT_PARLEY_BASE_URL=https://example.invalid/v1',
+    'HOME=/home/someone',
+    'EDITOR=vim',
+    'EMPTY_API_KEY=',
+  ].join('\\0'));\n`, { mode: 0o700 });
+
+  const got = await harvestShellCredentials({}, shell);
+  assert.equal(got.PARLEY_API_KEY, 'sk-test-value');
+  assert.equal(got.MIT_PARLEY_BASE_URL, 'https://example.invalid/v1');
+  // Only credential-shaped names, never arbitrary environment.
+  assert.equal(got.HOME, undefined);
+  assert.equal(got.EDITOR, undefined);
+  // Blank values are not treated as credentials.
+  assert.equal(got.EMPTY_API_KEY, undefined);
+
+  // An already-set credential must win; the guide must not be silently re-keyed.
+  const existing = await harvestShellCredentials({ PARLEY_API_KEY: 'from-parent' }, shell);
+  assert.equal(existing.PARLEY_API_KEY, undefined);
+
+  // A broken shell must not prevent the guide from starting.
+  assert.deepEqual(await harvestShellCredentials({}, join(root, 'does-not-exist')), {});
+});
+
+test('harvested credentials are never written to launch.json', async t => {
+  const f = await fixture(t);
+  process.env.HANDOFF_TEST_FAKE_API_KEY = 'sk-should-not-persist';
+  t.after(() => { delete process.env.HANDOFF_TEST_FAKE_API_KEY; });
+  await openGuide(f.home, f.root, { window: '0', distro: 'Ubuntu' });
+  const raw = await readFile(join(f.home, 'launch.json'), 'utf8');
+  assert.ok(!raw.includes('sk-should-not-persist'), 'launch.json must not contain credential values');
+  assert.ok(!/API_KEY/.test(raw), 'launch.json must not contain credential variable names');
 });

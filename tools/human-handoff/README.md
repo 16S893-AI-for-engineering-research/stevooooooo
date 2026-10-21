@@ -58,6 +58,15 @@ The launcher therefore resolves the one installed package that declares the mode
 - **Parley or another provider extension is active in the guide process**, so extension-specific recording is not disabled there, contrary to the isolation this profile otherwise aims for. The `--tools read,human_queue,human_checkpoint` whitelist still bounds what the guide can do.
 - Resolution matches a provider name inside installed `*pi-extension*` packages, which is a heuristic. When no package matches, the runner omits `--model` and falls back to pi's default rather than crash-looping.
 
+**Provider credentials need the same treatment.** The tab is launched with `wsl.exe --exec`, which runs the target directly and does **not** execute shell initialization. A key exported from `~/.bashrc` (or `~/.profile`, or sourced from a file such as `~/.parley.env`) is therefore absent in the guide, and pi fails with `No API key found for the selected model` even though the model itself now resolves. Note `--exec /bin/bash -lc` is not a fix either when the export lives in `~/.bashrc`, since a non-interactive login shell skips it.
+
+`harvestShellCredentials()` in `launcher.mjs` recovers them: the runner reads `env -0` from an interactive shell and copies across only variables whose names end in `_API_KEY`, `_BASE_URL`, `_AUTH_TOKEN`, or `_OAUTH_TOKEN`. Constraints that matter:
+
+- Values are passed to the guide **in memory only** and are never written to `launch.json`; a test asserts the file contains neither credential values nor credential variable names.
+- A variable already set in the launching environment is never overridden, so the guide cannot be silently re-keyed.
+- Arbitrary environment is not copied, only credential-shaped names.
+- A missing or uncooperative shell yields no credentials rather than blocking startup.
+
 | Command | Action |
 |---|---|
 | `/walk next` | Start the next accepted task, or resume the current paused task |
@@ -117,6 +126,13 @@ ps -p "$(python3 -c 'import json;print(json.load(open("launch.json")).get("pid",
 flock -n guide.lock true; echo $?    # 0 = no guide running, 1 = guide holds the lock
 ls -la sessions/                     # empty means pi exited before starting
 ```
+
+Two startup failures look similar but have different causes:
+
+| Symptom | Cause |
+|---|---|
+| `Model "<provider>/<id>" not found` | The provider comes from an extension that `--no-extensions` removed. |
+| `No API key found for the selected model` | `wsl.exe --exec` skipped shell init, so the provider's key was never exported. |
 
 To see the actual startup error, run the guide command in the foreground. This is also the manual way to open the walkthrough if the Windows Terminal launch fails; keep the `flock` so the single-guide invariant still holds:
 
