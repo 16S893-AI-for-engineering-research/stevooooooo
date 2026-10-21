@@ -1,10 +1,11 @@
 ---
 id: AA-37
 title: Connect robot USB dock and admin-bind all devices for WSL
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@human'
 created_date: '2026-10-20 21:15'
-updated_date: '2026-10-20 21:15'
+updated_date: '2026-10-21 01:34'
 labels:
   - human-action
   - human-key-82c2d849e0ff6e02
@@ -120,6 +121,12 @@ Preparation: Windows host with usbipd-win 5.3.0 already installed (confirmed pre
 - [ ] #1 All robot USB devices physically connected and bound in usbipd, so that from WSL I can attach them and see the expected /dev/ttyUSB* or /dev/ttyACM* and /dev/video* nodes. Specifically: both SO-101 arm buses, the Rotrics DexArm, the three OV9281 cameras, and the USB relay each appear in `usbipd state` with a BusId and a PersistedGuid. Also: a note of which CH343 serial (5B91030298 or 5B91045044) is the left arm versus the right arm, since I cannot determine that without moving hardware.
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Follow the user-accepted procedure one step at a time, record evidence and stop on deviations. Submit the outcome for orchestrator verification; do not complete the originating project task.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -128,12 +135,20 @@ Preparation: Windows host with usbipd-win 5.3.0 already installed (confirmed pre
 {
   "version": 1,
   "key": "82c2d849e0ff6e02d332c0d99ab9f781728389e46288ceb0eb17c7a990db591d",
-  "phase": "proposed",
+  "phase": "active",
   "createdAt": "2026-10-20T21:15:28.287Z",
   "origin": "01a15b09-5f50-755d-bad8-87a487c943cc",
   "step": 0,
   "evidence": [],
-  "history": []
+  "history": [
+    {
+      "action": "accept",
+      "at": "2026-10-21T01:22:46.619Z",
+      "hash": "38e9a3b39fdd071a20ee3d62e8b5808223cc3cba6224d3a0e819f2f9d82b5fd6"
+    }
+  ],
+  "acceptedHash": "38e9a3b39fdd071a20ee3d62e8b5808223cc3cba6224d3a0e819f2f9d82b5fd6",
+  "acceptedAt": "2026-10-21T01:22:46.622Z"
 }
 ```
 <!-- /human-handoff-state -->

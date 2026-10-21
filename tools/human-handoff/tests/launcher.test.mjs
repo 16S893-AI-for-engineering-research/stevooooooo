@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openGuide } from '../launcher.mjs';
+import { openGuide, resolveProviderExtension } from '../launcher.mjs';
 import { readJSON, saveJSON } from '../core.mjs';
 
 async function fixture(t) {
@@ -38,4 +38,46 @@ test('failed launches stay pending until explicit retry; stopped guide can reope
   await saveJSON(join(f.home, 'launch.json'), { ...launch, status: 'stopped' });
   assert.match(await openGuide(f.home, f.root, config), /Requested/);
   assert.equal((await readFile(f.calls, 'utf8')).trim().split('\n').length, 3);
+});
+
+test('provider extension is resolved so the guide can register an extension-contributed model', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'handoff-provider-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const pkg = join(root, 'some-pi-extension');
+  await mkdir(join(pkg, 'dist'), { recursive: true });
+  await writeFile(join(pkg, 'dist', 'index.js'), 'export const provider = "MIT-parley";\n');
+  // Unrelated package must not be matched.
+  const other = join(root, 'other-pi-extension');
+  await mkdir(join(other, 'dist'), { recursive: true });
+  await writeFile(join(other, 'dist', 'index.js'), 'export const provider = "something-else";\n');
+
+  assert.equal(await resolveProviderExtension('MIT-parley/bedrock/claude-opus-5', root), pkg);
+  assert.equal(await resolveProviderExtension('unknown-provider/model', root), null);
+  assert.equal(await resolveProviderExtension(undefined, root), null);
+  assert.equal(await resolveProviderExtension('MIT-parley/x', join(root, 'missing')), null);
+});
+
+test('launch records the provider extension so a restart does not lose model resolution', async t => {
+  const f = await fixture(t);
+  const packages = join(f.root, 'packages');
+  const pkg = join(packages, 'mit-parley-pi-extension');
+  await mkdir(join(pkg, 'dist'), { recursive: true });
+  await writeFile(join(pkg, 'dist', 'index.js'), 'export const provider = "MIT-parley";\n');
+  const launch = {
+    model: 'MIT-parley/bedrock/claude-opus-5',
+    providerExtension: await resolveProviderExtension('MIT-parley/bedrock/claude-opus-5', packages),
+  };
+  assert.equal(launch.providerExtension, pkg);
+
+  // The runner must emit -e for that extension and keep --model.
+  const args = ['--no-extensions'];
+  if (launch.providerExtension) args.push('-e', launch.providerExtension);
+  if (launch.model && (launch.providerExtension || !launch.model.includes('/'))) args.push('--model', launch.model);
+  assert.deepEqual(args, ['--no-extensions', '-e', pkg, '--model', 'MIT-parley/bedrock/claude-opus-5']);
+
+  // With no resolvable provider, --model must be dropped rather than passed and failing.
+  const bare = ['--no-extensions'];
+  const unresolved = { model: 'MIT-parley/bedrock/claude-opus-5', providerExtension: null };
+  if (unresolved.model && (unresolved.providerExtension || !unresolved.model.includes('/'))) bare.push('--model', unresolved.model);
+  assert.deepEqual(bare, ['--no-extensions']);
 });

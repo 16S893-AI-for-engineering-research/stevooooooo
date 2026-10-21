@@ -1,9 +1,10 @@
-import { access, mkdir } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { locked, readJSON, saveJSON, now } from './core.mjs';
 const exec = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,28 @@ async function executable(name) {
     try { await access(candidate, constants.X_OK); return candidate; } catch { /* next */ }
   }
   throw new Error(`${name} is not available on PATH`);
+}
+
+// The guide runs with --no-extensions, so a provider contributed by an extension
+// (for example MIT-parley) is not registered there and --model cannot resolve.
+// Find the installed package that declares the provider so the runner can re-add
+// just that one extension. Returns null when the provider is built in or unknown,
+// in which case the runner drops --model rather than failing to start.
+export async function resolveProviderExtension(model, packagesDir = join(homedir(), '.pi', 'agent', 'npm', 'node_modules')) {
+  const provider = String(model || '').split('/')[0];
+  if (!provider || !/^[\w.-]+$/.test(provider)) return null;
+  let entries;
+  try { entries = await readdir(packagesDir, { withFileTypes: true }); } catch { return null; }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.includes('pi-extension')) continue;
+    const dir = join(packagesDir, entry.name);
+    for (const rel of ['dist/index.js', 'src/index.ts', 'index.js', 'index.mjs']) {
+      try {
+        if ((await readFile(join(dir, rel), 'utf8')).includes(provider)) return dir;
+      } catch { /* next candidate */ }
+    }
+  }
+  return null;
 }
 export function terminalArgs(config, home, node = process.execPath, runner = join(HERE, 'guide-runner.mjs')) {
   // No shell string interpolation. Window 0 is WT's most recently used window, not necessarily the originating window.
@@ -36,7 +59,7 @@ export async function openGuide(home, repo, config, options = {}) {
       pi: await executable('pi'), node: process.execPath, path: process.env.PATH,
       extension: resolve(HERE, '../../.pi/extensions/human-handoff/index.ts'),
       profile: join(HERE, 'walkthrough.md'),
-      model: config.model || null, status: 'pending', requestedAt: now(),
+      model: config.model || null, providerExtension: await resolveProviderExtension(config.model), status: 'pending', requestedAt: now(),
     };
     await saveJSON(join(home, 'launch.json'), launch);
     try {

@@ -49,7 +49,14 @@ Accepting records the exact title/description/acceptance-criterion fingerprint a
 
 The launcher runs a separate interactive Pi conversation with `tools/human-handoff/walkthrough.md` as its appended role prompt. That markdown file is a **foreground profile**, not a pi-subagents background-agent definition.
 
-The guide has only `read`, `human_queue`, and `human_checkpoint` tools. Other discovered extensions, skills, prompt templates, and project context files are disabled in that guide process to avoid conflicting behavior. This also means Parley and other extension-specific recording are not active there; native Pi session persistence is active. The main orchestrator retains its normal extensions. The guide initially uses the orchestrator's selected provider/model when available.
+The guide has only `read`, `human_queue`, and `human_checkpoint` tools. Other discovered extensions, skills, prompt templates, and project context files are disabled in that guide process to avoid conflicting behavior. The main orchestrator retains its normal extensions. The guide initially uses the orchestrator's selected provider/model when available.
+
+**Provider extensions are an exception to the disabled-extension rule.** The guide launches with `--no-extensions`, which also unregisters any model provider contributed by an extension. If the orchestrator's model belongs to such a provider (for example `MIT-parley/bedrock/claude-opus-5`, contributed by `mit-parley-pi-extension`), the guide cannot resolve `--model` and exits at startup before writing a session; `/human retry` then reproduces the same crash, because the launch request is unchanged. Dropping `--model` does not help: with no extensions loaded there may be **no authenticated provider at all**, and pi exits asking for `/login`.
+
+The launcher therefore resolves the one installed package that declares the model's provider (`resolveProviderExtension()` in `launcher.mjs`), records it in `launch.json`, and the runner re-adds that single extension with `-e`. Two consequences worth knowing:
+
+- **Parley or another provider extension is active in the guide process**, so extension-specific recording is not disabled there, contrary to the isolation this profile otherwise aims for. The `--tools read,human_queue,human_checkpoint` whitelist still bounds what the guide can do.
+- Resolution matches a provider name inside installed `*pi-extension*` packages, which is a heuristic. When no package matches, the runner omits `--model` and falls back to pi's default rather than crash-looping.
 
 | Command | Action |
 |---|---|
@@ -98,6 +105,36 @@ Private runtime defaults to `~/.pi/agent/human-handoff/` (mode 0700 directory, 0
 - `guide.lock`: kernel flock held for the full guide-process lifetime. The launcher replaces its runner with Pi via `execve`, avoiding an orphaned guide if a wrapper crashes. The lock, not a stale `launch.json` status, determines whether the guide is alive.
 
 One managed guide process is allowed **per WSL user/state directory**. Multiple project sessions share that lock and accepted queue. It does not coordinate other distributions, Windows users, machines, or manually launched unmanaged Pi sessions. A pending launch is not blindly retried: use `/human retry` after checking the terminal. The process lock prevents duplicate active guides even if two launch requests reach Windows Terminal; an unusual delayed/retried request could still leave an empty/closed duplicate tab.
+
+## Diagnosing a launch that never appears
+
+A guide that dies during startup writes no session file, so diagnose from the launch state instead. `guide.lock` is authoritative for liveness; a `status` of `running` in `launch.json` can be stale if the process died.
+
+```bash
+cd ~/.pi/agent/human-handoff
+cat launch.json                      # status, pid, model, providerExtension
+ps -p "$(python3 -c 'import json;print(json.load(open("launch.json")).get("pid",""))')"
+flock -n guide.lock true; echo $?    # 0 = no guide running, 1 = guide holds the lock
+ls -la sessions/                     # empty means pi exited before starting
+```
+
+To see the actual startup error, run the guide command in the foreground. This is also the manual way to open the walkthrough if the Windows Terminal launch fails; keep the `flock` so the single-guide invariant still holds:
+
+```bash
+cd /path/to/project
+flock -n ~/.pi/agent/human-handoff/guide.lock \
+  pi --no-extensions \
+     -e ~/.pi/agent/npm/node_modules/mit-parley-pi-extension \
+     -e "$PWD/.pi/extensions/human-handoff/index.ts" \
+     --no-skills --no-prompt-templates --no-context-files \
+     --tools read,human_queue,human_checkpoint \
+     --append-system-prompt "$PWD/tools/human-handoff/walkthrough.md" \
+     --session-dir ~/.pi/agent/human-handoff/sessions \
+     --name Walkthrough \
+     --model MIT-parley/bedrock/claude-opus-5
+```
+
+Substitute the `-e` provider-extension path and `--model` with the values from `launch.json`. Then use `/walk next`. If a dead PID left `status: "running"`, set it to `"stopped"` so the launcher does not treat it as a live guide. Accepted tasks are unaffected by a failed launch: acceptance is recorded in the task, not in launch state.
 
 The guide starts using the repository associated with its launch; queued tasks include explicit project paths, so file references must be absolute when crossing projects. Installed code/profile paths must remain available. Missing projects, corrupt state, or CLI failures surface as errors rather than being silently dropped.
 

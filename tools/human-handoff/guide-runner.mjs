@@ -9,12 +9,21 @@ if (typeof process.execve !== 'function') throw new Error('Walkthrough runner re
 const config = await readJSON(join(home, 'launch.json'), null);
 if (!config) throw new Error('No launch request');
 const args = [
-  '--no-extensions', '-e', config.extension, '--no-skills', '--no-prompt-templates', '--no-context-files',
+  '--no-extensions',
+];
+// A provider contributed by an extension is unavailable under --no-extensions,
+// so re-add that single extension before the handoff one. Without it --model
+// cannot resolve and, with no built-in provider authenticated, the guide exits
+// immediately at startup.
+if (config.providerExtension) args.push('-e', config.providerExtension);
+args.push(
+  '-e', config.extension, '--no-skills', '--no-prompt-templates', '--no-context-files',
   '--tools', 'read,human_queue,human_checkpoint',
   '--append-system-prompt', config.profile, '--session-dir', join(home, 'sessions'),
   '--continue', '--name', 'Walkthrough',
-];
-if (config.model) args.push('--model', config.model);
+);
+// Only pass --model when its provider can actually be registered in the guide.
+if (config.model && (config.providerExtension || !config.model.includes('/'))) args.push('--model', config.model);
 const env = { ...process.env, PATH: config.path, PI_HUMAN_GUIDE: '1', PI_HUMAN_STATE_HOME: home };
 for (const key of ['PI_SESSION_ID', 'PI_SESSION_FILE', 'PI_PROVIDER', 'PI_MODEL', 'PI_REASONING_LEVEL']) delete env[key];
 process.chdir(config.repo);
