@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 960" role="img" aria-labelledby="title desc">
+  <title id="title">893 project structure and human-only handoff workflow</title>
+  <desc id="desc">A map of the project repository. General project systems are blue and gray; components that assign or guide human-only tasks are red.</desc>
+  <style>
+    text { fill: #e9f2ff; font-family: "Space Grotesk", Arial, sans-serif; }
+    .heading { font-family: "Orbitron", Arial, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+    .section { font-size: 16px; font-weight: 700; letter-spacing: .8px; }
+    .path { font-family: monospace; font-size: 16px; font-weight: 700; }
+    .detail { font-size: 14px; fill: #b9c9dd; }
+    .small { font-size: 13px; fill: #b9c9dd; }
+    .box { fill: #13243b; stroke: #426a96; stroke-width: 2; }
+    .human { fill: #3a1720; stroke: #ff6078; stroke-width: 3; }
+    .flow { fill: #231d33; stroke: #8e7dce; stroke-width: 2; }
+    .line { stroke: #627c9e; stroke-width: 2; fill: none; }
+    .humanline { stroke: #ff6078; stroke-width: 3; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#627c9e"/></marker>
+    <marker id="redarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff6078"/></marker>
+  </defs>
+
+  <rect width="1440" height="960" fill="#07111f"/>
+  <text x="58" y="62" class="heading">893 — PROJECT STRUCTURE</text>
+  <text x="58" y="91" class="detail">Blue = repository systems · Red = components that coordinate human-only tasks</text>
+
+  <text x="58" y="142" class="section">REPOSITORY</text>
+  <rect x="58" y="162" width="470" height="112" rx="12" class="box"/>
+  <text x="82" y="193" class="path">/AGENTS.md</text>
+  <text x="82" y="220" class="detail">Project workflow, Backlog.md rules, and robot safety constraints</text>
+  <text x="82" y="246" class="small">Read before implementation; task records are managed through the Backlog CLI.</text>
+
+  <rect x="58" y="300" width="470" height="190" rx="12" class="box"/>
+  <text x="82" y="332" class="path">/backlog</text>
+  <text x="82" y="361" class="detail">tasks/ · milestones/ · decisions/ · drafts/</text>
+  <text x="82" y="391" class="detail">docs/specs/</text>
+  <text x="104" y="418" class="small">doc-1  Hardware &amp; system reference</text>
+  <text x="104" y="444" class="small">doc-2  Agent working agreement &amp; change control</text>
+  <text x="104" y="470" class="small">doc-3  Orchestrator state &amp; session handoff</text>
+
+  <rect x="58" y="516" width="470" height="150" rx="12" class="box"/>
+  <text x="82" y="548" class="path">/sim</text>
+  <text x="82" y="577" class="detail">Python recreation of free-flying additive manufacturing</text>
+  <text x="82" y="604" class="small">src/ffam/ · tests/ · tools/ · vendor/</text>
+  <text x="82" y="631" class="small">Site code and media: /css · /js · /assets · /CAD · /papers</text>
+
+  <text x="590" y="142" class="section">PI CONFIGURATION</text>
+  <rect x="590" y="162" width="374" height="118" rx="12" class="box"/>
+  <text x="614" y="194" class="path">/.pi/skills</text>
+  <text x="614" y="222" class="detail">clarify-before-build/SKILL.md</text>
+  <text x="614" y="248" class="small">Clarifies requirements before creating physical or visual work.</text>
+
+  <rect x="590" y="306" width="374" height="158" rx="12" class="human"/>
+  <text x="614" y="338" class="path">/.pi/skills/human-handoff</text>
+  <text x="614" y="367" class="detail">Eligibility rules for human-only work</text>
+  <text x="614" y="394" class="small">Physical access · identity · permission · personal judgment</text>
+  <text x="614" y="422" class="small">Requires minimal steps, explicit user acceptance, and evidence review.</text>
+
+  <rect x="590" y="490" width="374" height="112" rx="12" class="human"/>
+  <text x="614" y="522" class="path">/.pi/extensions/human-handoff</text>
+  <text x="614" y="550" class="detail">Pi extension entry point</text>
+  <text x="614" y="577" class="small">Provides the handoff commands and tool integration.</text>
+
+  <text x="1024" y="142" class="section" fill="#ff9baa">HUMAN-ONLY HANDOFF</text>
+  <rect x="1024" y="162" width="358" height="146" rx="12" class="human"/>
+  <text x="1048" y="194" class="path">/tools/human-handoff</text>
+  <text x="1048" y="222" class="detail">Implementation, launcher, and tests</text>
+  <text x="1048" y="250" class="small">walkthrough.md: restricted guide profile</text>
+  <text x="1048" y="277" class="small">README.md: workflow, evidence, storage, and diagnostics</text>
+
+  <path d="M 777 464 L 777 490" class="humanline" marker-end="url(#redarrow)"/>
+  <path d="M 964 548 L 1024 248" class="humanline" marker-end="url(#redarrow)"/>
+  <path d="M 528 395 L 590 385" class="line" marker-end="url(#arrow)"/>
+  <text x="542" y="373" class="small">task context</text>
+
+  <text x="58" y="727" class="section">HOW A HUMAN-ONLY TASK MOVES</text>
+  <rect x="58" y="751" width="202" height="118" rx="12" class="flow"/>
+  <text x="78" y="783" class="path">Main Pi session</text>
+  <text x="78" y="811" class="small">Agent checks whether the work</text>
+  <text x="78" y="834" class="small">really requires a person.</text>
+
+  <rect x="316" y="751" width="202" height="118" rx="12" class="human"/>
+  <text x="336" y="783" class="path">Proposal</text>
+  <text x="336" y="811" class="small">human_request creates a</text>
+  <text x="336" y="834" class="small">reviewable Backlog procedure.</text>
+
+  <rect x="574" y="751" width="202" height="118" rx="12" class="human"/>
+  <text x="594" y="783" class="path">Explicit acceptance</text>
+  <text x="594" y="811" class="small">The user reviews and accepts;</text>
+  <text x="594" y="834" class="small">the agent cannot do this step.</text>
+
+  <rect x="832" y="751" width="242" height="118" rx="12" class="human"/>
+  <text x="852" y="783" class="path">Walkthrough guide</text>
+  <text x="852" y="811" class="small">A separate Pi tab guides the task</text>
+  <text x="852" y="834" class="small">with read, queue, and checkpoint tools.</text>
+
+  <rect x="1130" y="751" width="252" height="118" rx="12" class="flow"/>
+  <text x="1150" y="783" class="path">Verification</text>
+  <text x="1150" y="811" class="small">The main session reviews the</text>
+  <text x="1150" y="834" class="small">evidence before resuming work.</text>
+
+  <path d="M 260 810 L 316 810 M 518 810 L 574 810 M 776 810 L 832 810 M 1074 810 L 1130 810" class="humanline" marker-end="url(#redarrow)"/>
+  <rect x="58" y="900" width="20" height="20" rx="3" class="box"/><text x="90" y="916" class="small">Repository or automated-agent component</text>
+  <rect x="432" y="900" width="20" height="20" rx="3" class="human"/><text x="464" y="916" class="small">Human task assignment, acceptance, or guided execution</text>
+</svg>
