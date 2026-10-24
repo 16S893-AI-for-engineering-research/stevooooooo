@@ -172,6 +172,48 @@ relay:
     linux_by_path: platform-vhci_hcd.0-usb-0:4:1.0-port0
     windows_busid_observed: "9-2"
 
+# --- AA-10 ---
+homing:
+  # Named neutral pose for homing (joint angles in degrees, 0-360 STS3215 range).
+  # UNVERIFIED: these are placeholder values. A hardware session is required to
+  # confirm safe neutral poses for both arms before running live homing.
+  neutral_pose_deg:
+    shoulder_pan: 180.0
+    shoulder_lift: 180.0
+    elbow_flex: 180.0
+    wrist_flex: 180.0
+    wrist_roll: 180.0
+  # Whether AA-9 joint limits have been measured and are present in config.
+  # Homing refuses to run live (--live flag required) if this is false.
+  joint_limits_verified: false
+  # Velocity limit during homing motion (goal_speed register 0x2E / 46).
+  # Units: raw ticks/s. Set conservatively until verified.
+  # UNVERIFIED: value is a conservative placeholder.
+  goal_speed_ticks: 200
+  # Acceleration limit during homing motion (acceleration register 0x29 / 41).
+  # Units: raw ticks/s^2 (hardware-defined scale). Conservative placeholder.
+  # UNVERIFIED.
+  acceleration_ticks: 50
+  # Torque limit during homing (torque_limit register 0x30 / 48).
+  # Units: raw load units (0-1000 range on STS3215). Conservative placeholder.
+  # UNVERIFIED.
+  torque_limit_raw: 500
+
+fault_thresholds:
+  # UNVERIFIED: these thresholds are conservative placeholders.
+  # A hardware session is required to confirm safe values before production use.
+  # Overcurrent threshold (raw current register, u16 hardware units).
+  # STS3215 present_current register 0x45; units are hardware-defined.
+  overcurrent_raw: 800
+  # Overtemperature threshold (degrees C, present_temperature register 0x3F).
+  overtemperature_c: 70
+  # Gripper locked band: range of gripper position register values (degrees)
+  # that indicate the gripper may be engaged with an attachment point.
+  # null means the band is unknown -> fail closed (assume possibly locked).
+  gripper_locked_band_deg_low: null
+  gripper_locked_band_deg_high: null
+# --- AA-10 end ---
+
 laser:
   # Owner design values (doc-1 s5), not calibrated values.
   switched_by: relay
@@ -186,3 +228,97 @@ laser:
   # would exceed this value. Lower this during safety testing.
   max_continuous_on_s: 30.0
   # --- AA-29 end ---
+
+# --- AA-11 ---
+# SO-101 5-DoF kinematic chain parameters.
+# Source: robot/vendor/so101/so101_new_calib.urdf
+#   git-hash a758567c3978dfeefe282ede0500085a48fe8f78
+#   TheRobotStudio/SO-ARM100 (2026-10-06)
+# Joint origins (xyz, metres) and fixed-frame RPY (rad) are taken verbatim
+# from each <joint><origin> tag.  Axis is always [0,0,1] for every revolute
+# joint in this URDF.  Joint limits (lower/upper, rad) are taken verbatim from
+# <limit> tags.
+# NOTE: these are the URDF model values for a stock SO-101.  The owner's
+# assembly (CAD/Assembly 1.step) uses a custom gripper and mounting; the
+# tool-frame offset and arm base-to-chassis transforms (left_base_T and
+# right_base_T below) are marked unverified and must be measured in AA-16.
+so101_kinematics:
+  # 5-DoF revolute joint chain (proximal → distal).
+  # Gripper joint is excluded from IK; it is commanded only via AA-17/AA-8.
+  joints:
+    - name: shoulder_pan
+      parent: base_link
+      child: shoulder_link
+      # <origin xyz="0.0388353 -8.97657e-09 0.0624" rpy="3.14159 4.18253e-17 -3.14159"/>
+      origin_xyz: [0.0388353, 0.0, 0.0624]
+      origin_rpy: [3.14159, 0.0, -3.14159]
+      axis: [0, 0, 1]
+      limit_lower_rad: -1.91986
+      limit_upper_rad:  1.91986
+
+    - name: shoulder_lift
+      parent: shoulder_link
+      child: upper_arm_link
+      # <origin xyz="-0.0303992 -0.0182778 -0.0542" rpy="-1.5708 -1.5708 0"/>
+      origin_xyz: [-0.0303992, -0.0182778, -0.0542]
+      origin_rpy: [-1.5708, -1.5708, 0.0]
+      axis: [0, 0, 1]
+      limit_lower_rad: -1.74533
+      limit_upper_rad:  1.74533
+
+    - name: elbow_flex
+      parent: upper_arm_link
+      child: lower_arm_link
+      # <origin xyz="-0.11257 -0.028 1.73763e-16" rpy="-3.63608e-16 8.74301e-16 1.5708"/>
+      origin_xyz: [-0.11257, -0.028, 0.0]
+      origin_rpy: [0.0, 0.0, 1.5708]
+      axis: [0, 0, 1]
+      limit_lower_rad: -1.69
+      limit_upper_rad:  1.69
+
+    - name: wrist_flex
+      parent: lower_arm_link
+      child: wrist_link
+      # <origin xyz="-0.1349 0.0052 3.62355e-17" rpy="4.02456e-15 8.67362e-16 -1.5708"/>
+      origin_xyz: [-0.1349, 0.0052, 0.0]
+      origin_rpy: [0.0, 0.0, -1.5708]
+      axis: [0, 0, 1]
+      limit_lower_rad: -1.65806
+      limit_upper_rad:  1.65806
+
+    - name: wrist_roll
+      parent: wrist_link
+      child: gripper_link
+      # <origin xyz="5.55112e-17 -0.0611 0.0181" rpy="1.5708 0.0486795 3.14159"/>
+      origin_xyz: [0.0, -0.0611, 0.0181]
+      origin_rpy: [1.5708, 0.0486795, 3.14159]
+      axis: [0, 0, 1]
+      limit_lower_rad: -2.74385
+      limit_upper_rad:  2.84121
+
+  # Tool frame: offset from gripper_link origin to the TCP (tool centre point).
+  # UNVERIFIED: owner's custom gripper (CAD/Assembly 1.step) differs from the
+  # stock URDF gripper.  Measure in AA-16 hardware session; set unverified: false.
+  tool_frame_offset:
+    xyz: [0.0, 0.0, 0.0]
+    rpy: [0.0, 0.0, 0.0]
+    unverified: true
+
+  # Base-to-chassis transforms: where each arm's base_link sits in the
+  # chassis fixed frame.  UNVERIFIED: must be measured in AA-16.
+  # Convention: T_chassis_base  (4×4 HTM, stored as xyz + rpy for compactness)
+  left_arm_base_to_chassis:
+    xyz: [0.0, 0.0, 0.0]
+    rpy: [0.0, 0.0, 0.0]
+    unverified: true
+  right_arm_base_to_chassis:
+    xyz: [0.0, 0.0, 0.0]
+    rpy: [0.0, 0.0, 0.0]
+    unverified: true
+
+  # Joint-space trajectory limits (used by inchworm.trajectory).
+  # Conservative safe defaults; tighten after hardware testing.
+  trajectory:
+    max_velocity_rad_per_s: 1.0
+    max_acceleration_rad_per_s2: 2.0
+# --- AA-11 end ---

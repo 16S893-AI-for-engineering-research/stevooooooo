@@ -22,3 +22,8 @@ UNIT_SUFFIXES = ("_mm", "_deg", "_mm_per_px")
 # Add seconds suffix so max_continuous_on_s passes the unit-suffix check.
 UNIT_SUFFIXES = UNIT_SUFFIXES + ("_s",)  # type: ignore[assignment]
 # --- AA-29 end ---
+
+# --- AA-11 ---
+# Add angular-rate suffixes so SO101TrajectoryLimits fields pass the unit check.
+UNIT_SUFFIXES = UNIT_SUFFIXES + ("_rad_per_s", "_rad_per_s2")  # type: ignore[assignment]
+# --- AA-11 end ---

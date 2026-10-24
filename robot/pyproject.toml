@@ -7,6 +7,14 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6.0",
+    # --- AA-14 ---
+    "opencv-python-headless>=4.8",
+    "numpy>=1.24",
+    # --- AA-14 end ---
+    # --- AA-11 ---
+    # numpy is used by inchworm.kinematics (FK/IK) and inchworm.trajectory
+    # (trapezoidal joint-space planner).  No ROS or heavy deps; numpy only.
+    # --- AA-11 end ---
 ]
 
 # A dependency group (not an optional extra) so a bare `uv run pytest` installs
@@ -29,6 +37,12 @@ addopts = "-q"
 
 [project.scripts]
 inchworm-discover = "inchworm.discover:main"
+# --- AA-14 ---
+inchworm-camera = "inchworm.camera_cli:main"
+# --- AA-14 end ---
+# --- AA-10 ---
+inchworm-estop = "inchworm.estop:_cli_main"
+# --- AA-10 end ---
 
 [tool.uv]
 package = true

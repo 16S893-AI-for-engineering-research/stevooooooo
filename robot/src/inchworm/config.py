@@ -212,6 +212,122 @@ class UsbConfig(_Strict):
     max_concurrent_camera_streams: Literal[1]
 
 
+# --- AA-10 ---
+class HomingNeutralPose(_Strict):
+    """Named neutral pose for homing (degrees, STS3215 range 0-360).
+
+    UNVERIFIED: placeholder values until a hardware session measures safe
+    neutral positions for both arms. The homing routine refuses to run live
+    (``--live`` flag required) if ``joint_limits_verified`` is ``False``.
+    """
+
+    shoulder_pan: Degrees
+    shoulder_lift: Degrees
+    elbow_flex: Degrees
+    wrist_flex: Degrees
+    wrist_roll: Degrees
+
+
+class HomingConfig(_Strict):
+    """Configuration for the AA-10 homing routine.
+
+    All numeric fields are UNVERIFIED placeholders until measured on hardware.
+    """
+
+    neutral_pose_deg: HomingNeutralPose
+    # True only after AA-9 joint limits are measured and populated.
+    joint_limits_verified: bool = False
+    # Velocity limit applied during homing (STS3215 goal_speed register 0x2E / 46).
+    # Units: raw ticks/s. UNVERIFIED placeholder.
+    goal_speed_ticks: int = Field(default=200, ge=0)
+    # Acceleration limit applied during homing (STS3215 acceleration reg 0x29 / 41).
+    # Units: raw ticks/s^2 (hardware-defined). UNVERIFIED placeholder.
+    acceleration_ticks: int = Field(default=50, ge=0)
+    # Torque limit during homing (STS3215 torque_limit register 0x30 / 48).
+    # Units: raw load units (0-1000). UNVERIFIED placeholder.
+    torque_limit_raw: int = Field(default=500, ge=0, le=1000)
+
+
+class FaultThresholds(_Strict):
+    """Thresholds for overcurrent, overtemperature and gripper locked-band detection.
+
+    All values are UNVERIFIED placeholders until confirmed on hardware.
+    The gripper locked-band fields are ``None`` when unknown; the homing routine
+    treats ``None`` as "assume possibly locked → abort" (fail-closed).
+    """
+
+    # Overcurrent: raw present_current register value (STS3215 reg 0x45, u16).
+    # UNVERIFIED placeholder.
+    overcurrent_raw: int = Field(default=800, ge=0)
+    # Overtemperature: degrees C (STS3215 present_temperature reg 0x3F).
+    # UNVERIFIED placeholder.
+    overtemperature_c: int = Field(default=70, ge=0)
+    # Gripper locked band (degrees). null = unknown -> fail closed.
+    gripper_locked_band_deg_low: Optional[Degrees] = None
+    gripper_locked_band_deg_high: Optional[Degrees] = None
+# --- AA-10 end ---
+# --- AA-11 ---
+from typing import List  # noqa: E402 – local import for the marked block
+
+
+class SO101JointConfig(_Strict):
+    """One revolute joint in the 5-DoF SO-101 kinematic chain.
+
+    Values are taken verbatim from so101_new_calib.urdf (hash a758567c).
+    ``origin_xyz`` is in metres; ``origin_rpy`` and ``limit_*_rad`` are in
+    radians.  ``axis`` is always ``[0, 0, 1]`` for every joint in this URDF.
+    """
+
+    name: str
+    parent: str
+    child: str
+    origin_xyz: List[float]
+    origin_rpy: List[float]
+    axis: List[int]
+    limit_lower_rad: float
+    limit_upper_rad: float
+
+
+class SO101FrameOffset(_Strict):
+    """Compact xyz+rpy representation of a rigid-body transform.
+
+    ``unverified: true`` means the values are placeholders; the hardware
+    session (AA-16) must measure and update them.
+    """
+
+    xyz: List[float]
+    rpy: List[float]
+    unverified: bool = False
+
+
+class SO101TrajectoryLimits(_Strict):
+    """Conservative joint-space trajectory limits for the SO-101 arms."""
+
+    max_velocity_rad_per_s: float = Field(gt=0)
+    max_acceleration_rad_per_s2: float = Field(gt=0)
+
+
+class SO101KinematicsConfig(_Strict):
+    """SO-101 5-DoF kinematic chain parameters loaded from hardware.yaml.
+
+    The 5-DoF chain is shoulder_pan → shoulder_lift → elbow_flex →
+    wrist_flex → wrist_roll.  The gripper joint is excluded; it is
+    commanded only via the AA-17/AA-8 gripper_channel token.
+
+    Parameters are sourced from the TheRobotStudio URDF
+    (robot/vendor/so101/so101_new_calib.urdf, hash a758567c).  The
+    tool-frame offset and base-to-chassis transforms are marked
+    ``unverified: true`` until measured in AA-16.
+    """
+
+    joints: List[SO101JointConfig]
+    tool_frame_offset: SO101FrameOffset
+    left_arm_base_to_chassis: SO101FrameOffset
+    right_arm_base_to_chassis: SO101FrameOffset
+    trajectory: SO101TrajectoryLimits
+# --- AA-11 end ---
+
+
 class HardwareConfig(_Strict):
     schema_version: int
     backend: BackendName = Field(strict=False)
@@ -222,6 +338,13 @@ class HardwareConfig(_Strict):
     cameras: CamerasConfig
     relay: RelayConfig
     laser: LaserConfig
+    # --- AA-10 ---
+    homing: Optional["HomingConfig"] = None
+    fault_thresholds: Optional["FaultThresholds"] = None
+    # --- AA-10 end ---
+    # --- AA-11 ---
+    so101_kinematics: SO101KinematicsConfig
+    # --- AA-11 end ---
 
     @model_validator(mode="before")
     @classmethod

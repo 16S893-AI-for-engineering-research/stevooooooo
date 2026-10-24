@@ -113,5 +113,9 @@ def test_hardware_backend_refuses_to_open_devices(config):
     backend = HardwareBackend(config)
     with pytest.raises(BackendError, match="not implemented yet"):
         backend.open_serial("arm_left")
-    with pytest.raises(BackendError, match="not implemented yet"):
+    # --- AA-14 ---
+    # HardwareBackend._open_camera now raises BackendError with a different
+    # message directing callers to V4L2CameraTransport.open().
+    with pytest.raises(BackendError):
         backend.open_camera("camera_scanner")
+    # --- AA-14 end ---

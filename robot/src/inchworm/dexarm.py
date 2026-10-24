@@ -527,6 +527,33 @@ class DexArmDriver:
     # Rotrics-specific commands (unverified without live device)
     # ------------------------------------------------------------------
 
+    # --- AA-10 ---
+    def quickstop(self, *, dry_run: bool = False) -> None:
+        """Send the Marlin M410 quickstop command to halt all motion immediately.
+
+        M410 is the Marlin quickstop G-code that cancels the motion queue and
+        stops the steppers as fast as possible (without homing). It is the
+        DexArm emergency-stop command used by the AA-10 e-stop path.
+
+        .. note::
+            UNVERIFIED on live hardware. Marlin's M410 is standard but the
+            Rotrics DexArm firmware may respond differently. The first live
+            e-stop session must confirm the response and update this note.
+
+        Parameters
+        ----------
+        dry_run:
+            When ``True``, log without sending.
+        """
+        self._require_open()
+        cmd = "M410"
+        if dry_run:
+            self._emit("INFO", "dexarm_dry_run", {"cmd": cmd, "reason": "quickstop"})
+            return
+        self._send_receive(cmd)
+        self._emit("WARNING", "dexarm_quickstop", {"cmd": cmd})
+    # --- AA-10 end ---
+
     def select_module(self, module_id: int, *, dry_run: bool = False) -> None:
         """Select the DexArm tool module with M888.
 
@@ -781,6 +808,11 @@ class MockDexArmSerial:
             self._pos_y = 300.0
             self._pos_z = 200.0
             self._enqueue("ok")
+        # --- AA-10 ---
+        elif cmd.startswith("M410"):
+            # Quickstop: halt all motion. Mock just acknowledges.
+            self._enqueue("ok")
+        # --- AA-10 end ---
         elif cmd.startswith("G90") or cmd.startswith("G91"):
             self._enqueue("ok")
         elif cmd.startswith("G0 ") or cmd.startswith("G1 "):

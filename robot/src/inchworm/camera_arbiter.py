@@ -54,6 +54,16 @@ _POLL_INTERVAL_S: float = 0.05
 # Name of the single global lock file shared by every camera acquisition.
 _GLOBAL_LOCK_FILENAME = "_global_camera.lock"
 
+# Orchestrator hardening 2026-10-24: real camera transports must refuse to open
+# unless this process currently holds the global camera lock. CameraArbiter
+# sets this around backend.open_camera(); V4L2CameraTransport.open() checks it.
+_LOCK_HELD_DEVICE: "str | None" = None
+
+
+def global_lock_held_for(device: str) -> bool:
+    """True only while CameraArbiter is opening *device* under the global lock."""
+    return _LOCK_HELD_DEVICE == device
+
 
 class CameraArbiterError(RuntimeError):
     """Base error for arbiter failures."""
@@ -175,8 +185,13 @@ class CameraArbiter:
         lock_path = self._lock_dir / _GLOBAL_LOCK_FILENAME
         lock_fh = self._acquire_lock(device, lock_path, timeout_s)
         # Global lock is now held; open the camera.
+        global _LOCK_HELD_DEVICE
         try:
-            transport = self._backend.open_camera(device)
+            _LOCK_HELD_DEVICE = device
+            try:
+                transport = self._backend.open_camera(device)
+            finally:
+                _LOCK_HELD_DEVICE = None
         except Exception:
             # Release the lock before propagating; transport not opened.
             try:

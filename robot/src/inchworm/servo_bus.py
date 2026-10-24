@@ -110,6 +110,20 @@ _REG_PRESENT_VOLTAGE: int = 0x3E  # present voltage (1 byte, unit: 0.1 V)      [
 _REG_PRESENT_TEMPERATURE: int = 0x3F  # present temperature (1 byte, deg C)    [63]
 _REG_PRESENT_CURRENT: int = 0x45  # present current (2 bytes, u16)             [69]
 
+# ---------------------------------------------------------------------------
+# AA-10: velocity/current limiting registers
+# ---------------------------------------------------------------------------
+
+# --- AA-10 ---
+# STS3215 motion-limiting registers (verified against rustypot sts3215.rs):
+#   goal_speed      register 0x2E (46): maximum servo speed, raw ticks/s
+#   acceleration    register 0x29 (41): acceleration ramp, raw ticks/s^2
+#   torque_limit    register 0x30 (48): maximum torque / load, raw units 0-1000
+_REG_ACCELERATION: int = 0x29   # acceleration (1 byte)                        [41]
+_REG_GOAL_SPEED: int = 0x2E     # goal speed (2 bytes, L/H)                    [46]
+_REG_TORQUE_LIMIT: int = 0x30   # torque limit (2 bytes, L/H, range 0-1000)    [48]
+# --- AA-10 end ---
+
 # STS3215 response timeout in seconds
 _DEFAULT_TIMEOUT_S: float = 0.1
 
@@ -786,6 +800,108 @@ class ArmServoBus:
     # ------------------------------------------------------------------
     # Position write -- public (non-gripper joints only)
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Position write -- public (non-gripper joints only)
+    # ------------------------------------------------------------------
+
+    # --- AA-10 ---
+    def set_goal_speed(self, servo_id: int, speed_ticks: int) -> None:
+        """Set the goal speed (velocity limit) for ``servo_id``.
+
+        Writes STS3215 goal_speed register 0x2E (46) as a 2-byte little-endian
+        value. This limits how fast the servo moves toward goal_position.
+
+        Register verified against rustypot src/servo/feetech/sts3215.rs.
+
+        Parameters
+        ----------
+        servo_id:
+            Target servo ID.
+        speed_ticks:
+            Raw speed limit in ticks/s (0 = maximum speed, hardware defined).
+        """
+        if self._dry_run:
+            self._emit(
+                "info",
+                "servo_goal_speed_dry_run",
+                {"servo_id": servo_id, "speed_ticks": speed_ticks},
+            )
+            return
+        data = struct.pack("<H", speed_ticks)
+        self._bus.write_bytes(servo_id, _REG_GOAL_SPEED, data)
+        self._emit(
+            "info",
+            "servo_goal_speed_set",
+            {"servo_id": servo_id, "speed_ticks": speed_ticks},
+        )
+
+    def set_acceleration(self, servo_id: int, acceleration_ticks: int) -> None:
+        """Set the acceleration ramp for ``servo_id``.
+
+        Writes STS3215 acceleration register 0x29 (41) as a 1-byte value.
+        This controls how quickly the servo ramps up to goal_speed.
+
+        Register verified against rustypot src/servo/feetech/sts3215.rs.
+
+        Parameters
+        ----------
+        servo_id:
+            Target servo ID.
+        acceleration_ticks:
+            Raw acceleration (0-254, hardware-defined units). Smaller = gentler ramp.
+        """
+        if self._dry_run:
+            self._emit(
+                "info",
+                "servo_acceleration_dry_run",
+                {"servo_id": servo_id, "acceleration_ticks": acceleration_ticks},
+            )
+            return
+        data = bytes([acceleration_ticks & 0xFF])
+        self._bus.write_bytes(servo_id, _REG_ACCELERATION, data)
+        self._emit(
+            "info",
+            "servo_acceleration_set",
+            {"servo_id": servo_id, "acceleration_ticks": acceleration_ticks},
+        )
+
+    def set_torque_limit(self, servo_id: int, torque_limit_raw: int) -> None:
+        """Set the torque (load) limit for ``servo_id``.
+
+        Writes STS3215 torque_limit register 0x30 (48) as a 2-byte little-endian
+        value. Range: 0-1000 (hardware-defined). 1000 = full torque.
+
+        Register verified against rustypot src/servo/feetech/sts3215.rs.
+
+        Parameters
+        ----------
+        servo_id:
+            Target servo ID.
+        torque_limit_raw:
+            Raw torque limit (0-1000).
+        """
+        if torque_limit_raw < 0 or torque_limit_raw > 1000:
+            raise ServoRangeError(
+                servo_id,
+                torque_limit_raw,
+                "torque_limit_raw must be in [0, 1000]",
+            )
+        if self._dry_run:
+            self._emit(
+                "info",
+                "servo_torque_limit_dry_run",
+                {"servo_id": servo_id, "torque_limit_raw": torque_limit_raw},
+            )
+            return
+        data = struct.pack("<H", torque_limit_raw)
+        self._bus.write_bytes(servo_id, _REG_TORQUE_LIMIT, data)
+        self._emit(
+            "info",
+            "servo_torque_limit_set",
+            {"servo_id": servo_id, "torque_limit_raw": torque_limit_raw},
+        )
+    # --- AA-10 end ---
 
     def write_position_deg(self, joint_name: str, position_deg: Degrees) -> None:
         """Write a goal position (in degrees) for a named joint.
