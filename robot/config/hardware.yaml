@@ -82,6 +82,17 @@ dexarm:
     identify_by: usb_serial
     linux_by_id: usb-STMicroelectronics_STM32F407ZG_CDC_in_FS_Mode_306133643438-if00
     windows_busid_observed: "11-3"
+  # --- AA-12: DexArm workspace bounds (mm, arm frame). Values from Rotrics
+  # DexArm spec; all motions outside this box are rejected before transmission.
+  # Owner: verify / tighten after first live session.
+  workspace:
+    x_min_mm: -300.0
+    x_max_mm:  300.0
+    y_min_mm:    0.0
+    y_max_mm:  450.0
+    z_min_mm: -100.0
+    z_max_mm:  400.0
+  # --- AA-12 end ---
 
 cameras:
   left_arm:
@@ -164,3 +175,9 @@ laser:
     baseline_offset_mm: 67.0
     standoff_mm: 80.0
     height_sensitivity_mm_per_px: 0.1
+  # --- AA-29 ---
+  # Maximum continuous laser-on duration in seconds (default 30 s).
+  # LaserDriver raises LaserDurationExceededError if a single on-period
+  # would exceed this value. Lower this during safety testing.
+  max_continuous_on_s: 30.0
+  # --- AA-29 end ---

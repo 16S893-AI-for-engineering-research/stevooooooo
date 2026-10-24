@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 16:17'
+updated_date: '2026-10-24 16:26'
 labels: []
 milestone: m-1
 dependencies:
@@ -59,6 +59,8 @@ See doc-1 sections 3, 7 and 8.
 
 <!-- SECTION:NOTES:BEGIN -->
 Implementation complete. Files added: robot/src/inchworm/servo_bus.py (ArmServoBus driver, _ServoBus framing, typed errors, degrees<->ticks conversion isolated in ticks_to_degrees/degrees_to_ticks, gripper restricted to _write_gripper_position_deg), robot/src/inchworm/servo_discovery.py (scan_bus_ids + scan_and_persist), robot/scripts/scan_servos.py (dry-run by default, --live flag for hardware, --benchmark for AC4). Config extended: hardware.yaml servo_joints stanzas added under arms.left and arms.right (all null pending live scan), config.py ServoJointMap model added to ArmConfig. 52 new tests in robot/tests/test_servo_bus.py. Full suite: 304 passed.
+
+Audit run (post-implementation): uv run pytest -q => 324 passed in 3.30s. Sign-magnitude tests: TestSignMagnitudeDecode (11 tests) all pass including test_load_negative (0x0400|100 -> -100) and test_speed_negative (0x8000|50 -> -50). test_two_complement_would_differ confirms old struct '<h' gave wrong answer. present_current read: test_current_raw_returned and test_current_raw_zero both pass. Gripper restriction: TestGripperCapability (9 tests) all pass including test_no_token_import_outside_aa17 scan. test_checksum_error_is_distinct: direct asserts on .servo_id, .expected, .actual with no dead comment. Register addresses in docstring match code constants and rustypot (torque_enable 0x28=40, goal_position 0x2A=42, lock 0x37=55, present_position 0x38=56, speed 0x3A=58, load 0x3C=60, voltage 0x3E=62, temp 0x3F=63, current 0x45=69). No hardware I/O in tests (all use MockSerialTransport or MockBackend). AC1 re-verified: ping, read position, read current/load, read temp/voltage, write goal position, torque enable/disable all covered. AC3 re-verified: ServoChecksumError, ServoTimeoutError, ServoRangeError, ServoStatusError all distinct; no silent partial reads. AC5 re-verified: degrees at public interface, ticks isolated in ticks_to_degrees/degrees_to_ticks. AC6 re-verified: MockBackend tests pass. ACs 2 and 4 remain unchecked (hardware only).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

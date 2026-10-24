@@ -124,8 +124,37 @@ class ArmsConfig(_Strict):
     right: ArmConfig
 
 
+# --- AA-12 ---
+class DexArmWorkspace(_Strict):
+    """Axis-aligned workspace bounds for the DexArm (mm, in arm frame).
+
+    Moves outside these limits are rejected *before* transmission by the
+    :class:`~inchworm.dexarm.DexArmDriver`.
+    """
+
+    x_min_mm: Millimeters
+    x_max_mm: Millimeters
+    y_min_mm: Millimeters
+    y_max_mm: Millimeters
+    z_min_mm: Millimeters
+    z_max_mm: Millimeters
+
+    @model_validator(mode="after")
+    def _ranges_positive(self) -> "DexArmWorkspace":
+        for axis in ("x", "y", "z"):
+            lo = getattr(self, f"{axis}_min_mm")
+            hi = getattr(self, f"{axis}_max_mm")
+            if lo >= hi:
+                raise ValueError(f"{axis}_min_mm ({lo}) must be < {axis}_max_mm ({hi})")
+        return self
+# --- AA-12 end ---
+
+
 class DexArmConfig(_Strict):
     identity: DeviceIdentity
+    # --- AA-12 ---
+    workspace: Optional[DexArmWorkspace] = None
+    # --- AA-12 end ---
 
 
 class CameraConfig(_Strict):
@@ -157,6 +186,12 @@ class LaserDesign(_Strict):
 class LaserConfig(_Strict):
     switched_by: Literal["relay"]
     design: LaserDesign
+    # --- AA-29 ---
+    # Maximum continuous laser-on duration (seconds). LaserDriver raises
+    # LaserDurationExceededError if a single on-period would exceed this limit.
+    # Default 30 s matches typical scan duration; lower for safety testing.
+    max_continuous_on_s: float = Field(default=30.0, gt=0)
+    # --- AA-29 end ---
 
 
 class GeometryConfig(_Strict):
