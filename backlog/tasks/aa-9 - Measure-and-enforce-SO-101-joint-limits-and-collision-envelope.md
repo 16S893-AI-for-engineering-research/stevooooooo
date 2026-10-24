@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 22:51'
+updated_date: '2026-10-24 23:06'
 labels: []
 milestone: m-1
 dependencies:
@@ -69,6 +69,13 @@ Orchestrator review 2026-10-24 of the fix: _read_present_pose_rad fabricated 0.0
 Orchestrator verification 2026-10-24: AC#5 re-checked after the wave-3 fix and orchestrator hardening. `uv run pytest tests/test_ast_guard.py tests/test_motion_guard.py` all pass: the AST test proves no module outside {motion_guard, servo_bus, gripper_lock, torque (e-stop present-position hold only), joint_calibration} writes positions; homing and policy_actions route through GuardedArm; bypass_guard is the only documented override and it always logs a WARNING (test_bypass_guard_logs_warning); live present-pose read failure fails closed.
 
 LIVE 2026-10-24, left arm, torque-off manual sweep (owner), read-only recorder, 1324 samples per joint (robot/calibration_data/joint_ranges_left_2026-10-24.json). Servo-degree ranges: shoulder_pan 291.3->98.9 (168 deg, CROSSES the 4095/0 seam), shoulder_lift 134.0->291.0 (157), elbow_flex 168.4->3.2 (195, CROSSES), wrist_flex 41.8->245.8 (204), wrist_roll 148.8->27.6 (239, CROSSES), gripper 271.1->359.9 (89, ends at the seam). Servo EEPROM: position limits 0/4095, homing_offset 0x55 (IDs 1-3) / 0 (IDs 4-6). A first sweep with a non-wrap-aware recorder produced invalid 0-360 ranges; the recorder was fixed to unwrap continuous travel (test_unwrapped_range_across_seam). BLOCKER for live motion: three joints cross the encoder seam, so position-mode targets could travel the long way. Homing offsets must be recalibrated (LeRobot-style half-turn homing) before any position command; owner approval requested to write the EEPROM. AC#1 not yet checked (right arm pending; limits must be expressed after offset recalibration).
+
+LIVE 2026-10-24, left arm servo EEPROM calibration (owner-approved, torque OFF throughout, every write read back):
+1. Half-turn homing (LeRobot method): owner held all joints mid-travel. Homing offsets written: id1 -1352, id2 384, id3 1095, id4 -420, id5 1092, id6 1573. Read-back exact; each joint then read 2047/2048. Pre-change backup in robot/calibration_data/eeprom_backup_left_2026-10-24.json.
+2. Read-only re-sweep (1398 samples): no seam crossing on any joint. Ranges (ticks): pan 644-2557, lift 1225-3030, elbow 909-3121, wrist_flex 899-3217, wrist_roll 470-3320, gripper 1528-2517 (spans 168/159/194/204/251/87 deg, consistent with the pre-homing sweep).
+3. Min/Max_Position_Limit written to EEPROM with a 30-tick margin, read-back verified: pan 674-2527, lift 1255-3000, elbow 939-3091, wrist_flex 929-3187, wrist_roll 500-3290 (owner: not continuous on this build), gripper 1558-2487. Stored in hardware.yaml motion_guard.left_arm_limits.servo_tick_limits.
+OWNER NOTE: these are per-joint independent maxima; the real safe envelope depends on all joints together. The collision model (keep-out geometry, currently placeholders) must be built and validated before motion near the limits.
+AC#1 NOT checked yet: the right arm is pending, and the radian-valued soft limits need AA-9 servo_calibration (joint zero and sign), which is unmeasured.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

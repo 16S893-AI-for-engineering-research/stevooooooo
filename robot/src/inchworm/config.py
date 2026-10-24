@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Dict, Literal, Optional, Tuple, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -494,6 +494,9 @@ class SoftJointLimits(_Strict):
     wrist_flex_upper_rad: Optional[float] = None
     wrist_roll_lower_rad: Optional[float] = None
     wrist_roll_upper_rad: Optional[float] = None
+    # Measured raw servo-tick travel limits per joint (also written to servo
+    # EEPROM Min/Max_Position_Limit). Includes the gripper. Optional.
+    servo_tick_limits: Optional[Dict[str, List[int]]] = None  # [min, max]
     # True until a hardware session with measure_limits.py --live populates
     # all fields and sets this to False.
     unverified: bool = True

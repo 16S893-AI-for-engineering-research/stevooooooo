@@ -1,0 +1,44 @@
+{
+  "1": {
+    "homing_offset_raw": 85,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 610
+  },
+  "2": {
+    "homing_offset_raw": 85,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 2346
+  },
+  "3": {
+    "homing_offset_raw": 85,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 3057
+  },
+  "4": {
+    "homing_offset_raw": 0,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 1627
+  },
+  "5": {
+    "homing_offset_raw": 0,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 3139
+  },
+  "6": {
+    "homing_offset_raw": 0,
+    "min_lim": 0,
+    "max_lim": 4095,
+    "lock": 1,
+    "pos_before": 3620
+  }
+}

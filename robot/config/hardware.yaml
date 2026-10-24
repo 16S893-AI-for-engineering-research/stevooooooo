@@ -434,9 +434,21 @@ motion_guard:
     wrist_flex_upper_rad: null
     wrist_roll_lower_rad: null
     wrist_roll_upper_rad: null
-    unverified: true  # set to false only after measure_limits.py --live
+    unverified: true  # radians need AA-9 servo_calibration (zero offset + sign); still unmeasured
     method: null      # e.g. "torque-off manual sweep, measure_limits.py --live"
     measured_date: null  # e.g. "2026-10-28"
+    # MEASURED 2026-10-24 (owner-supervised torque-off sweep after half-turn homing)
+    # and WRITTEN to servo EEPROM Min/Max_Position_Limit (read-back verified).
+    # Raw servo ticks, independent per-joint maxima minus a 30-tick margin. They are
+    # NOT combined-joint safe limits: the collision model enforces those.
+    # See robot/calibration_data/README.md.
+    servo_tick_limits:
+      shoulder_pan: [674, 2527]
+      shoulder_lift: [1255, 3000]
+      elbow_flex: [939, 3091]
+      wrist_flex: [929, 3187]
+      wrist_roll: [500, 3290]
+      gripper: [1558, 2487]
   right_arm_limits:
     shoulder_pan_lower_rad: null
     shoulder_pan_upper_rad: null
