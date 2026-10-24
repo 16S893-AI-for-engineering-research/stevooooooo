@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:13'
-updated_date: '2026-10-24 17:48'
+updated_date: '2026-10-24 22:34'
 labels: []
 milestone: m-5
 dependencies:
@@ -31,7 +31,7 @@ See doc-1 section 5.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The relay serial protocol is determined and documented, and a driver turns the laser on, turns it off and reports the commanded state by logical role from config
+- [x] #1 The relay serial protocol is determined and documented, and a driver turns the laser on, turns it off and reports the commanded state by logical role from config
 - [x] #2 Laser-on is exposed as a context manager that turns the laser off on normal exit and on exception
 - [x] #3 Emergency stop (AA-10) turns the laser off, verified by a test
 - [x] #4 Process exit, including SIGINT and SIGTERM, turns the laser off, and the residual risk if the process is SIGKILLed is documented with a mitigation
@@ -74,6 +74,8 @@ AC#6 re-checked 2026-10-24 (active watchdog implementation):
 AA-10 is now implemented. The EStop class wires laser.trigger_estop() in its stop() method; test_estop.py::TestEStopTurnsLaserOff::test_estop_turns_laser_off verifies end-to-end that EStop.stop() turns the laser off via the AA-29 hook. AC#3 can now be checked by the orchestrator against this test output (497 tests pass, 2026-10-24).
 
 Orchestrator 2026-10-24: AC#3 verified. tests/test_estop.py::TestEStopTurnsLaserOff::test_estop_turns_laser_off now asserts that the Lcus1 OFF bytes are the last bytes written to the relay transport after EStop.stop(), not just the driver flag. Full suite: 583 passed.
+
+LIVE HARDWARE 2026-10-24 (owner present): `uv run python scripts/laser_probe.py --live --on-seconds 1` sent ON [160,1,1,162] (A0 01 01 A2), held 1.0 s, then OFF [160,1,0,161] (A0 01 00 A1) at 9600 8N1 via discovery-resolved /dev/ttyUSB0. Script output: commanded_on True then False, cumulative_on_s=1.001, rc=0. Owner observed: the relay clicked and its LED lit, the line laser came on for about 1 s, both turned off, and the laser was off afterwards. Protocol and baud marked VERIFIED in laser.py and hardware.yaml (protocol name lcus1). AC#5 stays unchecked: LCUS-1 does not report state (can_report_state False), so a commanded-vs-reported mismatch cannot be detected on this hardware; this needs an owner decision (accept with documented limitation, or add a state sensor such as a photodiode on the laser).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -167,11 +167,10 @@ class RelayProtocol(ABC):
 class Lcus1Protocol(RelayProtocol):
     """LCUS-1 USB relay wire encoding.
 
-    .. warning::
-        **UNVERIFIED** – This encoding matches publicly documented LCUS-1
-        behaviour (on: ``A0 01 01 A2``, off: ``A0 01 00 A1``), but has NOT
-        been confirmed against the specific relay module in this robot. A live
-        hardware test with ``laser_probe.py --live`` is required to check AC#1.
+    **VERIFIED 2026-10-24 on this robot's relay** (CH340 1a86:7523, 9600 8N1):
+    owner-supervised ``laser_probe.py --live --on-seconds 1``. The relay
+    clicked and its LED lit, the line laser came on for about 1 s, and both went
+    off on the OFF command (on: ``A0 01 01 A2``, off: ``A0 01 00 A1``).
 
     The checksum byte is ``A0 + channel + state``. Channel is hard-coded to
     ``0x01`` (single relay, channel 1).
@@ -179,7 +178,7 @@ class Lcus1Protocol(RelayProtocol):
     The LCUS-1 does NOT echo state; :meth:`can_report_state` returns ``False``.
     """
 
-    name = "lcus1_unverified"
+    name = "lcus1"
 
     # Channel 1 byte sequences
     _ON: bytes = bytes([0xA0, 0x01, 0x01, 0xA2])

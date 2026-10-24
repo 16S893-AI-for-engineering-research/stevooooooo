@@ -87,7 +87,8 @@ class TestLcus1Protocol:
         assert p.can_report_state() is False
 
     def test_protocol_name(self):
-        assert "unverified" in Lcus1Protocol().name.lower()
+        # Verified on hardware 2026-10-24 (owner-supervised laser_probe --live).
+        assert Lcus1Protocol().name == "lcus1"
 
 
 # ---------------------------------------------------------------------------

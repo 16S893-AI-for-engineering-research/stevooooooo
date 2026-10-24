@@ -204,8 +204,8 @@ relay:
     windows_busid_observed: "9-2"
   # --- serial-transport ---
   # Serial port settings for the relay (CH340 LCUS-1).
-  # baudrate: 9600 — UNVERIFIED: CH340 LCUS-1 factory default;
-  # confirm and update in first live session.
+  # baudrate: 9600 — VERIFIED 2026-10-24 (owner-supervised laser_probe --live:
+  # relay and laser switched on and off correctly with the LCUS-1 protocol).
   serial:
     baudrate: 9600
     timeout_s: 0.1
