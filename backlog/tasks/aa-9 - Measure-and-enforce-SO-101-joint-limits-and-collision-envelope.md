@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 18:21'
+updated_date: '2026-10-24 19:40'
 labels: []
 milestone: m-1
 dependencies:
@@ -38,7 +38,7 @@ See doc-1 sections 2, 3 and 10.
 - [x] #2 A validator rejects any commanded joint target outside soft limits before it reaches the servo bus, and the rejection path is unit-tested
 - [x] #3 A documented collision model (at minimum conservative keep-out zones for chassis, opposite arm, DexArm and tube volume) rejects unsafe poses and unsafe straight-line joint interpolations, not just unsafe endpoints
 - [ ] #4 Both the folded transit pose and a safe neutral pose are defined, pass validation and are stored as named poses in config
-- [ ] #5 Validation is enforced inside the motion layer so that bypassing it requires an explicit documented override flag
+- [x] #5 Validation is enforced inside the motion layer so that bypassing it requires an explicit documented override flag
 - [x] #6 Tests cover in-limit acceptance, out-of-limit rejection, and a trajectory whose endpoints are legal but whose interpolation passes through a keep-out zone
 <!-- AC:END -->
 
@@ -65,6 +65,8 @@ See doc-1 sections 2, 3 and 10.
 AA-9 fix (orchestrator review 2026-10-24): (1) Added joint_calibration.py - servo_deg<->joint_rad via zero_offset_deg+sign; live fails closed on null/unverified; removed hardcoded deg-180. (2) GuardedArm.write_position_deg reads present pose, builds full 5-DoF target, runs check_pose+check_trajectory. (3) homing.py routes live writes through GuardedArm.apply_joint_command (guarded_arms= injection), errors without it. (4) policy_actions.py routes writes through GuardedArm.apply_joint_command, warns on raw bus. (5) test_ast_guard.py: AST test enforces only {motion_guard,servo_bus,gripper_lock,torque,joint_calibration} may call write_position_deg. (6) 783/783 tests pass. AC#1,AC#4 unchecked (hardware required).
 
 Orchestrator review 2026-10-24 of the fix: _read_present_pose_rad fabricated 0.0 rad on a read failure or missing servo ID, so the collision check validated a pose the arm is not in. LIVE mode now raises PresentPoseUnknownError (fail closed); the dry-run fallback is kept with a warning. Tests: test_live_present_pose_read_failure_fails_closed, test_dry_run_present_pose_read_failure_falls_back. Verified that the AST guard test exists and passes. 902 passed.
+
+Orchestrator verification 2026-10-24: AC#5 re-checked after the wave-3 fix and orchestrator hardening. `uv run pytest tests/test_ast_guard.py tests/test_motion_guard.py` all pass: the AST test proves no module outside {motion_guard, servo_bus, gripper_lock, torque (e-stop present-position hold only), joint_calibration} writes positions; homing and policy_actions route through GuardedArm; bypass_guard is the only documented override and it always logs a WARNING (test_bypass_guard_logs_warning); live present-pose read failure fails closed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

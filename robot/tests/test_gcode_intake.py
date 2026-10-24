@@ -402,7 +402,7 @@ class _MockDriver:
         self._pos_y: float = 10.0
         self._pos_z: float = 0.3
 
-    def get_position(self, dry_run: bool = False):
+    def get_position(self):
         """Return a simple namespace that has .x, .y, .z."""
         from types import SimpleNamespace
         return SimpleNamespace(x=self._pos_x, y=self._pos_y, z=self._pos_z)
@@ -628,7 +628,7 @@ class TestStreamSegment:
         """When get_position fails, stream falls back to (0,0,0) and logs a warning."""
 
         class NoPosMockDriver(_MockDriver):
-            def get_position(self, dry_run=False):
+            def get_position(self):
                 raise AttributeError("not available")
 
         gcode = textwrap.dedent("""\
@@ -817,3 +817,30 @@ class TestBoundingBox:
         bb.update(0.0, 0.0, 0.0)
         s = str(bb)
         assert "BoundingBox" in s
+
+
+# --- Orchestrator 2026-10-24 audit findings 1 and 3 ---
+def test_stream_calls_get_position_with_real_driver_signature():
+    """The real DexArmDriver.get_position() takes no arguments; the mock must
+    match, so a dry_run= kwarg is caught as a TypeError in tests."""
+    import inspect
+    from inchworm.dexarm import DexArmDriver
+    assert list(inspect.signature(DexArmDriver.get_position).parameters) == ["self"]
+
+
+def test_m114_failure_live_raises_typed_abort_and_runs_safety_sequence():
+    from inchworm.gcode_intake import GCodeStreamAborted
+
+    class Laser:
+        def __init__(self): self.off_calls = 0
+        def off(self): self.off_calls += 1
+
+    class NoPos(_MockDriver):
+        def get_position(self):
+            raise RuntimeError("M114 timeout")
+
+    seg = parse_segment("G1 X5 Y0 Z0 F2400\n")
+    laser = Laser()
+    with pytest.raises(GCodeStreamAborted, match="M114"):
+        stream_segment(seg, NoPos(), laser_driver=laser)
+    assert laser.off_calls >= 1

@@ -1077,17 +1077,26 @@ def stream_segment(
     # fail closed. Relative moves from a guessed (0,0,0) could drive the
     # nozzle anywhere. The (0,0,0) seed is kept for dry-run only.
     try:
-        start_pos = driver.get_position(dry_run=dry_run) if not dry_run else None  # type: ignore[union-attr]
+        # DexArmDriver.get_position() takes no arguments (audit finding 1).
+        start_pos = driver.get_position() if not dry_run else None  # type: ignore[union-attr]
     except Exception as exc:
         if not dry_run:
+            # Nothing has moved yet, but run the full abort sequence anyway
+            # (retract/quickstop + laser off) and raise the typed error callers
+            # catch (audit finding 3).
+            retract_ok, quickstop = _abort_safe(driver, laser_driver, config, dry_run=False)
             raise GCodeStreamAborted(
-                RuntimeError(f"M114 start-position query failed: {exc}")
-            ) if _abort_accepts_single_arg() else RuntimeError(
-                f"gcode_intake: M114 start-position query failed; refusing to stream: {exc}"
+                f"M114 start-position query failed; refusing to stream: {exc}",
+                exc, retract_ok=retract_ok, quickstop_attempted=quickstop,
             ) from exc
         start_pos = None
     if start_pos is None and not dry_run:
-        raise RuntimeError("gcode_intake: M114 returned no position; refusing to stream")
+        _err = RuntimeError("M114 returned no position")
+        retract_ok, quickstop = _abort_safe(driver, laser_driver, config, dry_run=False)
+        raise GCodeStreamAborted(
+            "M114 returned no position; refusing to stream", _err,
+            retract_ok=retract_ok, quickstop_attempted=quickstop,
+        )
 
     # State tracking for streaming
     abs_xyz = True
@@ -1365,11 +1374,3 @@ def dry_run_segment(
     print_fn("  Validation        : PASSED")
     return segment
 
-
-def _abort_accepts_single_arg() -> bool:
-    """GCodeStreamAborted signature varies; only use it if a 1-arg call works."""
-    try:
-        GCodeStreamAborted(RuntimeError("probe"))
-        return True
-    except TypeError:
-        return False

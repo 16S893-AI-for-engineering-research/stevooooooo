@@ -873,11 +873,18 @@ class GripperLockSM:
                         },
                     )
             except Exception as exc:  # noqa: BLE001
+                # Orchestrator 2026-10-24 (audit finding 6): if the gripper
+                # servo cannot be read, refuse to unlock (fail closed), and
+                # stay LOCKED.
                 self._emit(
-                    "warning",
+                    "error",
                     "gripper_unlock_load_read_failed",
                     {"error": str(exc)},
                 )
+                raise UnlockRefused(
+                    self._role,
+                    f"cannot read gripper servo state before unlock: {exc}",
+                ) from exc
 
         prev_state = self._state
         self._state = GripperState.UNLOCKING

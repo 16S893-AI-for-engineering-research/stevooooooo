@@ -178,6 +178,11 @@ class TorqueManager:
             try:
                 if not bus.dry_run:
                     present = bus.read_position_deg(servo_id)
+                    # DELIBERATE GuardedArm bypass (audit finding 4): this
+                    # e-stop hold re-commands the joint's OWN present position
+                    # read a moment ago, so it cannot move the arm into a new
+                    # pose, and it must still work when the guard (calibration
+                    # or limits) is unavailable. Allowed by test_ast_guard.
                     bus.write_position_deg(joint, present)
             except ServoError as exc:
                 _LOG.warning("hold: present-position re-command failed on %s/%s: %s", role, joint, exc)

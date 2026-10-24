@@ -141,7 +141,7 @@ def _make_supervisor(
     if seating_detector is None:
         seating_detector = MagicMock(return_value=False)
     if lock_callable is None:
-        lock_callable = MagicMock()
+        lock_callable = MagicMock(return_value=True)
     return PolicySupervisor(
         policy=policy,
         config=config,
@@ -273,7 +273,7 @@ class TestGripperBlock:
     def test_lock_callable_not_called_on_abort(self, chain, supervisor_config_default):
         """lock_callable must never be called when the run aborts."""
         stub = StubPolicy(inject_gripper_at_step=0)
-        lock = MagicMock()
+        lock = MagicMock(return_value=True)
         sup = _make_supervisor(
             policy=stub,
             config=supervisor_config_default,
@@ -790,7 +790,7 @@ class TestEndToEnd:
             step_count[0] += 1
             return step_count[0] >= 3  # seated after 3 checks
 
-        lock = MagicMock()
+        lock = MagicMock(return_value=True)
         executor = MagicMock()
 
         sup = _make_supervisor(
@@ -821,7 +821,7 @@ class TestEndToEnd:
             retract_pose_unverified=False,
         )
         stub = StubPolicy(noop=True)
-        lock = MagicMock()
+        lock = MagicMock(return_value=True)
 
         sup = _make_supervisor(
             policy=stub,
@@ -848,7 +848,7 @@ class TestEndToEnd:
         )
         stub = StubPolicy(noop=True)
         approach = MagicMock(return_value=True)
-        lock = MagicMock()
+        lock = MagicMock(return_value=True)
         executor = MagicMock()
 
         sup = _make_supervisor(
@@ -935,7 +935,7 @@ class TestAllAbortTriggers:
         stub = StubPolicy(noop=True)
         # Succeed immediately
         seating = MagicMock(return_value=True)
-        lock = MagicMock()
+        lock = MagicMock(return_value=True)
         sup = _make_supervisor(
             policy=stub, config=cfg, chain=chain,
             seating_detector=seating,
@@ -1070,3 +1070,14 @@ def test_policy_exception_retracts_and_aborts(chain):
     from inchworm.supervisor import AbortReason
     assert AbortReason.STEP_EXCEPTION in result.abort_reasons
     assert sup._motion_executor.called  # retract was commanded
+
+
+# --- Orchestrator 2026-10-24 audit finding 5 ---
+def test_lock_callable_returning_none_is_failure_not_success(chain):
+    sup = _make_supervisor(policy=StubPolicy(noop=True), config=_ok_cfg(max_retries=0),
+                           chain=chain, dry_run=False)
+    sup._seating_detector = MagicMock(return_value=True)
+    sup._lock_callable = MagicMock(return_value=None)  # no-op lock
+    sup._motion_executor = MagicMock()
+    result = sup.run(cycle_index=0)
+    assert result.outcome == SupervisorOutcome.HALT

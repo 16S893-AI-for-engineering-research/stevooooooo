@@ -1107,3 +1107,17 @@ def test_hold_tick_read_failure_counter_resets_on_success():
     with patch.object(sm._bus, "read_position_deg", return_value=155.0):
         sm.hold_tick()
     assert sm._hold_read_failures == 0
+
+
+# --- Orchestrator 2026-10-24 audit finding 6 ---
+def test_unlock_refuses_when_gripper_state_unreadable():
+    from inchworm.gripper_lock import UnlockRefused
+    from inchworm.servo_bus import ServoTimeoutError
+    transport = _make_transport()
+    sm = _live_sm(transport)
+    sm._state = GripperState.LOCKED
+    sm._opposite_arm_locked_fn = lambda: True
+    with patch.object(sm._bus, "read_joint_state", side_effect=ServoTimeoutError(6, "read")):
+        with pytest.raises(UnlockRefused, match="cannot read"):
+            sm.unlock()
+    assert sm.state == GripperState.LOCKED

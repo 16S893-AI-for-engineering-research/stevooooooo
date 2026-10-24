@@ -520,9 +520,12 @@ class PolicySupervisor:
                     except Exception as exc:  # noqa: BLE001
                         _LOG.error("supervisor: lock_callable raised: %s", exc)
                         locked = False
-                    # None is treated as success for backward compatibility
-                    # with callables that return nothing and raise on failure.
-                    if locked is False:
+                    # Orchestrator 2026-10-24 (audit finding 5): only an
+                    # explicit success counts: True, or a verdict whose name is
+                    # LATCHED. None or anything else is treated as a lock
+                    # failure, so a no-op callable can never report success.
+                    _ok = locked is True or getattr(locked, "name", None) == "LATCHED"
+                    if not _ok:
                         abort_reasons.append(AbortReason.LOCK_FAILED)
                         _emit_supervisor_abort(
                             self._logger, role=self._role, cycle_index=cycle_index,
