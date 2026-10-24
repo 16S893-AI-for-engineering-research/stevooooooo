@@ -1,0 +1,96 @@
+{
+  "arm": "arm_right",
+  "method": "union of two read-only torque-off sweeps after half-turn homing",
+  "joints": {
+    "shoulder_pan": {
+      "servo_id": 1,
+      "min_ticks": 758,
+      "max_ticks": 3477,
+      "span_deg": 239.0,
+      "seam_or_wrap": false,
+      "pass1": [
+        2044,
+        2048
+      ],
+      "pass2": [
+        758,
+        3477
+      ]
+    },
+    "shoulder_lift": {
+      "servo_id": 2,
+      "min_ticks": 1293,
+      "max_ticks": 2965,
+      "span_deg": 147.0,
+      "seam_or_wrap": false,
+      "pass1": [
+        1293,
+        2965
+      ],
+      "pass2": [
+        1294,
+        1386
+      ]
+    },
+    "elbow_flex": {
+      "servo_id": 3,
+      "min_ticks": 876,
+      "max_ticks": 3076,
+      "span_deg": 193.4,
+      "seam_or_wrap": false,
+      "pass1": [
+        876,
+        3076
+      ],
+      "pass2": [
+        3070,
+        3075
+      ]
+    },
+    "wrist_flex": {
+      "servo_id": 4,
+      "min_ticks": 869,
+      "max_ticks": 3197,
+      "span_deg": 204.6,
+      "seam_or_wrap": false,
+      "pass1": [
+        870,
+        3197
+      ],
+      "pass2": [
+        869,
+        875
+      ]
+    },
+    "wrist_roll": {
+      "servo_id": 5,
+      "min_ticks": 524,
+      "max_ticks": 3464,
+      "span_deg": 258.4,
+      "seam_or_wrap": false,
+      "pass1": [
+        524,
+        3464
+      ],
+      "pass2": [
+        2083,
+        2289
+      ]
+    },
+    "gripper": {
+      "servo_id": 6,
+      "min_ticks": 1543,
+      "max_ticks": 2509,
+      "span_deg": 84.9,
+      "seam_or_wrap": false,
+      "pass1": [
+        1543,
+        2509
+      ],
+      "pass2": [
+        2066,
+        2066
+      ]
+    }
+  }
+}

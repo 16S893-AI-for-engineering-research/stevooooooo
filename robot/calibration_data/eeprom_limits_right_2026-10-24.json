@@ -1,0 +1,38 @@
+{
+  "shoulder_pan": {
+    "servo_id": 1,
+    "min_position_limit": 1191,
+    "max_position_limit": 3044,
+    "verified": true
+  },
+  "shoulder_lift": {
+    "servo_id": 2,
+    "min_position_limit": 1323,
+    "max_position_limit": 2935,
+    "verified": true
+  },
+  "elbow_flex": {
+    "servo_id": 3,
+    "min_position_limit": 906,
+    "max_position_limit": 3046,
+    "verified": true
+  },
+  "wrist_flex": {
+    "servo_id": 4,
+    "min_position_limit": 899,
+    "max_position_limit": 3167,
+    "verified": true
+  },
+  "wrist_roll": {
+    "servo_id": 5,
+    "min_position_limit": 554,
+    "max_position_limit": 3434,
+    "verified": true
+  },
+  "gripper": {
+    "servo_id": 6,
+    "min_position_limit": 1573,
+    "max_position_limit": 2479,
+    "verified": true
+  }
+}

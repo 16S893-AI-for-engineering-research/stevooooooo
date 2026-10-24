@@ -37,3 +37,24 @@ depends on all joints together (self, chassis, other arm, DexArm and tube
 collisions). The servo limits are only an outer box; the AA-9 MotionGuard collision
 model enforces combined-joint safety, and its keep-out geometry must be built and
 validated before any motion near those limits.
+
+## Right arm servo EEPROM calibration, 2026-10-24 (owner-approved and supervised)
+
+Same procedure as the left arm. Homing offsets: id1 -312, id2 397, id3 -99, id4 269,
+id5 -1063, id6 611 (each read 2046-2048 after writing). Backup:
+`eeprom_backup_right_2026-10-24.json`. Two read-only sweeps (pass 1 missed the
+shoulder pan); the merged union is `joint_ranges_right_homed_2026-10-24.json`.
+
+The measured right shoulder_pan travel was 758-3477 (239 deg) against 168 deg on the left.
+**Owner decision (b):** cap the right shoulder_pan to the left arm's limit span (1853
+ticks) centred on its measured midpoint: 1191..3044. Left shoulder_pan was re-swept to
+confirm (654-2565, 168 deg, repeatable), so its limit 674..2527 was kept.
+
+| joint | servo limits (ticks) | servo deg |
+|---|---|---|
+| shoulder_pan | 1191..3044 | 104.7..267.5 |
+| shoulder_lift | 1323..2935 | 116.3..258.0 |
+| elbow_flex | 906..3046 | 79.6..267.7 |
+| wrist_flex | 899..3167 | 79.0..278.3 |
+| wrist_roll | 554..3434 | 48.7..301.8 |
+| gripper | 1573..2479 | 138.3..217.9 |

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 23:06'
+updated_date: '2026-10-24 23:19'
 labels: []
 milestone: m-1
 dependencies:
@@ -76,6 +76,8 @@ LIVE 2026-10-24, left arm servo EEPROM calibration (owner-approved, torque OFF t
 3. Min/Max_Position_Limit written to EEPROM with a 30-tick margin, read-back verified: pan 674-2527, lift 1255-3000, elbow 939-3091, wrist_flex 929-3187, wrist_roll 500-3290 (owner: not continuous on this build), gripper 1558-2487. Stored in hardware.yaml motion_guard.left_arm_limits.servo_tick_limits.
 OWNER NOTE: these are per-joint independent maxima; the real safe envelope depends on all joints together. The collision model (keep-out geometry, currently placeholders) must be built and validated before motion near the limits.
 AC#1 NOT checked yet: the right arm is pending, and the radian-valued soft limits need AA-9 servo_calibration (joint zero and sign), which is unmeasured.
+
+LIVE 2026-10-24, right arm servo EEPROM calibration (owner-approved, torque OFF, all writes read back). Homing offsets id1 -312, id2 397, id3 -99, id4 269, id5 -1063, id6 611. Two read-only sweeps (the first missed shoulder_pan); merged ranges (ticks): pan 758-3477 (239 deg), lift 1293-2965, elbow 876-3076, wrist_flex 869-3197, wrist_roll 524-3464, gripper 1543-2509; no seam crossing. Left shoulder_pan re-swept: 654-2565 (168 deg), repeatable, limit kept. OWNER DECISION (b): right shoulder_pan capped to the left span (1853 ticks) centred on its midpoint, giving 1191-3044. EEPROM limits written: pan 1191-3044, lift 1323-2935, elbow 906-3046, wrist_flex 899-3167, wrist_roll 554-3434, gripper 1573-2479. Both arms now have per-joint servo-side limits. AC#1 still unchecked: radian soft limits need the joint zero and sign calibration, and the combined-joint envelope needs the collision geometry.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

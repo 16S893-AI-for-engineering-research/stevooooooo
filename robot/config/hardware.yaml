@@ -460,9 +460,19 @@ motion_guard:
     wrist_flex_upper_rad: null
     wrist_roll_lower_rad: null
     wrist_roll_upper_rad: null
-    unverified: true
+    unverified: true  # radians need AA-9 servo_calibration (zero offset + sign); still unmeasured
     method: null
     measured_date: null
+    # MEASURED 2026-10-24 and WRITTEN to servo EEPROM (read-back verified). Raw
+    # servo ticks, per-joint maxima minus a 30-tick margin; shoulder_pan capped by
+    # owner to the left arm's span. NOT combined-joint safe limits.
+    servo_tick_limits:
+      shoulder_pan: [1191, 3044]
+      shoulder_lift: [1323, 2935]
+      elbow_flex: [906, 3046]
+      wrist_flex: [899, 3167]
+      wrist_roll: [554, 3434]
+      gripper: [1573, 2479]
 
   # Collision model.
   # Dense sampling of straight-line joint interpolations: 50 samples.
