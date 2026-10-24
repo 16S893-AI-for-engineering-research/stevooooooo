@@ -1,0 +1,18 @@
+lerobot 0.6.1  torch 2.11.0+cu130  GPU NVIDIA GeForce RTX 3050 Ti Laptop GPU  total 4096 MB
+       res  bs   amp  peak_MB  step_s
+240x 320   1 False     1005    0.68
+240x 320   2 False     1010    0.21
+240x 320   4 False     1018    0.19
+240x 320   8 False     1021    0.16
+240x 320   1  True     1007    0.38
+240x 320   2  True     1010    0.20
+240x 320   4  True     1011    0.19
+240x 320   8  True     1019    0.19
+480x 640   1 False     1017    0.14
+480x 640   2 False     1013    0.14
+480x 640   4 False     1025    0.21
+480x 640   8 False     1724    0.36
+480x 640   1  True     1014    0.18
+480x 640   2  True     1016    0.20
+480x 640   4  True     1025    0.19
+480x 640   8  True     1677    0.26

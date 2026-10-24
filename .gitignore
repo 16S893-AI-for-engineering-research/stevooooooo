@@ -28,3 +28,6 @@ robot/sessions/
 robot/out/
 robot/datasets/
 robot/checkpoints/
+
+# Catch-all for misplaced nested robot/robot/ outputs
+robot/robot/

@@ -784,3 +784,59 @@ leveling:
   max_residual_rms_mm: 0.5
   max_uncertainty_mm: 0.2
 # --- AA-32 end ---
+# --- AA-23 ---
+# Teleop capture configuration (AA-23). All values are UNVERIFIED defaults.
+# Set tube_support_source to 'fixture' or 'locked_arm' before recording.
+# Set operator_token to a non-empty string to satisfy the precondition check.
+# Run scripts/teleop.py --live --speed-scale 0.2 under owner supervision to verify
+# the mirror_map and record the result (AC#1).
+teleop_capture:
+  leader_arm: right        # unverified: true - owner to confirm
+  follower_arm: left       # unverified: true - owner to confirm
+  tube_support_source: null  # unverified: true; set to 'fixture' or 'locked_arm'
+  operator_token: null     # set to non-empty string to confirm operator readiness
+  mirror_map:
+    shoulder_pan:
+      sign: 1              # unverified: true
+      offset_deg: 0.0      # unverified: true
+    shoulder_lift:
+      sign: 1              # unverified: true
+      offset_deg: 0.0      # unverified: true
+    elbow_flex:
+      sign: 1              # unverified: true
+      offset_deg: 0.0      # unverified: true
+    wrist_flex:
+      sign: 1              # unverified: true
+      offset_deg: 0.0      # unverified: true
+    wrist_roll:
+      sign: -1             # unverified: true (mirrored mounting inverts roll)
+      offset_deg: 0.0      # unverified: true
+  start_offset_range:
+    shoulder_pan_max_deg: 5.0   # unverified: true
+    shoulder_lift_max_deg: 5.0  # unverified: true
+    elbow_flex_max_deg: 5.0     # unverified: true
+    wrist_flex_max_deg: 5.0     # unverified: true
+    wrist_roll_max_deg: 5.0     # unverified: true
+  dataset_root: datasets/teleop  # relative to robot/ (resolve_robot_path)
+  camera_frame_width: 640
+  camera_frame_height: 480
+  speed_scale_default: 0.2
+# --- AA-23 end ---
+# --- AA-33 ---
+# Per-hop leveling correction configuration (AA-33).
+# All values are UNVERIFIED defaults; calibrate against hardware before live use.
+# null thresholds fail closed in live mode (any correction triggers rescan/halt).
+print_frame:
+  # Maximum |Z offset| (mm) before a rescan is triggered. unverified: true
+  sanity_bound_z_mm: 5.0       # unverified: true
+  # Maximum |rx| tilt (rad) before a rescan. ~5.7 deg. unverified: true
+  sanity_bound_rx_rad: 0.1     # unverified: true
+  # Maximum |ry| tilt (rad) before a rescan. ~5.7 deg. unverified: true
+  sanity_bound_ry_rad: 0.1     # unverified: true
+  # Verification rescan: Z residual must be within this value (mm). unverified: true
+  residual_tolerance_mm: 0.5   # unverified: true
+  # Verification residual tolerance for rx (rad). unverified: true
+  residual_tolerance_rx_rad: 0.05  # unverified: true
+  # Verification residual tolerance for ry (rad). unverified: true
+  residual_tolerance_ry_rad: 0.05  # unverified: true
+# --- AA-33 end ---

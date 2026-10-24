@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-24 16:07'
+updated_date: '2026-10-24 18:58'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -78,6 +78,7 @@ Total bandwidth is shared, so:
   - `usbipd attach` on an unbound device fails with `Device is not shared; run 'usbipd bind --busid <id>' as administrator first`, so each device needs a one-time admin bind.
   - usbipd-win version present: 5.3.0.
 - GPU: NVIDIA RTX 3050 Laptop, **4 GB VRAM**. System RAM 7 GB, 8 CPU cores. Policy training must fit this budget (small image resolution, small batch, gradient accumulation, mono single-camera input).
+- **Measured 2026-10-24 (AA-22):** the GPU is an **RTX 3050 Ti Laptop, 4096 MB**, and CUDA works inside WSL (torch 2.11.0+cu130). A real LeRobot `ACTPolicy` training step (ResNet-18 + transformer, default chunk 100, 5-D state and action) peaks at about **1.0 GB** for batch 1-4 and about **1.7 GB at 480x640, batch 8**, so local ACT training is feasible. LeRobot resolved to **0.6.1** in `robot/lerobot_env` (a separate Python 3.12 uv project).
 
 ## 8. Software conventions
 

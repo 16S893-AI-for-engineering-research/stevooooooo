@@ -1,0 +1,37 @@
+# --- AA-22 ---
+# Separate uv project for LeRobot 0.6.x + Python 3.12.
+# LeRobot requires Python>=3.12 which is incompatible with the main robot
+# package (requires-python>=3.10).  This is a separate project that adds
+# lerobot as a dependency alongside an editable path dep on inchworm.
+#
+# Recreate from scratch:
+#   cd robot/lerobot_env
+#   uv sync                        # installs all pinned deps
+#   uv run python smoke.py         # verify versions + CUDA
+#   uv run pytest tests/           # run LeRobot-integrated tests
+[project]
+name = "lerobot-env"
+version = "0.1.0"
+description = "Pinned LeRobot 0.6.x environment for the inchworm SO-101 robot"
+requires-python = ">=3.12"
+dependencies = [
+    # Newest available 0.6.x release on PyPI (0.6.2 does not exist).
+    "lerobot==0.6.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+inchworm-robot = { path = "../", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "inchworm-robot",
+]
+# --- AA-22 end ---

@@ -949,6 +949,34 @@ class AA16CalibrationConfig(_Strict):
 # --- AA-16 end ---
 
 
+# --- AA-33 ---
+
+
+class PrintFrameConfigSchema(_Strict):
+    """Configuration for the AA-33 per-hop leveling correction (PrintFrame).
+
+    Loaded from the ``print_frame`` block in hardware.yaml.  All values are
+    **unverified** defaults; calibrate against hardware before live use.
+    ``None`` thresholds fail closed in live mode.
+    """
+
+    # Maximum allowed |Z offset| from a single scan (mm).
+    # null = unverified; live mode always triggers rescan/halt.
+    sanity_bound_z_mm: Optional[float] = Field(default=5.0, gt=0)   # unverified: true
+    # Maximum allowed |rx| tilt (radians). unverified: true
+    sanity_bound_rx_rad: Optional[float] = Field(default=0.1, gt=0) # unverified: true
+    # Maximum allowed |ry| tilt (radians). unverified: true
+    sanity_bound_ry_rad: Optional[float] = Field(default=0.1, gt=0) # unverified: true
+    # After applying correction, verification rescan must show Z residual ≤ this (mm).
+    # null = unverified; live mode always fails verification.
+    residual_tolerance_mm: Optional[float] = Field(default=0.5, gt=0)         # unverified: true
+    # Verification residual tolerance for rx (radians). unverified: true
+    residual_tolerance_rx_rad: Optional[float] = Field(default=0.05, gt=0)    # unverified: true
+    # Verification residual tolerance for ry (radians). unverified: true
+    residual_tolerance_ry_rad: Optional[float] = Field(default=0.05, gt=0)    # unverified: true
+
+
+# --- AA-33 end ---
 # --- AA-32 ---
 
 
@@ -983,6 +1011,183 @@ class LevelingConfigSchema(_Strict):
 
 
 # --- AA-32 end ---
+# --- AA-34 ---
+
+
+class GCodeIntakeConfigSchema(_Strict):
+    """AA-34 G-code intake configuration loaded from hardware.yaml.
+
+    All limits are UNVERIFIED defaults until the owner confirms them against
+    the specific nozzle, hotend, and DexArm firmware in use.
+    Live mode applies these limits as hard rejection thresholds.
+
+    See :class:`inchworm.gcode_intake.GCodeIntakeConfig` for field semantics.
+    """
+
+    # Maximum feedrate in mm/min. unverified: true — confirm with DexArm firmware
+    max_feedrate_mm_min: float = Field(default=9000.0, gt=0)  # unverified: true
+    # Maximum nozzle temperature (°C). unverified: true — confirm with hotend spec
+    max_nozzle_temp_c: float = Field(default=280.0, gt=0)    # unverified: true
+    # Maximum bed temperature (°C). unverified: true — confirm with bed heater spec
+    max_bed_temp_c: float = Field(default=120.0, gt=0)       # unverified: true
+    # Z-origin consistency tolerance (mm). unverified: true
+    z_origin_tolerance_mm: float = Field(default=1.0, gt=0)  # unverified: true
+    # Nozzle retract distance on abort (mm).
+    retract_z_mm: float = Field(default=3.0, gt=0)
+
+
+# --- AA-34 end ---
+
+# --- AA-21 ---
+
+
+class CycleRunnerConfig(_Strict):
+    """AA-21 dry crawl cycle runner configuration.
+
+    All values are ``unverified: true`` until an owner-supervised session
+    measures them.  Live mode fails closed on any unverified field.
+
+    ``initial_moving_arm``
+        Which arm moves first.  ``"left"`` or ``"right"``.
+        Config-driven documented choice marked for owner confirmation.
+        Changing this changes which arm advances the tube on cycle 0.
+
+    ``advance_direction``
+        +1 or -1: the direction multiplier passed to
+        :meth:`~inchworm.frames.FrameModel.complete_advance`.  Determines
+        which physical direction on the chassis is "forward".  UNVERIFIED
+        until AA-16 verifies the tube-frame orientation.
+
+    ``advance_direction_owner_confirmed``
+        Must be set to ``True`` by the owner after confirming that
+        ``advance_direction`` matches the physical crawl direction.
+        Live mode refuses to start while this is ``False``.
+
+    ``supervisor_success_at_step``
+        In dry-run, the scripted seating detector fires success after this
+        many policy steps (0 = immediate success on step 0).  Has no effect
+        in live mode.
+    """
+
+    # Which arm moves on the first cycle.  "left" or "right".
+    initial_moving_arm: str = Field(default="left", pattern=r"^(left|right)$")
+    # Advance direction: +1 = positive tube-x in chassis frame, -1 = negative.
+    # UNVERIFIED: owner must confirm after AA-16 calibration.
+    advance_direction: int = Field(default=1)
+    # Must be set True by owner after verifying advance_direction on hardware.
+    advance_direction_owner_confirmed: bool = False
+    # Number of policy steps before the scripted seating detector succeeds (dry-run).
+    supervisor_success_at_step: int = Field(default=2, ge=0)
+
+    def model_post_init(self, __context: object) -> None:  # type: ignore[override]
+        if self.advance_direction not in (1, -1):
+            raise ValueError(
+                f"advance_direction must be +1 or -1, got {self.advance_direction!r}"
+            )
+
+
+# --- AA-21 end ---
+# --- AA-23 ---
+
+
+class JointMirrorParams(_Strict):
+    """Per-joint mirror mapping from leader to follower for teleop capture.
+
+    sign:  +1 or -1 (mirrored mounting may flip a joint direction).  unverified: true
+    offset_deg: additive offset applied after sign flip (servo degrees).  unverified: true
+    """
+
+    sign: int = Field(default=1)          # unverified: true; must be +1 or -1
+    offset_deg: float = Field(default=0.0)  # unverified: true
+
+    @model_validator(mode="after")
+    def _sign_valid(self) -> "JointMirrorParams":
+        if self.sign not in (1, -1):
+            raise ValueError(f"sign must be +1 or -1, got {self.sign}")
+        return self
+
+
+class MirrorMapConfig(_Strict):
+    """Per-joint mirror parameters for all five teleop joints (joints 1-5).
+
+    Joint 6 (gripper) is intentionally absent: it is never part of the
+    teleop mapping (AGENTS.md invariant 4; decision-1 rule 2).
+    """
+
+    shoulder_pan: JointMirrorParams = Field(default_factory=JointMirrorParams)
+    shoulder_lift: JointMirrorParams = Field(default_factory=JointMirrorParams)
+    elbow_flex: JointMirrorParams = Field(default_factory=JointMirrorParams)
+    wrist_flex: JointMirrorParams = Field(default_factory=JointMirrorParams)
+    wrist_roll: JointMirrorParams = Field(default_factory=JointMirrorParams)
+
+
+class StartOffsetRangeConfig(_Strict):
+    """Symmetric per-joint random start-offset range (degrees) drawn at episode start.
+
+    Each episode F arm is moved to the AA-18 pre-insertion pose PLUS a random
+    offset within [-max_deg, +max_deg] for each joint.  Range is stored in
+    episode metadata.  unverified: true for all fields.
+    """
+
+    shoulder_pan_max_deg: float = Field(default=5.0, ge=0)   # unverified: true
+    shoulder_lift_max_deg: float = Field(default=5.0, ge=0)  # unverified: true
+    elbow_flex_max_deg: float = Field(default=5.0, ge=0)     # unverified: true
+    wrist_flex_max_deg: float = Field(default=5.0, ge=0)     # unverified: true
+    wrist_roll_max_deg: float = Field(default=5.0, ge=0)     # unverified: true
+
+
+class TeleopCaptureConfig(_Strict):
+    """AA-23 teleop capture configuration loaded from hardware.yaml.
+
+    leader_arm:  which arm acts as leader (torque off, read-only).  The leader
+        arm must NOT be the tube holder during recording.
+    follower_arm: which arm performs the insertion (torque on, GuardedArm writes).
+    tube_support_source: attestation of how the tube is supported during
+        recording.  'fixture' means a physical fixture; 'locked_arm' means a
+        locked torque-enabled arm (NOT the leader).
+    mirror_map: per-joint sign+offset config.  All unverified: true until owner
+        runs scripts/teleop.py --live --speed-scale 0.2 and logs the mapping.
+    start_offset_range: per-joint start-offset range for randomisation.
+    dataset_root: local path under which LeRobot-compatible episodes are written.
+        Never pushed to the hub.
+    camera_frame_width, camera_frame_height: wrist-camera resolution for capture.
+    speed_scale_default: default fractional speed scale for dry-run teleop.
+    """
+
+    leader_arm: str = Field(default="right")    # unverified: true — owner to confirm
+    follower_arm: str = Field(default="left")   # unverified: true — owner to confirm
+    # 'fixture' or 'locked_arm' — set to the actual attestation before recording
+    tube_support_source: Optional[str] = None   # unverified: true; null = unset
+    mirror_map: MirrorMapConfig = Field(default_factory=MirrorMapConfig)
+    start_offset_range: StartOffsetRangeConfig = Field(
+        default_factory=StartOffsetRangeConfig
+    )
+    # Local dataset root; episodes are NEVER pushed to the hub.
+    # Relative paths resolve against the robot/ package dir (DEFAULT_CONFIG_PATH.parents[1]),
+    # never the process CWD (orchestrator fix 2026-10-24: a CWD-relative default wrote
+    # into robot/robot/datasets).
+    dataset_root: str = Field(default="datasets/teleop")  # unverified: true
+    camera_frame_width: int = Field(default=640, gt=0)
+    camera_frame_height: int = Field(default=480, gt=0)
+    speed_scale_default: float = Field(default=0.2, gt=0, le=1.0)
+    # Minimum operator confirmation token required to start recording.
+    # Set to a non-empty string in the CLI or config to satisfy the precondition.
+    operator_token: Optional[str] = None  # null = token not yet provided
+
+    @model_validator(mode="after")
+    def _arms_distinct(self) -> "TeleopCaptureConfig":
+        if self.leader_arm == self.follower_arm:
+            raise ValueError(
+                f"leader_arm and follower_arm must be distinct, got {self.leader_arm!r} for both"
+            )
+        if self.leader_arm not in ("left", "right"):
+            raise ValueError(f"leader_arm must be 'left' or 'right', got {self.leader_arm!r}")
+        if self.follower_arm not in ("left", "right"):
+            raise ValueError(f"follower_arm must be 'left' or 'right', got {self.follower_arm!r}")
+        return self
+
+
+# --- AA-23 end ---
 
 
 class HardwareConfig(_Strict):
@@ -1036,6 +1241,18 @@ class HardwareConfig(_Strict):
     # --- AA-32 ---
     leveling: Optional["LevelingConfigSchema"] = None
     # --- AA-32 end ---
+    # --- AA-21 ---
+    cycle_runner: Optional["CycleRunnerConfig"] = None
+    # --- AA-21 end ---
+    # --- AA-23 ---
+    teleop_capture: Optional["TeleopCaptureConfig"] = None
+    # --- AA-23 end ---
+    # --- AA-33 ---
+    print_frame: Optional["PrintFrameConfigSchema"] = None
+    # --- AA-33 end ---
+    # --- AA-34 ---
+    gcode_intake: Optional["GCodeIntakeConfigSchema"] = None
+    # --- AA-34 end ---
 
     @model_validator(mode="before")
     @classmethod
@@ -1145,3 +1362,10 @@ def load_config(path: Union[str, Path, None] = None) -> HardwareConfig:
     except yaml.YAMLError as err:
         raise ConfigError(f"invalid YAML in hardware config {config_path}: {err}") from None
     return parse_config(data, source=str(config_path))
+
+
+# --- orchestrator: path resolution helper ---
+def resolve_robot_path(p: "Union[str, Path]") -> Path:
+    """Resolve *p* against the robot/ package directory if it is relative."""
+    q = Path(p)
+    return q if q.is_absolute() else (DEFAULT_CONFIG_PATH.parents[1] / q).resolve()
