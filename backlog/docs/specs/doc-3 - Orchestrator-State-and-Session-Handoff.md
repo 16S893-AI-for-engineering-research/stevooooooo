@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 19:41'
+updated_date: '2026-10-24 19:51'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-24 by the orchestrator at commit `aa931b1`. 1462 tests pass (`cd robot && uv run pytest`). All hardware-free work is done; the remaining ACs need the owner, the robot or a trained model.
+**Last verified:** 2026-10-24 by the orchestrator at commit `92ac565`. 1496 tests pass (`cd robot && uv run pytest`). All hardware-free work is done; the remaining ACs need the owner, the robot or a trained model.
 
 ## 1. Resume in 60 seconds
 
@@ -72,7 +72,7 @@ Order matters: each step unblocks the next. All scripts are in `robot/scripts/`,
 3. **Servo IDs (AA-8 #2, #4):** `uv run python scripts/scan_servos.py --live --persist`, then `--benchmark` (>= 20 Hz).
 4. **Joint limits and calibration (AA-9 #1):** `uv run python scripts/measure_limits.py --live --arm left` / `--arm right` (torque-off manual sweep). Also measure per-joint zero offset and sign, then set `unverified: false`.
 5. **Gripper bands (AA-17 #1):** `uv run python scripts/gripper_bands.py --live --arm arm_left` / `arm_right`.
-6. **Left/right confirmation:** low-speed jog of one joint per arm (live jog is refused until it is wired through GuardedArm; this is a follow-up before this step).
+6. **Left/right confirmation:** `uv run python scripts/jog.py --arm left --delta 0.005,0,0 --live` (speed-scale 0.2 default, through GuardedArm). It refuses until steps 3-4 populate servo IDs, calibration and limits.
 7. **Named poses (AA-9 #4, AA-19 #1/#4):** neutral and folded_transit, then `scripts/fold_cycle.py --live --cycles 10`.
 8. **DexArm (AA-12 bounds, AA-13):** confirm 115200 baud and homing; measure the real workspace box (replace `unverified: true`); then the AA-13 repeatability suite.
 9. **Cameras (AA-14 #4, AA-38):** `scripts/camera_probe.py --live --role ...` for each role, then the concurrency measurement.
@@ -88,7 +88,7 @@ Order matters: each step unblocks the next. All scripts are in `robot/scripts/`,
 4. **Tube fixture design** per `robot/docs/tube_fixture.md` (decision-1).
 5. Whether to relax the single-camera rule after AA-38 is measured.
 
-Known software follow-ups (small, hardware-adjacent): wire live jog through GuardedArm (AA-11 #4); add the missing `scripts/fault_inject_hw.py` (referenced in AA-28); make `attach_usb.py` verify that each device appears after `usbipd attach` (silent failures observed).
+Software follow-ups: none outstanding. Live jog, `scripts/fault_inject_hw.py` and attach verification landed in `92ac565`.
 
 ## 5. Decisions already made (do not silently revisit)
 
