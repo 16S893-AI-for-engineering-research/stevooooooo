@@ -32,6 +32,8 @@ from inchworm.dexarm import (
     DexArmDisconnect,
     DexArmDriver,
     DexArmError,
+    DexArmMotionInRawError,
+    DexArmNoBoundsError,
     DexArmPosition,
     MockDexArmSerial,
     _parse_m114,
@@ -340,7 +342,7 @@ class TestCommandQueueAndErrors:
         mock.inject_error("out of range")
         driver = _driver(mock)
         with pytest.raises(DexArmCommandError) as exc_info:
-            driver.send_raw("G0 X999.0 Y999.0 Z999.0")
+            driver.send_raw("M117 hello")  # non-motion; triggers injected error
         err = exc_info.value
         assert hasattr(err, "command")
         assert hasattr(err, "firmware_response")
@@ -421,11 +423,44 @@ class TestWorkspaceBounds:
     def test_bounds_error_is_subclass_of_dexarm_error(self):
         assert issubclass(DexArmBoundsError, DexArmError)
 
-    def test_no_bounds_check_when_workspace_is_none(self):
+    def test_no_bounds_raises_no_bounds_error_without_workspace(self):
         mock = MockDexArmSerial()
         driver = DexArmDriver(mock, workspace=None, ack_timeout_s=1.0)
-        # Should not raise even for very large coords.
-        driver.move_absolute(99999.0, 99999.0, 99999.0)
+        # Fail-closed: motion commands refuse to run without a workspace.
+        with pytest.raises(DexArmNoBoundsError):
+            driver.move_absolute(0.0, 200.0, 100.0)
+
+    def test_no_bounds_error_carries_command(self):
+        mock = MockDexArmSerial()
+        driver = DexArmDriver(mock, workspace=None, ack_timeout_s=1.0)
+        with pytest.raises(DexArmNoBoundsError) as exc_info:
+            driver.move_absolute(1.0, 2.0, 3.0)
+        assert exc_info.value.command != ""
+
+    def test_no_bounds_error_is_subclass_of_dexarm_error(self):
+        assert issubclass(DexArmNoBoundsError, DexArmError)
+
+    def test_home_allowed_without_workspace(self):
+        """home() is permitted without a workspace (recovery to known-safe state)."""
+        mock = MockDexArmSerial()
+        driver = DexArmDriver(mock, workspace=None, ack_timeout_s=1.0)
+        # Must not raise DexArmNoBoundsError.
+        driver.home()
+
+    def test_move_relative_no_workspace_raises_no_bounds_error(self):
+        mock = MockDexArmSerial()
+        mock.set_position(0.0, 300.0, 200.0)
+        driver = DexArmDriver(mock, workspace=None, ack_timeout_s=1.0)
+        with pytest.raises(DexArmNoBoundsError):
+            driver.move_relative(1.0, 0.0, 0.0)
+
+    def test_no_bounds_not_transmitted_on_no_bounds_error(self):
+        mock = MockDexArmSerial()
+        driver = DexArmDriver(mock, workspace=None, ack_timeout_s=1.0)
+        with pytest.raises(DexArmNoBoundsError):
+            driver.move_absolute(0.0, 200.0, 100.0)
+        # No G0/G90 bytes sent; rejection happens before transmission.
+        assert not mock.written
 
     def test_relative_move_outside_bounds_raises(self):
         mock = MockDexArmSerial()
@@ -551,6 +586,159 @@ class TestM114Parsing:
 
 
 # ---------------------------------------------------------------------------
+# P1: send_raw and select_module reject motion G-codes
+# ---------------------------------------------------------------------------
+
+
+class TestMotionInRawRejection:
+    """send_raw and select_module must refuse motion G-codes (AA-12 P1)."""
+
+    def test_send_raw_rejects_g0(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G0 X10 Y200 Z100")
+
+    def test_send_raw_rejects_g1(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G1 X0 Y200 Z100 F3000")
+
+    def test_send_raw_rejects_g2(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G2 X10 Y10 I5 J5")
+
+    def test_send_raw_rejects_g3(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G3 X10 Y10 I5 J5")
+
+    def test_send_raw_rejects_g28(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G28")
+
+    def test_send_raw_rejects_g29(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G29 W")
+
+    def test_send_raw_rejects_zero_padded_g00(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G00 X10 Y10 Z10")
+
+    def test_send_raw_rejects_line_number_prefix(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("N10 G1 X10 Y20 Z5")
+
+    def test_send_raw_rejects_case_insensitive(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("g0 x10 y200 z100")
+
+    def test_send_raw_allows_non_motion_gcodes(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        # G90 (absolute mode), G92 (set position), M114 — all non-motion
+        driver.send_raw("G90")
+        driver.send_raw("G92 E0")
+        driver.send_raw("M114")
+
+    def test_send_raw_motion_rejected_before_transmission(self):
+        """No bytes reach the transport when a motion code is rejected."""
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError):
+            driver.send_raw("G0 X10 Y200 Z100")
+        assert not mock.written
+
+    def test_motion_in_raw_error_carries_gcode_and_matched_code(self):
+        mock = MockDexArmSerial()
+        driver = _driver(mock)
+        with pytest.raises(DexArmMotionInRawError) as exc_info:
+            driver.send_raw("G1 X5 Y5 Z5")
+        err = exc_info.value
+        assert "G1" in err.matched_code.upper()
+        assert "G1" in err.gcode_line.upper() or "g1" in err.gcode_line
+
+    def test_motion_in_raw_error_is_subclass_of_dexarm_error(self):
+        assert issubclass(DexArmMotionInRawError, DexArmError)
+
+
+# ---------------------------------------------------------------------------
+# P1: unverified workspace warning at connect
+# ---------------------------------------------------------------------------
+
+
+class TestUnverifiedWorkspaceWarning:
+    """DexArmWorkspace.unverified triggers a WARNING log at connect (AA-12 P1)."""
+
+    def test_unverified_true_emits_warning_at_connect(self):
+        mock = MockDexArmSerial()
+        logger = MagicMock()
+        ws = DexArmWorkspace(
+            x_min_mm=-300.0, x_max_mm=300.0,
+            y_min_mm=0.0, y_max_mm=450.0,
+            z_min_mm=-100.0, z_max_mm=400.0,
+            unverified=True,
+        )
+        driver = DexArmDriver(mock, workspace=ws, ack_timeout_s=1.0, logger=logger)
+        driver.connect()
+        calls = logger.emit.call_args_list
+        warning_calls = [
+            kw for _, kw in calls
+            if kw.get("severity") == "WARNING"
+            and "unverified" in kw.get("event_type", "")
+        ]
+        assert warning_calls, "Expected a WARNING emit for unverified workspace"
+
+    def test_verified_workspace_no_warning_at_connect(self):
+        mock = MockDexArmSerial()
+        logger = MagicMock()
+        ws = DexArmWorkspace(
+            x_min_mm=-300.0, x_max_mm=300.0,
+            y_min_mm=0.0, y_max_mm=450.0,
+            z_min_mm=-100.0, z_max_mm=400.0,
+            unverified=False,
+        )
+        driver = DexArmDriver(mock, workspace=ws, ack_timeout_s=1.0, logger=logger)
+        driver.connect()
+        calls = logger.emit.call_args_list
+        warning_calls = [
+            kw for _, kw in calls
+            if kw.get("severity") == "WARNING"
+            and "unverified" in kw.get("event_type", "")
+        ]
+        assert not warning_calls, "No unverified warning expected for verified workspace"
+
+    def test_hardware_yaml_workspace_is_unverified(self):
+        """The shipped hardware.yaml has unverified=True on the workspace."""
+        config = load_config()
+        ws = config.dexarm.workspace
+        assert ws is not None
+        assert ws.unverified is True
+
+    def test_workspace_unverified_field_defaults_false(self):
+        ws = DexArmWorkspace(
+            x_min_mm=-100.0, x_max_mm=100.0,
+            y_min_mm=0.0, y_max_mm=200.0,
+            z_min_mm=-50.0, z_max_mm=50.0,
+        )
+        assert ws.unverified is False
+
+
+# ---------------------------------------------------------------------------
 # Module-select (Rotrics-specific, unverified)
 # ---------------------------------------------------------------------------
 
@@ -568,3 +756,23 @@ class TestModuleSelect:
         driver.select_module(0)
         sent = b"".join(mock.written).decode()
         assert "M888" in sent
+
+
+# --- Orchestrator regression test 2026-10-24: no-space motion G-codes ---
+import pytest as _pytest
+from inchworm.dexarm import _MOTION_GCODE_RE as _RX
+
+
+@_pytest.mark.parametrize("line", [
+    "G0X5", "G1X0;c", "g01 x1", "N10 G1 X1", "  G2 X1", "G3X1Y1I0J1",
+    "G28", "G29", "G5 X1", "G00 X0", "M114\nG1X1",
+])
+def test_motion_regex_catches_all_motion_forms(line):
+    assert _RX.search(line), line
+
+
+@_pytest.mark.parametrize("line", [
+    "M114", "G4 P100", "G92 X0", "G10", "G12", "M888 P0", "M115", "G90", "G91",
+])
+def test_motion_regex_allows_non_motion(line):
+    assert not _RX.search(line), line

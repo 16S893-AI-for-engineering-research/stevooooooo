@@ -1,11 +1,11 @@
 ---
 id: AA-12
 title: DexArm G-code driver and connection management
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-24 16:47'
+updated_date: '2026-10-24 17:14'
 labels: []
 milestone: m-1
 dependencies:
@@ -36,7 +36,7 @@ See doc-1 sections 3, 7 and 8.
 - [x] #2 Driver supports homing, absolute and relative linear moves in mm, feedrate control, position query and a documented safe-park command
 - [x] #3 Move completion is positively confirmed (blocking acknowledgement or position query convergence) so callers can rely on the arm being settled before capturing a frame
 - [x] #4 A command queue serializes access so concurrent callers cannot interleave G-code lines, and malformed or rejected commands raise typed errors including the firmware response
-- [ ] #5 Workspace bounds for the DexArm are configured and commanded moves outside them are rejected before transmission
+- [x] #5 Workspace bounds for the DexArm are configured and commanded moves outside them are rejected before transmission
 - [x] #6 A mock DexArm backend emulates acknowledgements and position queries, and tests cover handshake, move confirmation, bounds rejection and error mapping
 <!-- AC:END -->
 
@@ -54,7 +54,9 @@ See doc-1 sections 3, 7 and 8.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Implemented inchworm/dexarm.py with: DexArmDriver (handshake via M115, get_position via M114, home/G28, move_absolute/relative, set_feedrate, safe_park, send_raw, select_module); DexArmWorkspace bounds in config.py (AA-12 block) and hardware.yaml (AA-12 block); MockDexArmSerial mock transport. All motion entry points have dry_run=True. M888 module select marked UNVERIFIED. Telemetry via SessionLogger. threading.Lock serialises all wire access. Bounds checked before transmission in _check_bounds(). Typed errors: DexArmDisconnect, DexArmCommandError, DexArmBoundsError. 56 new tests in tests/test_dexarm.py; full suite 380 passed 0 failed.
+P1 safety fixes applied (2026-10-24 resumption): (1) Fail-closed: _check_bounds now raises DexArmNoBoundsError when workspace is None; home() remains permitted without bounds (recovery action, comment in code). (2) send_raw and select_module now call _reject_motion_gcode() which raises DexArmMotionInRawError for G0/G1/G2/G3/G28/G29 and zero-padded/line-number forms. (3) DexArmWorkspace.unverified: bool = False added to config.py; hardware.yaml workspace marked unverified: true with comment; WARNING emitted at connect when unverified. 78 test_dexarm tests, 434 full suite passed.
+
+Orchestrator fix 2026-10-24: _MOTION_GCODE_RE missed Marlin no-space forms (G0X5, G1X0;c) and G5, so send_raw could have issued unbounded motion. Replaced the pattern with a lookbehind/lookahead version and added 20 parametrized regression tests (test_motion_regex_*). Full suite: 461 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

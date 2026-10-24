@@ -32,8 +32,18 @@ Safety invariants
   watchdog timeout. Document this in the operational runbook.
 * **Max-continuous-on**: :meth:`LaserDriver.on` enforces a configured
   maximum single-on duration from ``config.laser.max_continuous_on_s``.
-  Exceeding the limit raises :class:`LaserDurationExceededError`; the laser
-  is NOT turned on. Cumulative on-time is logged per session via AA-7 telemetry.
+  Two complementary mechanisms:
+
+  1. *Pre-check*: if ``duration_s`` is supplied and exceeds the limit,
+     :class:`LaserDurationExceededError` is raised before energising the relay.
+  2. *Active watchdog*: a :class:`threading.Timer` is started when the relay is
+     energised (with or without ``duration_s``). If ``off()`` is not called
+     before the limit elapses, the watchdog calls ``off()`` automatically, logs
+     a ``laser_max_on_cutoff`` WARNING event, and resets internal state so that
+     the next ``on()`` call works normally (no explicit re-arming needed; the
+     watchdog firing is equivalent to a manual ``off()``).
+
+  ``off()`` and ``close()`` always cancel the watchdog before it fires.
 
 Commanded-vs-reported state
 ---------------------------
@@ -265,6 +275,7 @@ class LaserDriver:
         self._cumulative_on_s: float = 0.0
         self._closed: bool = False
         self._lock = threading.Lock()
+        self._watchdog: Optional[threading.Timer] = None
 
         # Register atexit for fail-safe off.
         atexit.register(self._atexit_off)
@@ -336,6 +347,10 @@ class LaserDriver:
             self._transport.write(self._protocol.encode_on())
             self._commanded_on = True
             self._on_start_time = time.monotonic()
+            # Start the active watchdog; it fires off() if the caller never does.
+            self._watchdog = threading.Timer(self._max_on_s, self._watchdog_cutoff)
+            self._watchdog.daemon = True
+            self._watchdog.start()
 
         self._log("INFO", "laser_on", {
             "protocol": self._protocol.name,
@@ -348,12 +363,25 @@ class LaserDriver:
         Safe to call even if already off (no-op when not on and driver is open).
         Safe to call after :meth:`close` (will attempt to send off command if
         transport is still open).
+
+        Always cancels the active watchdog timer, if any.
         """
+        # Cancel the watchdog *before* acquiring the lock so the watchdog
+        # callback (which also calls off()) cannot deadlock: if the watchdog
+        # fires and calls off(), it will acquire the lock normally from its
+        # own thread; cancelling here is a best-effort early stop.
+        watchdog = self._watchdog
+        if watchdog is not None:
+            watchdog.cancel()
+            self._watchdog = None
+
         with self._lock:
             was_on = self._commanded_on
             on_start = self._on_start_time
             self._commanded_on = False
             self._on_start_time = None
+            # Clear watchdog ref inside lock as well (harmless double-clear).
+            self._watchdog = None
 
             if self._transport.is_open:
                 self._transport.write(self._protocol.encode_off())
@@ -409,6 +437,22 @@ class LaserDriver:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _watchdog_cutoff(self) -> None:
+        """Called by the watchdog timer when max_continuous_on_s elapses.
+
+        Executed on the timer's daemon thread. Logs a WARNING then calls
+        off() to de-energise the relay. After this, the next on() call works
+        normally – no explicit re-arming is required.
+        """
+        self._log("WARNING", "laser_max_on_cutoff", {
+            "max_continuous_on_s": self._max_on_s,
+            "reason": "watchdog_elapsed",
+        })
+        try:
+            self.off()
+        except Exception:
+            pass
 
     def _require_open(self) -> None:
         if self._closed:

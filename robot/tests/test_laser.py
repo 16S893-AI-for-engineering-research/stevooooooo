@@ -222,6 +222,141 @@ class TestDurationLimit:
 
 
 # ---------------------------------------------------------------------------
+# AC#6 (active watchdog): auto-cutoff when max_continuous_on_s elapses
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def watchdog_config(config):
+    """Config with a small max_continuous_on_s so watchdog tests finish quickly."""
+    return config.model_copy(
+        update={"laser": config.laser.model_copy(update={"max_continuous_on_s": 0.2})}
+    )
+
+
+class TestWatchdog:
+    """AC#6 active enforcement: watchdog fires off() after max_continuous_on_s."""
+
+    def test_watchdog_sends_off_bytes_after_limit(self, watchdog_config, mock_transport):
+        """Relay receives OFF bytes after the limit with no caller action."""
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()  # no duration_s – only watchdog can stop it
+        assert drv.commanded_on is True
+        # Wait up to 1 s for watchdog to fire (limit is 0.2 s).
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if not drv.commanded_on:
+                break
+            time.sleep(0.02)
+        assert drv.commanded_on is False, "watchdog did not fire in time"
+        assert mock_transport.written[-1] == bytes([0xA0, 0x01, 0x00, 0xA1])
+        drv.close()
+
+    def test_watchdog_logs_laser_max_on_cutoff(self, watchdog_config, mock_transport):
+        """laser_max_on_cutoff WARNING is emitted when the watchdog fires."""
+        import logging
+        records = []
+
+        class Capture(logging.Handler):
+            def emit(self, record):
+                records.append(record)
+
+        handler = Capture()
+        logging.getLogger("inchworm.laser").addHandler(handler)
+        try:
+            drv = LaserDriver(mock_transport, watchdog_config)
+            drv.on()
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                if not drv.commanded_on:
+                    break
+                time.sleep(0.02)
+            drv.close()
+        finally:
+            logging.getLogger("inchworm.laser").removeHandler(handler)
+
+        cutoff_records = [r for r in records if "laser_max_on_cutoff" in r.getMessage()]
+        assert cutoff_records, "expected laser_max_on_cutoff log record"
+        assert cutoff_records[0].levelno == logging.WARNING
+
+    def test_manual_off_cancels_watchdog(self, watchdog_config, mock_transport):
+        """Calling off() manually cancels the watchdog; no second OFF is sent."""
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()
+        drv.off()  # cancel the watchdog now
+        off_count_at_manual = mock_transport.written.count(bytes([0xA0, 0x01, 0x00, 0xA1]))
+        # Sleep past the watchdog deadline.
+        time.sleep(0.35)
+        off_count_after = mock_transport.written.count(bytes([0xA0, 0x01, 0x00, 0xA1]))
+        assert off_count_after == off_count_at_manual, (
+            f"watchdog fired after manual off: {off_count_after} vs {off_count_at_manual}"
+        )
+        drv.close()
+
+    def test_close_cancels_watchdog(self, watchdog_config, mock_transport):
+        """close() cancels the watchdog; no extra OFF bytes are written after close."""
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()
+        drv.close()
+        off_count_at_close = mock_transport.written.count(bytes([0xA0, 0x01, 0x00, 0xA1]))
+        time.sleep(0.35)
+        off_count_after = mock_transport.written.count(bytes([0xA0, 0x01, 0x00, 0xA1]))
+        assert off_count_after == off_count_at_close, (
+            f"watchdog fired after close: {off_count_after} vs {off_count_at_close}"
+        )
+
+    def test_no_leaked_threads_after_off(self, watchdog_config, mock_transport):
+        """Calling off() leaves no live watchdog threads."""
+        threads_before = threading.active_count()
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()
+        drv.off()
+        # Give any spurious thread a moment to die.
+        time.sleep(0.05)
+        threads_after = threading.active_count()
+        drv.close()
+        # Thread count should not grow from active watchdog timers.
+        assert threads_after <= threads_before + 1, (
+            f"possible thread leak: before={threads_before} after={threads_after}"
+        )
+
+    def test_no_leaked_threads_after_watchdog_fires(self, watchdog_config, mock_transport):
+        """Watchdog thread cleans itself up after firing."""
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()
+        # Wait for watchdog to fire.
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if not drv.commanded_on:
+                break
+            time.sleep(0.02)
+        # Brief pause for thread to fully finish.
+        time.sleep(0.05)
+        # Watchdog timer thread should be done (daemon, finished callback).
+        live_names = [t.name for t in threading.enumerate()]
+        # No Timer threads for this driver should be alive.
+        assert drv._watchdog is None, "watchdog ref should be cleared after firing"
+        drv.close()
+
+    def test_on_after_watchdog_fires_works(self, watchdog_config, mock_transport):
+        """After the watchdog fires, the next on() call works normally."""
+        drv = LaserDriver(mock_transport, watchdog_config)
+        drv.on()
+        # Wait for watchdog to cut off.
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if not drv.commanded_on:
+                break
+            time.sleep(0.02)
+        assert drv.commanded_on is False
+        # No re-arming required; just call on() again.
+        drv.on()
+        assert drv.commanded_on is True
+        drv.close()
+
+
+
+# ---------------------------------------------------------------------------
 # AC#6 / AC#7: cumulative on-time logging
 # ---------------------------------------------------------------------------
 

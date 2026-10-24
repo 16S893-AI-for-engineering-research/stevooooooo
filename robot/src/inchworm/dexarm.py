@@ -98,6 +98,51 @@ class DexArmBoundsError(DexArmError):
         self.workspace = workspace
 
 
+class DexArmNoBoundsError(DexArmError):
+    """Raised when a motion command is attempted with no workspace configured.
+
+    Bounds enforcement is **fail-closed**: the driver refuses to move without
+    a configured workspace so that a missing or unconfigured workspace cannot
+    silently allow unbounded motion.  Pass an explicit
+    :class:`~inchworm.config.DexArmWorkspace` to the constructor to enable
+    motion commands.
+
+    The only exception is :meth:`DexArmDriver.home` (G28), which is permitted
+    because homing is a recovery action that moves to the factory home position
+    regardless of current state.
+    """
+
+    def __init__(self, command: str = "") -> None:
+        detail = f" (command: {command!r})" if command else ""
+        super().__init__(
+            f"motion command refused: no workspace bounds configured{detail}. "
+            "Construct DexArmDriver with a DexArmWorkspace to enable motion."
+        )
+        self.command = command
+
+
+class DexArmMotionInRawError(DexArmError):
+    """Raised when a motion G-code is passed to send_raw or select_module.
+
+    Only the bounded motion API (move_absolute, move_relative, home, safe_park)
+    may issue motion commands.  Direct raw G-code paths do not enforce workspace
+    bounds, so they refuse motion codes entirely.
+
+    Blocked codes: G0, G1, G2, G3, G28, G29 and their zero-padded forms
+    (G00, G01, G02, G03), case-insensitive, including with leading line numbers
+    (e.g. ``N10 G1 X10``).
+    """
+
+    def __init__(self, gcode_line: str, matched_code: str) -> None:
+        super().__init__(
+            f"motion G-code {matched_code!r} is not allowed in send_raw/select_module; "
+            f"use the bounded motion API (move_absolute, move_relative, home). "
+            f"Rejected line: {gcode_line!r}"
+        )
+        self.gcode_line = gcode_line
+        self.matched_code = matched_code
+
+
 # ---------------------------------------------------------------------------
 # Position dataclass
 # ---------------------------------------------------------------------------
@@ -125,6 +170,36 @@ _M114_RE = re.compile(
     r"X:\s*(-?[\d.]+)\s+Y:\s*(-?[\d.]+)\s+Z:\s*(-?[\d.]+)",
     re.IGNORECASE,
 )
+
+# Motion G-codes that are blocked in send_raw and select_module.
+# Blocked codes: G0, G1, G2, G3, G00, G01, G02, G03, G28, G29 (case-insensitive).
+# Supports leading line numbers like "N10 G1 X10".
+# Only the bounded motion API (move_absolute, move_relative, home, safe_park)
+# may issue these codes; send_raw and select_module cannot bypass bounds.
+# Matches any motion G-code anywhere in the line: G0-G3 (with optional
+# leading zeros), G5 (Bezier), G28 (home), G29 (bed level), with any
+# following character that is not a digit, so "G0X5", "G1X0;c" and
+# "N10 G1 X1" are caught, while G4/G10/G12/G92 are not.
+# Orchestrator fix 2026-10-24: the original pattern required whitespace
+# after the code and missed Marlin's no-space form.
+_MOTION_GCODE_RE = re.compile(
+    r"(?<![A-Z0-9.])G0*(0|1|2|3|5|28|29)(?!\d)",
+    re.IGNORECASE,
+)
+
+
+def _reject_motion_gcode(gcode_line: str) -> None:
+    """Raise :class:`DexArmMotionInRawError` if *gcode_line* contains a motion G-code.
+
+    Motion codes (G0, G1, G2, G3, G28, G29 and zero-padded forms) are blocked
+    in :meth:`~DexArmDriver.send_raw` and :meth:`~DexArmDriver.select_module`
+    because those paths do not enforce workspace bounds.  Use the bounded motion
+    API (:meth:`~DexArmDriver.move_absolute`, :meth:`~DexArmDriver.move_relative`,
+    :meth:`~DexArmDriver.home`) for all motion commands.
+    """
+    m = _MOTION_GCODE_RE.search(gcode_line)
+    if m:
+        raise DexArmMotionInRawError(gcode_line, f"G{m.group(1)}")
 
 
 def _parse_m114(lines: Sequence[str]) -> Optional[DexArmPosition]:
@@ -207,6 +282,11 @@ class DexArmDriver:
     def connect(self) -> str:
         """Perform handshake: send ``M115`` and return firmware identity string.
 
+        Logs a WARNING when the configured workspace is marked as
+        ``unverified: true`` — the bounds are a placeholder from the Rotrics
+        spec and must be replaced with the measured as-built envelope before
+        production use.
+
         Raises :class:`DexArmDisconnect` if the transport is not open or the
         firmware does not respond within ``ack_timeout_s``.
         """
@@ -217,6 +297,18 @@ class DexArmDriver:
         ) or "unknown"
         self._firmware_id = identity
         self._emit("INFO", "dexarm_connected", {"firmware_id": identity})
+        # Warn when workspace bounds are unverified (placeholder from spec).
+        if self.workspace is not None and getattr(self.workspace, "unverified", False):
+            self._emit(
+                "WARNING",
+                "dexarm_workspace_unverified",
+                {
+                    "message": (
+                        "DexArm workspace bounds are unverified (placeholder from Rotrics spec). "
+                        "Replace with measured as-built envelope before production use."
+                    )
+                },
+            )
         return identity
 
     def disconnect(self) -> None:
@@ -254,6 +346,12 @@ class DexArmDriver:
 
     def home(self, *, dry_run: bool = False) -> None:
         """Home all axes (G28).
+
+        .. note::
+            Homing is permitted even when no workspace is configured because
+            G28 is a recovery action that moves to the factory home position
+            (a known-safe state) regardless of the current position.  It does
+            not require knowledge of the allowed envelope.
 
         Parameters
         ----------
@@ -447,6 +545,7 @@ class DexArmDriver:
         """
         self._require_open()
         cmd = f"M888 P{module_id}"
+        _reject_motion_gcode(cmd)
         if dry_run:
             self._emit(
                 "INFO", "dexarm_dry_run",
@@ -484,6 +583,7 @@ class DexArmDriver:
             All response lines before and including the final ``ok``.
         """
         self._require_open()
+        _reject_motion_gcode(gcode_line)
         if dry_run:
             self._emit("INFO", "dexarm_dry_run", {"cmd": gcode_line})
             return []
@@ -498,8 +598,10 @@ class DexArmDriver:
             raise DexArmDisconnect("DexArm transport is not open")
 
     def _check_bounds(self, x: float, y: float, z: float) -> None:
+        # Fail-closed: refuse motion without a configured workspace so that a
+        # missing or unconfigured workspace cannot silently allow unbounded motion.
         if self.workspace is None:
-            return
+            raise DexArmNoBoundsError(f"G0 X{x:.3f} Y{y:.3f} Z{z:.3f}")
         ws = self.workspace
         if (
             x < ws.x_min_mm or x > ws.x_max_mm

@@ -130,6 +130,12 @@ class DexArmWorkspace(_Strict):
 
     Moves outside these limits are rejected *before* transmission by the
     :class:`~inchworm.dexarm.DexArmDriver`.
+
+    ``unverified`` is ``True`` when the bounds are a placeholder from the
+    Rotrics specification and have not been measured against the as-built
+    chassis envelope.  The driver logs a WARNING at connect when this flag
+    is set; the hardware session must replace the values with the measured
+    envelope and set ``unverified: false``.
     """
 
     x_min_mm: Millimeters
@@ -138,6 +144,9 @@ class DexArmWorkspace(_Strict):
     y_max_mm: Millimeters
     z_min_mm: Millimeters
     z_max_mm: Millimeters
+    # True when bounds are a spec placeholder; hardware session must measure
+    # the real envelope and set this to false.
+    unverified: bool = False
 
     @model_validator(mode="after")
     def _ranges_positive(self) -> "DexArmWorkspace":

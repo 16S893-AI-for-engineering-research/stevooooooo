@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:13'
-updated_date: '2026-10-24 16:47'
+updated_date: '2026-10-24 17:10'
 labels: []
 milestone: m-5
 dependencies:
@@ -36,7 +36,7 @@ See doc-1 section 5.
 - [ ] #3 Emergency stop (AA-10) turns the laser off, verified by a test
 - [x] #4 Process exit, including SIGINT and SIGTERM, turns the laser off, and the residual risk if the process is SIGKILLed is documented with a mitigation
 - [ ] #5 Commanded state is tracked and a mismatch between commanded and reported relay state raises a typed error rather than being ignored
-- [ ] #6 Cumulative laser-on time per session is logged, and a configured maximum continuous-on duration is enforced
+- [x] #6 Cumulative laser-on time per session is logged, and a configured maximum continuous-on duration is enforced
 - [x] #7 Tests cover on, off, exception-path off, state-mismatch detection and the duration limit against the mock backend
 <!-- AC:END -->
 
@@ -62,6 +62,14 @@ AC#1 UNCHECKED: needs owner-supervised hardware session: uv run python scripts/l
 AC#3 UNCHECKED: AA-10 e-stop bus not yet implemented; estop() hook is tested locally in test_laser.py::TestEstopHook.
 AC#5 UNCHECKED: LCUS-1 protocol cannot report relay state back over serial; mismatch detection impossible for this hardware variant. LaserStateMismatchError is typed and exists for future protocol variants with state readback (e.g. GPIO sense line). See laser.py module docstring.
 Implementation: robot/src/inchworm/laser.py (new), robot/tests/test_laser.py (new, 32 tests), robot/scripts/laser_probe.py (new, dry-run-default). Shared file additions in marked blocks: config.py LaserConfig.max_continuous_on_s, hardware.yaml laser.max_continuous_on_s, units.py UNIT_SUFFIXES += _s. Full test suite: 356 passed.
+
+AC#6 re-checked 2026-10-24 (active watchdog implementation):
+- threading.Timer watchdog starts inside on() (inside lock) and fires _watchdog_cutoff() after max_continuous_on_s.
+- _watchdog_cutoff logs laser_max_on_cutoff WARNING then calls off().
+- off() and close() cancel the watchdog before it fires.
+- No deadlock: watchdog cancel is attempted outside the lock; watchdog callback acquires lock normally on its daemon thread.
+- Tests (TestWatchdog, 7 tests): watchdog sends OFF bytes with no caller action; logs WARNING; manual off cancels it; close() cancels it; no leaked threads after off; no leaked threads after watchdog fires; on() works again after watchdog fires.
+- Evidence: uv run pytest tests/test_laser.py -- 39 passed in 2.25s; uv run pytest -q -- 419 passed in 6.32s.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

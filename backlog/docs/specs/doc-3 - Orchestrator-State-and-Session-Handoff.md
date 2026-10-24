@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 16:08'
+updated_date: '2026-10-24 17:14'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -41,9 +41,11 @@ git log --oneline -5
 
 ## 2. Where the project stands
 
-- **Done and reviewed (Sonnet, plus an orchestrator live check where hardware is involved):** AA-4 scaffold and config. AA-5 discovery: cameras are resolved by **usbipd BusId through `vhci_hcd.0/status`** because both openaicams share serial 5423534724. Verified with a reversed attach order. AA-6 single global camera lock. AA-7 logging (only P2 test nits remain). AA-37 human bind.
-- Open follow-up: `scripts/attach_usb.py` does not verify that a device appears after `usbipd attach`. A silent failure was observed twice. See the AA-5 comment.
-- Package: `robot/src/inchworm/`, tests in `robot/tests/`, config in `robot/config/hardware.yaml`.
+- **Done:** AA-4, AA-5, AA-6, AA-7, AA-37, and AA-12 (DexArm G-code driver; mock-verified only, with real-device behaviour exercised by AA-13; the workspace box is marked `unverified: true`).
+- **Software half done, hardware ACs pending:** AA-8 (servo bus: ACs #2 live ID scan and #4 20 Hz benchmark; run `scripts/scan_servos.py --live`), AA-29 (laser relay: #1 protocol is unverified LCUS-1, so run `scripts/laser_probe.py --live`; #3 waits on AA-10 e-stop; #5 because LCUS-1 cannot report state).
+- **Lessons recorded:** agent self-audits passed three real safety bugs (camera lock per device, bounds fail-open and the raw-motion regex, laser max-on not enforced). The orchestrator must independently check every safety-relevant change.
+- Parallel lanes run in managed worktrees. The orchestrator applies the returned patches with `git apply --3way` and runs the full suite before committing.
+- Package: `robot/src/inchworm/`, tests in `robot/tests/` (461 pass), config in `robot/config/hardware.yaml`.
 
 ## 3. Blocked right now / pending owner input
 

@@ -92,6 +92,11 @@ dexarm:
     y_max_mm:  450.0
     z_min_mm: -100.0
     z_max_mm:  400.0
+    # unverified: true — bounds are a placeholder from the Rotrics spec and
+    # have NOT been measured against the as-built chassis envelope.  The
+    # hardware session must measure the real envelope and replace these values,
+    # then set unverified to false.
+    unverified: true
   # --- AA-12 end ---
 
 cameras:
