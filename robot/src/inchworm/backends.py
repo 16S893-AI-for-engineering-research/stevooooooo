@@ -142,9 +142,16 @@ class MockSerialTransport(SerialTransport):
         self.written: List[bytes] = []
         self._rx = bytearray()
         self._open = True
+        self._reply_queue: List[bytes] = []
 
     def feed(self, data: bytes) -> None:
         self._rx.extend(data)
+
+    def queue_reply(self, data: bytes) -> None:
+        """Queue a reply released only AFTER the next write, like a real
+        half-duplex servo bus (a device answers only after a request). Use
+        this for multi-step transactions; feed() makes bytes readable at once."""
+        self._reply_queue.append(bytes(data))
 
     def _require_open(self) -> None:
         if not self._open:
@@ -153,6 +160,8 @@ class MockSerialTransport(SerialTransport):
     def write(self, data: bytes) -> int:
         self._require_open()
         self.written.append(bytes(data))
+        if self._reply_queue:
+            self._rx.extend(self._reply_queue.pop(0))
         return len(data)
 
     def read(self, size: int) -> bytes:

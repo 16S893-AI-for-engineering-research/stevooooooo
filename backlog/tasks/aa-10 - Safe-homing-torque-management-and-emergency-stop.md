@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 17:48'
+updated_date: '2026-10-24 22:39'
 labels: []
 milestone: m-1
 dependencies:
@@ -60,6 +60,8 @@ See doc-1 sections 3, 8 and 9.
 Implementation complete. New modules: inchworm/torque.py, inchworm/homing.py, inchworm/estop.py, scripts/estop.py. Marked blocks added to config.py, hardware.yaml, servo_bus.py, dexarm.py, pyproject.toml. Tests: tests/test_torque.py (8 tests), tests/test_homing.py (12 tests), tests/test_estop.py (16 tests). All 497 tests pass (uv run pytest). AC#1: HomingRoutine implements velocity/current-limited motion to neutral pose; refuses live run when joint_limits_verified=False. AC#2: gripper locked band null->fail-closed abort; within band->abort; outside band->proceeds; no unlock attempted. AC#3: TorqueManager centralises torque en/de-energise; power-cycle recovery documented in torque.py module docstring. AC#4: EStop.stop() disables both arms (TorqueManager.disable_all), sends M410 to DexArm, triggers laser hooks via laser.trigger_estop(). AC#5: programmatic, CLI (scripts/estop.py), SIGINT/SIGTERM handlers installed; all tested. AC#6: FaultMonitor typed fault events (overcurrent, overtemperature, servo_unreachable) all trigger EStop.stop(); tested. AA-29 AC#3 note: test_estop_turns_laser_off verifies end-to-end that EStop.stop() turns laser off via the AA-29 hook.
 
 Orchestrator changes 2026-10-24 (provisional, pending the owner decision in the comment): EStop.stop() now HOLDS arms by default (TorqueManager.hold_arm/hold_all: re-command present position, torque ON, gripper untouched). It releases torque only with release_on_stop=True or for overcurrent/overtemperature faults. Tests: test_default_estop_holds_arms_not_releases, test_release_on_stop_disables_torque, test_thermal_and_overcurrent_faults_release[...], test_unreachable_fault_holds. Full suite: 583 passed. AC#4 stays unchecked until the owner confirms the stop semantics.
+
+LIVE FINDING 2026-10-24 (read-only check before any motion; owner present): all 12 servos read torque_enable=0 and goal_position=0 deg, while present positions were 3-275 deg. Enabling torque would have driven every joint at full speed to 0 deg (up to 275 deg of travel), including the arms slamming and the grippers moving. FIX in ArmServoBus.set_torque_enable(True): read present, write goal := present, read the goal back and refuse with ServoRangeError if it does not match, and only then write torque_enable. This is the single code path for enabling torque (TorqueManager, homing, estop hold, measure_limits all go through it). Tests: test_enable_sends_correct_packet (4-step sequence), test_enable_refuses_if_goal_readback_mismatch. MockSerialTransport gained queue_reply() (half-duplex reply after write). Suite 1500 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

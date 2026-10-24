@@ -407,11 +407,27 @@ class TestReadJointState:
 
 class TestTorqueEnable:
     def test_enable_sends_correct_packet(self, transport, bus):
-        transport.feed(_write_response(1))
+        # Enable = read present, write goal := present, read goal back, then
+        # write torque_enable (orchestrator safety fix 2026-10-24).
+        present = struct.pack("<H", 1234)
+        transport.queue_reply(_read_response(1, present))   # read present
+        transport.queue_reply(_write_response(1))           # write goal
+        transport.queue_reply(_read_response(1, present))   # read goal back
+        transport.queue_reply(_write_response(1))           # write torque enable
         bus.set_torque_enable(servo_id=1, enable=True)
-        assert len(transport.written) == 1
-        packet = transport.written[0]
-        assert packet[4] == _INST_WRITE  # instruction byte
+        assert len(transport.written) == 4
+        goal_pkt, torque_pkt = transport.written[1], transport.written[3]
+        assert goal_pkt[4] == _INST_WRITE and goal_pkt[5] == _REG_GOAL_POSITION
+        assert goal_pkt[6:8] == present
+        assert torque_pkt[4] == _INST_WRITE and torque_pkt[5] == _REG_TORQUE_ENABLE
+
+    def test_enable_refuses_if_goal_readback_mismatch(self, transport, bus):
+        transport.queue_reply(_read_response(1, struct.pack("<H", 1234)))
+        transport.queue_reply(_write_response(1))
+        transport.queue_reply(_read_response(1, struct.pack("<H", 0)))  # goal did not take
+        with pytest.raises(ServoRangeError, match="refusing to enable torque"):
+            bus.set_torque_enable(servo_id=1, enable=True)
+        assert all(p[5] != _REG_TORQUE_ENABLE for p in transport.written)
 
     def test_disable_sends_correct_packet(self, transport, bus):
         transport.feed(_write_response(1))
@@ -738,9 +754,12 @@ class TestMockBackendIntegration:
             joint_id_map=_JOINT_MAP,
             timeout_s=0.05,
         )
-        transport.feed(_write_response(2))
+        present = struct.pack("<H", 2048)
+        for r in (_read_response(2, present), _write_response(2),
+                  _read_response(2, present), _write_response(2)):
+            transport.queue_reply(r)
         bus.set_torque_enable(servo_id=2, enable=True)
-        assert len(transport.written) == 1
+        assert len(transport.written) == 4
 
 
 # ---------------------------------------------------------------------------

@@ -797,6 +797,23 @@ class ArmServoBus:
                 {"servo_id": servo_id, "enable": enable},
             )
             return
+        if enable:
+            # SAFETY (orchestrator 2026-10-24, found on live hardware before
+            # any motion): with torque off, goal_position (reg 42) is stale.
+            # It read 0 deg on all 12 servos while present positions were
+            # 3-275 deg. Enabling torque makes the servo drive at full speed
+            # to the stale goal, so the joint would slam up to 275 deg. ALWAYS
+            # set goal := present (read back and verified) before enabling
+            # torque. There is no way to enable torque without this step.
+            present = self._bus.read_bytes(servo_id, _REG_PRESENT_POSITION, 2)
+            self._bus.write_bytes(servo_id, _REG_GOAL_POSITION, present)
+            echo = self._bus.read_bytes(servo_id, _REG_GOAL_POSITION, 2)
+            if echo != present:
+                raise ServoRangeError(
+                    servo_id, echo.hex(),
+                    f"goal_position read-back {echo.hex()} != present {present.hex()}; "
+                    "refusing to enable torque",
+                )
         data = bytes([1 if enable else 0])
         self._bus.write_bytes(servo_id, _REG_TORQUE_ENABLE, data)
         self._emit(
