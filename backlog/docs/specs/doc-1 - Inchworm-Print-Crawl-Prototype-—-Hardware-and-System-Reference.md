@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-24 15:35'
+updated_date: '2026-10-24 16:07'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -18,6 +18,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - Attachment-point pitch: **183.676 mm**, center to center, along the tube axis.
 - The DexArm is mounted **90 degrees** from the two SO-101 arms; all three are in line on the chassis.
 - One cycle advances the tube by exactly one pitch (183.676 mm) unless a task explicitly states otherwise.
+- **Both SO-101 arms hold the tube at the start of every cycle and at all times while printing** (owner, 2026-10-24). Only during a regrip does one arm release while the other holds.
 - Arms have a restricted reachable envelope: the picture at `pictures/robot.png` shows the real built configuration and the folded pose. Arms cannot move anywhere in their nominal workspace; joint limits and self/chassis/tube collision envelopes must be derived and enforced in software.
 - Reference imagery and CAD: `pictures/robot.png`, `CAD/Assembly 1.step`, `assets/robot-assembly.glb`.
 
@@ -26,7 +27,8 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 ### SO-ARM101 (x2) — crawl arms
 - 5 DoF + gripper, Feetech STS/SCS-class serial bus servos, daisy-chained on one serial bus per arm.
 - Each arm reaches the host as a CH343 USB-serial adapter. On Windows these enumerate as `USB-Enhanced-SERIAL CH343` (COM3 / COM5 observed); under WSL they appear as `/dev/ttyACM*` or `/dev/ttyUSB*` after `usbipd attach`.
-- Servo IDs have already been assigned by the owner. **No leader arms exist** — there is no teleoperation leader for either follower arm. All demonstration data must be collected without a leader.
+- Servo IDs have already been assigned by the owner. **No purpose-built leader arms exist.** Per **decision-1** (2026-10-24), demonstrations use **cross-arm teleoperation**: one follower, torque off, acts as the leader for the other, while the tube is held by a **fixture**. A torque-off arm can never hold the tube.
+- Gearing: both followers use STS3215 at **1/345 on all joints**. A purpose-built SO-101 leader uses 1/191 (pan), 1/345 (shoulder lift), 1/191 (elbow) and 1/147 (wrist flex, wrist roll, gripper), so a follower used as a leader is stiffer to backdrive (source: LeRobot `docs/source/so101.mdx`).
 - **Custom gripper**: the owner replaced the stock gripper with a custom design in which the **lock/latch mechanism and the jaw share the same servo ID**. There is no separate lock servo. Lock vs unlock is therefore a *position band* of the single gripper servo, not a separate actuator. Locking must be commanded by code (never left to a learned policy) and must hold position until the next regrip.
 
 ### Rotrics DexArm — print/scan arm

@@ -4,6 +4,7 @@ title: Train and evaluate the insertion policy
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:12'
+updated_date: '2026-10-24 16:07'
 labels: []
 milestone: m-3
 dependencies:
@@ -37,4 +38,17 @@ See doc-1 sections 7 and 9.
 - [ ] #5 Failure modes are characterized and reported (for example miss direction, jam, oscillation, timeout) with counts
 - [ ] #6 Maximum observed contact force or servo load during attempts is recorded, and runs that exceed a documented safe load are counted as unsafe failures regardless of outcome
 - [ ] #7 A go or no-go recommendation for autonomous use is stated with the measured success rate, the unsafe-failure count and the retry count needed to reach an acceptable per-cycle success probability
+- [ ] #8 At least one human-in-the-loop correction round (policy rollout with owner takeover recorded, e.g. lerobot-rollout --strategy.type=dagger or equivalent, then fine-tune) is run, and success before and after each round is reported; up to 3 rounds are budgeted
+- [ ] #9 Local training memory feasibility on the 4 GB GPU is measured first; if it is infeasible, training runs on a documented cloud target (Colab or HF Jobs) with a private, non-pushed dataset or explicit owner approval to upload, and the cost is recorded
+- [ ] #10 Online success is reported separately for the fixture setup and for the real crawl configuration, so fixture-to-crawl distribution shift is measured
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @orchestrator
+created: 2026-10-24 16:07
+---
+ACs #8-#10 added 2026-10-24 with owner approval (plan item E, decision-1). Start with one arm's policy (item H).
+---
+<!-- COMMENTS:END -->

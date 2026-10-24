@@ -4,6 +4,7 @@ title: LeRobot environment setup and SO-101 integration
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:12'
+updated_date: '2026-10-24 16:07'
 labels: []
 milestone: m-3
 dependencies:
@@ -37,4 +38,16 @@ See doc-1 sections 6, 7 and 8.
 - [ ] #5 Observation and action space definitions match the handoff contract from AA-20, and a mismatch raises an error at construction time
 - [ ] #6 A VRAM and memory feasibility note records measured usage for a minimal forward and backward pass at the intended image resolution on the 4 GB GPU, with recommended resolution and batch size
 - [ ] #7 Documentation in robot/README.md explains how to recreate the environment from scratch
+- [ ] #8 LeRobot runs in a separate uv-managed Python >= 3.12 environment, since LeRobot 0.6.2 requires 3.12 and the host default is 3.10, and the robot package remains importable from it
+- [ ] #9 Camera observations for each arm are resolved through AA-5 discovery (usbipd BusId), never by OpenCV index or by-id, because both arm cameras share USB serial 5423534724
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @orchestrator
+created: 2026-10-24 16:07
+---
+ACs #8 and #9 added 2026-10-24 with owner approval (plan item D). The adapter's 5-joint gripper-free action space is already covered by AC #4.
+---
+<!-- COMMENTS:END -->
