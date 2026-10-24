@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-24 19:02'
+updated_date: '2026-10-24 19:08'
 labels: []
 milestone: m-3
 dependencies:
@@ -53,13 +53,13 @@ Implementation plan (AA-22, @agent):
 <!-- AC:BEGIN -->
 - [x] #1 LeRobot is installed in a reproducible pinned environment under the project and a smoke test imports it and reports the resolved versions and CUDA availability
 - [x] #2 A robot adapter exposes this build to LeRobot using the project drivers, with the correct joint-to-servo map, mono single-channel camera observations and the chassis-fixed frame convention
-- [ ] #3 Camera access from the LeRobot path goes through the USB arbiter so only one camera streams at a time, verified by a test
+- [x] #3 Camera access from the LeRobot path goes through the USB arbiter so only one camera streams at a time, verified by a test
 - [x] #4 The gripper servo is excluded from the LeRobot action space at the adapter level, not merely by convention
 - [x] #5 Observation and action space definitions match the handoff contract from AA-20, and a mismatch raises an error at construction time
 - [x] #6 A VRAM and memory feasibility note records measured usage for a minimal forward and backward pass at the intended image resolution on the 4 GB GPU, with recommended resolution and batch size
 - [x] #7 Documentation in robot/README.md explains how to recreate the environment from scratch
 - [x] #8 LeRobot runs in a separate uv-managed Python >= 3.12 environment, since LeRobot 0.6.2 requires 3.12 and the host default is 3.10, and the robot package remains importable from it
-- [ ] #9 Camera observations for each arm are resolved through AA-5 discovery (usbipd BusId), never by OpenCV index or by-id, because both arm cameras share USB serial 5423534724
+- [x] #9 Camera observations for each arm are resolved through AA-5 discovery (usbipd BusId), never by OpenCV index or by-id, because both arm cameras share USB serial 5423534724
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -85,6 +85,25 @@ Orchestrator verification 2026-10-24 (evidence run by the orchestrator):
 - AC#6: real ACTPolicy measurement (see note above), 480x640 bs=8 ~1.7 GB.
 - AC#7: robot/README.md AA-22 block (setup, versions, VRAM table).
 NOT checked: AC#3 and AC#9. The adapter accepts an arbitrary injected frame_source and camera_wh; no test proves the LeRobot path goes through CameraArbiter or that the camera is resolved via AA-5 discovery. A factory that builds the frame source from CameraArbiter.acquire(role) + open_capture, plus a test, is needed (follow-up wave).
+
+AC#3 and AC#9 re-checked 2026-10-24 (worker subagent):
+
+Added to inchworm/lerobot_adapter.py (# --- AA-22 --- block):
+- make_arbiter_frame_source(arbiter, backend_device_role, settings, cam_h, cam_w): context manager that acquires AA-6 CameraArbiter once per episode (never per frame), wraps AA-14 open_capture, and yields Callable[[], np.ndarray] returning (H, W) uint8 grayscale. Lock held for the full episode duration.
+- build_adapter_from_config(cfg, arm_role, *, guarded_arm, ...): maps arm_role -> _ARM_ROLE_TO_BACKEND_CAMERA -> backend_device_role, creates CameraArbiter from backend, returns (adapter, arbiter, backend_device_role). Production code never passes an arbitrary frame_source or OpenCV index.
+- _ARM_ROLE_TO_BACKEND_CAMERA: {arm_left: camera_left_arm, arm_right: camera_right_arm}
+- _BACKEND_CAMERA_TO_DISCOVERY_ROLE: {camera_left_arm: cam_left, camera_right_arm: cam_right}
+
+14 new tests in tests/test_lerobot_adapter.py. Total: 1281 passed in 25.27s.
+
+Test evidence:
+- test_ac3_second_acquire_times_out_while_streaming: two arbiters sharing same lock_dir; second acquire raises CameraArbiterTimeoutError while first holds the lock.
+- test_ac3_no_direct_opencv_call_in_frame_source: MockMjpegBackend raises BackendError on integer index; frames arriving proves named-device path used.
+- test_ac9_both_ov9281_arms_resolved_via_discovery_naming: both arm roles chain to cam_left/cam_right discovery roles (usbip_busid).
+- test_ac3_adapter_built_from_config_frames_through_arbiter: end-to-end with MockMjpegBackend; obs[wrist_cam] arrives and is (H, W, 1) uint8.
+
+AC#3 CHECKED (evidence above).
+AC#9 CHECKED (evidence above).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -140,7 +140,7 @@ opcode causes a `GCodeDialectError` (`unrecognised_command`).
 | Code | Meaning | Notes |
 |------|---------|-------|
 | G0 / G1 | Rapid / linear move | Main print motion |
-| G2 / G3 | Arc move (CW / CCW) | I/J form supported; R form gives approximate bounding box |
+| G2 / G3 | Arc move (CW / CCW) | **Accepted at parse/validate time for bounding-box only; rejected at stream time.** Configure Cura with arc support disabled (Arc Welder off) so all arcs are linearised to G1 moves before slicing. See note below. |
 | G4 | Dwell | |
 | G21 | Set units to mm | |
 | G90 / G91 | Absolute / relative XYZ | Both accepted; tracker keeps state |
@@ -160,8 +160,9 @@ opcode causes a `GCodeDialectError` (`unrecognised_command`).
 | M115 | Firmware info | |
 | T0 / T1 | Tool select | |
 
-**Explicitly forbidden**: G28 (home axes) — never allowed in a segment file.
+**Explicitly forbidden at stream time**: G28 (home axes) — never allowed in a segment file; G2/G3 arc moves — accepted by the parser/validator but rejected when streaming (configure Cura to linearise arcs; see note below).
 
+> **G2/G3 arc note (AA-34)**: The `stream_segment` function rejects G2/G3 commands with a `GCodeArcRejected` error (reason: `arc_not_linearised`). Arc moves are rejected because the DexArm firmware's arc interpolation is unverified and Cura can be configured without arc support. To disable arcs in Cura: in *Preferences → Configure Cura → Plugins*, ensure "Arc Welder" is not installed or is disabled; alternatively, search for "arc" in Cura print settings and set it to off. G2/G3 are still accepted during *validation* to check the bounding box; only streaming rejects them.
 ---
 
 ## 8. Feedrate Limits

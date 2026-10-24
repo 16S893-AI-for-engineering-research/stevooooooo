@@ -38,7 +38,9 @@ here for tests and dry-run use.
 
 Allowed command set (Marlin/Cura dialect)
 -----------------------------------------
-* **Motion**: G0, G1 (linear), G2, G3 (arc) — with optional X, Y, Z, E, F, I, J, R params
+* **Motion**: G0, G1 (linear), G2, G3 (arc — accepted at parse/validate time;
+  **rejected at stream time** with :class:`GCodeArcRejected`) — with optional
+  X, Y, Z, E, F, I, J, R params
 * **Positioning mode**: G90 (absolute XYZ), G91 (relative XYZ)
 * **Extruder mode**: M82 (absolute E), M83 (relative E)
 * **Temperature**: M104, M109 (nozzle), M140, M190 (bed)
@@ -65,15 +67,20 @@ All rejection errors carry a ``line_num`` (1-indexed) and a ``reason`` string:
 * :class:`GCodeFeedrateError`  — feedrate exceeds configured limit
 * :class:`GCodeTempError`      — temperature command exceeds configured limit
 * :class:`GCodeOriginError`    — first-layer Z inconsistent with leveled frame Z0
+* :class:`GCodeArcRejected`    — G2/G3 arc command encountered at stream time
 
 Safety on abort
 ---------------
 :func:`stream_segment` catches every exception from the DexArm driver and from
 the progress callback.  On any error:
 
-1. Retract nozzle: G91 + G1 Z+3 mm via :meth:`~inchworm.dexarm.DexArmDriver.move_relative`.
-2. Laser off: call ``laser_driver.off()`` if a laser driver was supplied.
-3. Re-raise the original exception wrapped in :class:`GCodeStreamAborted`.
+1. Retract nozzle: ``driver.move_relative(0, 0, +retract_z_mm)``.
+2. If retract raises, fall back to ``driver.quickstop()`` (M410) and log it.
+3. Laser off: call ``laser_driver.off()`` if a laser driver was supplied.
+   This step is **always attempted** regardless of whether the retract or
+   quickstop succeeded.
+4. Re-raise the original exception wrapped in :class:`GCodeStreamAborted`,
+   which carries ``retract_ok`` and ``quickstop_attempted`` attributes.
 
 Units
 -----
@@ -363,11 +370,55 @@ class GCodeStreamAborted(RuntimeError):
     The nozzle retract and laser-off actions have already been attempted
     before this exception is raised.  The ``cause`` attribute holds the
     original exception.
+
+    Attributes
+    ----------
+    cause:
+        The original exception that triggered the abort.
+    retract_ok:
+        ``True`` if the nozzle retract (move_relative +Z) succeeded.
+        ``False`` if the retract itself raised (quickstop was attempted).
+    quickstop_attempted:
+        ``True`` if M410 quickstop was sent (because retract failed).
     """
 
-    def __init__(self, message: str, cause: BaseException) -> None:
+    def __init__(
+        self,
+        message: str,
+        cause: BaseException,
+        retract_ok: bool = True,
+        quickstop_attempted: bool = False,
+    ) -> None:
         super().__init__(message)
         self.cause = cause
+        self.retract_ok = retract_ok
+        self.quickstop_attempted = quickstop_attempted
+
+
+class GCodeArcRejected(GCodeValidationError):
+    """Raised during streaming when a G2/G3 arc command is encountered.
+
+    Arc commands (G2/G3) are accepted during *parsing* and *validation*
+    (for bounding-box computation) but **rejected at stream time** because
+    the DexArm firmware may not support arc interpolation reliably, and Cura
+    can be configured to output only linear moves.
+
+    Reason: ``arc_not_linearised``.
+
+    **Cura configuration**: disable arc support in Cura
+    (search for "Arc Welder" or "Arc" in Cura settings and ensure it is off).
+    See ``docs/cura_dexarm_profile.md`` section §7 for details.
+    """
+
+    def __init__(self, line_num: int, line_text: str) -> None:
+        super().__init__(
+            line_num,
+            line_text,
+            "arc_not_linearised",
+            "G2/G3 arc commands are rejected at stream time; configure Cura "
+            "to disable arc output (Arc Welder off). "
+            "See docs/cura_dexarm_profile.md §7.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -938,22 +989,37 @@ _RETRACT_Z_MM = 3.0
 ProgressCallback = Callable[[int, int], None]
 
 
+# --- AA-34 ---
 def stream_segment(
     segment: ParsedSegment,
     driver: object,  # DexArmDriver — typed loosely to avoid circular import
     *,
     config: Optional[GCodeIntakeConfig] = None,
+    frame: Optional[PrintFrameTransform] = None,
     laser_driver: Optional[object] = None,  # LaserDriver
     progress_cb: Optional[ProgressCallback] = None,
     dry_run: bool = False,
 ) -> None:
     """Stream a validated :class:`ParsedSegment` line-by-line to the DexArm.
 
-    Only G-code lines with opcodes are sent; blank and comment-only lines
-    are skipped.  Motion commands are issued via the bounded
-    :meth:`~inchworm.dexarm.DexArmDriver.move_absolute` /
-    :meth:`~inchworm.dexarm.DexArmDriver.move_relative` API; non-motion
-    commands are sent via :meth:`~inchworm.dexarm.DexArmDriver.send_raw`.
+    Streaming corrections (AA-34 orchestrator review 2026-10-24)
+    -------------------------------------------------------------
+    * **Start position**: M114 is sent before the first move; the reported
+      position seeds the tracking state instead of assuming (0, 0, 0).
+    * **Print-frame transform**: ``frame.apply(xyz)`` is called on every
+      G0/G1 XYZ before the ``print_move`` call so the AA-33 leveling
+      correction reaches the arm on every move.
+    * **E passthrough**: M82/M83 extrusion mode is tracked; absolute E is
+      forwarded verbatim; relative E is accumulated from the start-position
+      query.  Both modes pass E through to ``DexArmDriver.print_move``.
+    * **Arc rejection**: G2/G3 are rejected with :class:`GCodeArcRejected`.
+      Configure Cura with arc support off (see ``docs/cura_dexarm_profile.md``).
+    * **Abort path**: on any driver error the abort sequence is:
+      1. ``driver.move_relative(0, 0, +retract_z)`` — retract nozzle.
+      2. If retract fails, ``driver.quickstop()`` (M410) — halt motion.
+      3. ``laser_driver.off()`` — always attempted regardless of retract outcome.
+      :class:`GCodeStreamAborted` is raised with ``retract_ok`` and
+      ``quickstop_attempted`` attributes recording which actions succeeded.
 
     Parameters
     ----------
@@ -965,6 +1031,10 @@ def stream_segment(
     config:
         :class:`GCodeIntakeConfig` for abort retract distance.  Uses module
         defaults when ``None``.
+    frame:
+        Print-frame transform (AA-33).  When ``None``, :class:`IdentityPrintFrame`
+        is used (no leveling correction).  In live printing always supply a
+        verified :class:`~inchworm.print_frame.PrintFrame` from AA-33.
     laser_driver:
         Optional :class:`~inchworm.laser.LaserDriver`.  Its ``off()`` method
         is called on abort.
@@ -980,45 +1050,107 @@ def stream_segment(
     GCodeStreamAborted
         If any driver error or unexpected exception occurs.  Nozzle retract
         and laser-off have already been attempted.
+    GCodeArcRejected
+        If a G2 or G3 arc command is encountered during streaming.
     """
     if config is None:
         config = GCodeIntakeConfig()
+    if frame is None:
+        frame = IdentityPrintFrame()
 
     motion_lines = [gl for gl in segment.lines if gl.opcode in _MOTION_OPCODES]
     sendable_lines = [gl for gl in segment.lines if gl.opcode is not None]
     total = len(motion_lines)
     sent = 0
 
-    # State tracking for streaming
-    abs_xyz = True
-    cur_x = 0.0
-    cur_y = 0.0
-    cur_z = 0.0
-    cur_f: Optional[float] = None
-
     log.info(
-        "gcode_intake: starting stream; total_sendable=%d motion_lines=%d dry_run=%s",
+        "gcode_intake: starting stream; total_sendable=%d motion_lines=%d "
+        "frame_id=%s dry_run=%s",
         len(sendable_lines),
         total,
+        frame.frame_id,
         dry_run,
     )
+
+    # --- Query start position via M114 (AA-34 fix: do not assume 0,0,0) ---
+    # Orchestrator 2026-10-24: in LIVE mode an unknown start position must
+    # fail closed. Relative moves from a guessed (0,0,0) could drive the
+    # nozzle anywhere. The (0,0,0) seed is kept for dry-run only.
+    try:
+        start_pos = driver.get_position(dry_run=dry_run) if not dry_run else None  # type: ignore[union-attr]
+    except Exception as exc:
+        if not dry_run:
+            raise GCodeStreamAborted(
+                RuntimeError(f"M114 start-position query failed: {exc}")
+            ) if _abort_accepts_single_arg() else RuntimeError(
+                f"gcode_intake: M114 start-position query failed; refusing to stream: {exc}"
+            ) from exc
+        start_pos = None
+    if start_pos is None and not dry_run:
+        raise RuntimeError("gcode_intake: M114 returned no position; refusing to stream")
+
+    # State tracking for streaming
+    abs_xyz = True
+    # Seed XYZ from M114 if available; fall back to 0,0,0 with a warning
+    if start_pos is not None:
+        cur_x: float = start_pos.x
+        cur_y: float = start_pos.y
+        cur_z: float = start_pos.z
+    else:
+        if not dry_run:
+            log.warning(
+                "gcode_intake: M114 start-position query failed; "
+                "seeding position as (0, 0, 0)"
+            )
+        cur_x = 0.0
+        cur_y = 0.0
+        cur_z = 0.0
+
+    # Extruder state: track M82 (absolute) / M83 (relative) mode
+    abs_e = True         # M82 = absolute E (Cura default); M83 = relative
+    cur_e: float = 0.0   # current absolute E position (seeded from 0 or G92)
+    cur_f: Optional[float] = None
+
+    gl: Optional[object] = None  # keep reference for error logging
 
     try:
         for gl in sendable_lines:
             # Mode tracking
-            if gl.opcode == "G90":
+            if gl.opcode == "G90":  # type: ignore[union-attr]
                 abs_xyz = True
-            elif gl.opcode == "G91":
+                driver.send_raw("G90", dry_run=dry_run)  # type: ignore[union-attr]
+                continue
+            elif gl.opcode == "G91":  # type: ignore[union-attr]
                 abs_xyz = False
+                driver.send_raw("G91", dry_run=dry_run)  # type: ignore[union-attr]
+                continue
 
-            if "F" in gl.params:
-                cur_f = gl.params["F"]
+            # Extruder mode tracking (never send raw; tracked internally)
+            if gl.opcode == "M82":  # type: ignore[union-attr]
+                abs_e = True
+                raw_cmd = _rebuild_gcode(gl)  # type: ignore[arg-type]
+                driver.send_raw(raw_cmd, dry_run=dry_run)  # type: ignore[union-attr]
+                continue
+            elif gl.opcode == "M83":  # type: ignore[union-attr]
+                abs_e = False
+                raw_cmd = _rebuild_gcode(gl)  # type: ignore[arg-type]
+                driver.send_raw(raw_cmd, dry_run=dry_run)  # type: ignore[union-attr]
+                continue
 
-            if gl.opcode in _MOTION_OPCODES:
-                raw_x = gl.params.get("X")
-                raw_y = gl.params.get("Y")
-                raw_z = gl.params.get("Z")
+            if "F" in gl.params:  # type: ignore[union-attr]
+                cur_f = gl.params["F"]  # type: ignore[union-attr]
 
+            if gl.opcode in _MOTION_OPCODES:  # type: ignore[union-attr]
+                # --- Reject arcs at stream time ---
+                if gl.opcode in ("G2", "G3"):  # type: ignore[union-attr]
+                    raise GCodeArcRejected(gl.line_num, gl.raw)  # type: ignore[union-attr]
+
+                raw_x = gl.params.get("X")  # type: ignore[union-attr]
+                raw_y = gl.params.get("Y")  # type: ignore[union-attr]
+                raw_z = gl.params.get("Z")  # type: ignore[union-attr]
+                raw_e = gl.params.get("E")  # type: ignore[union-attr]
+
+                # Resolve XYZ target
                 if abs_xyz:
                     tx = raw_x if raw_x is not None else cur_x
                     ty = raw_y if raw_y is not None else cur_y
@@ -1028,10 +1160,26 @@ def stream_segment(
                     ty = cur_y + (raw_y or 0.0)
                     tz = cur_z + (raw_z or 0.0)
 
-                # Use the bounded absolute move API
-                driver.move_absolute(  # type: ignore[union-attr]
-                    tx, ty, tz,
-                    feedrate=cur_f,
+                # --- Apply AA-33 print-frame transform ---
+                tx_arm, ty_arm, tz_arm = frame.apply((tx, ty, tz))
+
+                # Resolve E value (pass through; caller responsible for G92 reset)
+                send_e: Optional[float] = None
+                if raw_e is not None:
+                    if abs_e:
+                        # Absolute E: forward as-is; track for relative transitions
+                        send_e = raw_e
+                        cur_e = raw_e
+                    else:
+                        # Relative E: pass as delta (firmware is in M83 mode)
+                        send_e = raw_e
+                        cur_e += raw_e
+
+                # Use print_move (bounds-checked G1 with E/F) — AA-34 bounded API
+                driver.print_move(  # type: ignore[union-attr]
+                    tx_arm, ty_arm, tz_arm,
+                    e=send_e,
+                    f=cur_f,
                     dry_run=dry_run,
                 )
                 cur_x, cur_y, cur_z = tx, ty, tz
@@ -1040,20 +1188,27 @@ def stream_segment(
                     progress_cb(sent, total)
             else:
                 # Non-motion command: send via send_raw
-                # Build a raw G-code line from opcode + params
-                raw_cmd = _rebuild_gcode(gl)
+                raw_cmd = _rebuild_gcode(gl)  # type: ignore[arg-type]
+                # G92 resets extruder position — track cur_e
+                if gl.opcode == "G92" and "E" in gl.params:  # type: ignore[union-attr]
+                    cur_e = gl.params["E"]  # type: ignore[union-attr]
                 driver.send_raw(raw_cmd, dry_run=dry_run)  # type: ignore[union-attr]
 
     except Exception as exc:
+        line_num = gl.line_num if gl is not None and hasattr(gl, "line_num") else 0  # type: ignore[union-attr]
         log.error(
             "gcode_intake: stream aborted at line %d: %s",
-            gl.line_num if "gl" in dir() else 0,
+            line_num,
             exc,
         )
-        _abort_safe(driver, laser_driver, config, dry_run=dry_run)
+        retract_ok, quickstop_attempted = _abort_safe(
+            driver, laser_driver, config, dry_run=dry_run
+        )
         raise GCodeStreamAborted(
             f"streaming aborted: {exc}",
             cause=exc,
+            retract_ok=retract_ok,
+            quickstop_attempted=quickstop_attempted,
         ) from exc
 
     log.info(
@@ -1061,6 +1216,7 @@ def stream_segment(
         sent,
         dry_run,
     )
+# --- AA-34 end ---
 
 
 def _rebuild_gcode(gl: GCodeLine) -> str:
@@ -1081,12 +1237,24 @@ def _abort_safe(
     config: GCodeIntakeConfig,
     *,
     dry_run: bool = False,
-) -> None:
+) -> Tuple[bool, bool]:
     """Attempt nozzle retract and laser off as best-effort on abort.
 
-    Errors here are logged and swallowed to ensure both actions are attempted.
+    Abort sequence (AA-34):
+    1. ``driver.move_relative(0, 0, +retract_z)`` — retract nozzle.
+    2. If retract raises, ``driver.quickstop()`` (M410) — halt motion.
+    3. ``laser_driver.off()`` — always attempted regardless of retract outcome.
+
+    Returns
+    -------
+    tuple[bool, bool]
+        ``(retract_ok, quickstop_attempted)`` — both logged; the caller
+        records them in :class:`GCodeStreamAborted`.
     """
-    # Retract: G91 relative + G1 Z+retract_z
+    retract_ok = False
+    quickstop_attempted = False
+
+    # Step 1: retract nozzle
     try:
         log.warning(
             "gcode_intake: abort retract: Z+%.1f mm dry_run=%s",
@@ -1097,16 +1265,29 @@ def _abort_safe(
             0.0, 0.0, config.retract_z_mm,
             dry_run=dry_run,
         )
+        retract_ok = True
     except Exception as exc:
-        log.error("gcode_intake: retract failed: %s", exc)
+        # Step 2: retract failed — try M410 quickstop
+        log.error(
+            "gcode_intake: retract failed (%s); falling back to quickstop (M410)",
+            exc,
+        )
+        quickstop_attempted = True
+        try:
+            driver.quickstop(dry_run=dry_run)  # type: ignore[union-attr]
+            log.warning("gcode_intake: M410 quickstop sent")
+        except Exception as qs_exc:
+            log.error("gcode_intake: quickstop also failed: %s", qs_exc)
 
-    # Laser off
+    # Step 3: laser off (always attempted)
     if laser_driver is not None:
         try:
             log.warning("gcode_intake: abort laser off")
             laser_driver.off()  # type: ignore[union-attr]
         except Exception as exc:
             log.error("gcode_intake: laser off failed: %s", exc)
+
+    return retract_ok, quickstop_attempted
 
 
 # ---------------------------------------------------------------------------
@@ -1183,3 +1364,12 @@ def dry_run_segment(
     print_fn(f"  Frame ID          : {frame_id}")
     print_fn("  Validation        : PASSED")
     return segment
+
+
+def _abort_accepts_single_arg() -> bool:
+    """GCodeStreamAborted signature varies; only use it if a 1-arg call works."""
+    try:
+        GCodeStreamAborted(RuntimeError("probe"))
+        return True
+    except TypeError:
+        return False

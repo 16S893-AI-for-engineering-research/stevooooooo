@@ -424,6 +424,15 @@ class CycleRunner:
         # Zero q used as seed for IK (placeholder until retract pose is verified)
         self._zero_q = np.zeros(N_JOINTS, dtype=np.float64)
 
+        # --- AA-28 ---
+        # Optional AA-28 hook objects; injected by the caller after construction
+        # or via set_aa28_hooks().  When None, the hooks are no-ops so the
+        # cycle runs exactly as before.
+        self._aa28_verifier: Optional[Any] = None     # TubeStateVerifier
+        self._aa28_responder: Optional[Any] = None    # FaultResponder
+        self._aa28_checkpoint: Optional[Any] = None   # CycleStateCheckpoint
+        # --- AA-28 end ---
+
     # ------------------------------------------------------------------
     # Public properties
     # ------------------------------------------------------------------
@@ -442,6 +451,35 @@ class CycleRunner:
     def frame_model(self) -> FrameModel:
         """The shared AA-15 FrameModel (mutable state)."""
         return self._fm
+
+    # --- AA-28 ---
+    def set_aa28_hooks(
+        self,
+        *,
+        verifier: Optional[Any] = None,
+        responder: Optional[Any] = None,
+        checkpoint: Optional[Any] = None,
+    ) -> None:
+        """Attach AA-28 recovery hooks (TubeStateVerifier, FaultResponder,
+        CycleStateCheckpoint) to this runner.
+
+        All three are optional; passing ``None`` clears that hook.  Hooks are
+        called at the pre-cycle verification step (verifier), after phase
+        transitions (checkpoint), and on fault detection (responder).
+
+        Parameters
+        ----------
+        verifier:
+            :class:`~inchworm.recovery.TubeStateVerifier` instance.
+        responder:
+            :class:`~inchworm.recovery.FaultResponder` instance.
+        checkpoint:
+            :class:`~inchworm.recovery.CycleStateCheckpoint` instance.
+        """
+        self._aa28_verifier = verifier
+        self._aa28_responder = responder
+        self._aa28_checkpoint = checkpoint
+    # --- AA-28 end ---
 
     # ------------------------------------------------------------------
     # Public run methods
@@ -689,6 +727,35 @@ class CycleRunner:
                 planned_duration_s=0.0,
                 outcome="ok",
             ))
+
+        # --- AA-28 --- pre-cycle tube state verification
+        if self._aa28_verifier is not None:
+            v_result = self._aa28_verifier.verify(context="pre_cycle")
+            if not v_result.passed and not self._dry_run:
+                plan.phases.append(CyclePhaseRecord(
+                    phase=_PHASE_PREFLIGHT,
+                    planned_duration_s=0.0,
+                    outcome="fault",
+                    note="AA-28 pre-cycle verification failed: " + "; ".join(v_result.reasons),
+                ))
+                if self._aa28_responder is not None and v_result.reasons:
+                    from inchworm.recovery import RecoveryFaultKind
+                    self._aa28_responder.respond(
+                        fault_kind=RecoveryFaultKind.LOCK_VERIFICATION_FAILURE,
+                        detail="pre_cycle: " + "; ".join(v_result.reasons),
+                        cycle_index=cycle_index,
+                    )
+                raise PreflightError(["AA-28 pre-cycle verification failed: " + r for r in v_result.reasons])
+        if self._aa28_checkpoint is not None:
+            from inchworm.recovery import CyclePhase
+            self._aa28_checkpoint.save(
+                cycle_index=cycle_index,
+                phase=CyclePhase.PRE_CYCLE,
+                frame_model=self._fm,
+                left_sm=self._left_sm,
+                right_sm=self._right_sm,
+            )
+        # --- AA-28 end ---
 
         # ── Phase 2: Unlock moving arm ──────────────────────────────────────
         # Safety gate: H must be LOCKED before M can be unlocked.
@@ -955,6 +1022,20 @@ class CycleRunner:
 
         # ── Phase 9: Fold ─────────────────────────────────────────────────────
         self._safe_fold_both(cycle_index, plan)
+
+        # --- AA-28 --- post-cycle checkpoint and verification
+        if self._aa28_checkpoint is not None:
+            from inchworm.recovery import CyclePhase
+            self._aa28_checkpoint.save(
+                cycle_index=cycle_index,
+                phase=CyclePhase.POST_CYCLE,
+                frame_model=self._fm,
+                left_sm=self._left_sm,
+                right_sm=self._right_sm,
+            )
+        if self._aa28_verifier is not None:
+            self._aa28_verifier.verify(context="post_cycle")
+        # --- AA-28 end ---
 
     # ------------------------------------------------------------------
     # Preflight

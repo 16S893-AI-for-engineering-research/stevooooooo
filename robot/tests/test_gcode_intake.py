@@ -27,6 +27,7 @@ import pytest
 from inchworm.config import DexArmWorkspace
 from inchworm.gcode_intake import (
     BoundingBox,
+    GCodeArcRejected,
     GCodeBoundsError,
     GCodeDialectError,
     GCodeFeedrateError,
@@ -382,15 +383,41 @@ class TestValidateSegment:
 
 
 class _MockDriver:
-    """Minimal DexArmDriver stub for streamer tests."""
+    """Minimal DexArmDriver stub for streamer tests (updated for AA-34)."""
 
-    def __init__(self, fail_on_call: Optional[int] = None) -> None:
-        self.moves: List[tuple] = []
+    def __init__(
+        self,
+        fail_on_call: Optional[int] = None,
+        fail_move_relative: bool = False,
+    ) -> None:
+        self.moves: List[tuple] = []        # (x, y, z) or ("rel", dx, dy, dz)
+        self.print_moves: List[tuple] = []  # (x, y, z, e, f) from print_move
         self.raw_cmds: List[str] = []
+        self.quickstops: int = 0
         self._call_count = 0
         self._fail_on_call = fail_on_call
+        self._fail_move_relative = fail_move_relative
+        # Simulated position for get_position
+        self._pos_x: float = 5.0
+        self._pos_y: float = 10.0
+        self._pos_z: float = 0.3
+
+    def get_position(self, dry_run: bool = False):
+        """Return a simple namespace that has .x, .y, .z."""
+        from types import SimpleNamespace
+        return SimpleNamespace(x=self._pos_x, y=self._pos_y, z=self._pos_z)
+
+    def print_move(self, x, y, z, e=None, f=None, *, dry_run=False) -> None:
+        """AA-34 bounded print move with E and F."""
+        self._call_count += 1
+        if self._fail_on_call is not None and self._call_count >= self._fail_on_call:
+            from inchworm.dexarm import DexArmCommandError
+            raise DexArmCommandError(f"G1 X{x} Y{y} Z{z}", "error:rejected")
+        self.print_moves.append((x, y, z, e, f))
+        self.moves.append((x, y, z))  # keep for backward-compat assertions
 
     def move_absolute(self, x, y, z, feedrate=None, *, dry_run=False) -> None:
+        """Legacy — used by retract / safe-park paths (not called during streaming)."""
         self._call_count += 1
         if self._fail_on_call is not None and self._call_count >= self._fail_on_call:
             from inchworm.dexarm import DexArmCommandError
@@ -398,8 +425,15 @@ class _MockDriver:
         self.moves.append((x, y, z))
 
     def move_relative(self, dx, dy, dz, feedrate=None, *, dry_run=False) -> None:
-        # Used for retract
+        """Used for retract on abort."""
+        if self._fail_move_relative:
+            from inchworm.dexarm import DexArmCommandError
+            raise DexArmCommandError("G1 Z+3", "error:firmware_error")
         self.moves.append(("rel", dx, dy, dz))
+
+    def quickstop(self, *, dry_run: bool = False) -> None:
+        """M410 quickstop — called when retract fails."""
+        self.quickstops += 1
 
     def send_raw(self, cmd: str, *, dry_run: bool = False) -> list:
         self.raw_cmds.append(cmd)
@@ -424,20 +458,28 @@ class TestStreamSegment:
         """)
         return parse_segment(gcode)
 
+    def test_stream_calls_print_move(self) -> None:
+        """stream_segment uses print_move (AA-34 bounded API) for motion lines."""
+        seg = self._simple_seg()
+        driver = _MockDriver()
+        stream_segment(seg, driver)
+        # All three G1 lines should produce print_move calls
+        assert len(driver.print_moves) == 3
+
+    # Keep old name as alias so CI doesn't break if run on old results
     def test_stream_calls_move_absolute(self) -> None:
         seg = self._simple_seg()
         driver = _MockDriver()
         stream_segment(seg, driver)
-        # All three G1 lines should produce move_absolute calls
         assert len(driver.moves) == 3
 
     def test_stream_dry_run_no_real_moves(self) -> None:
         seg = self._simple_seg()
         driver = _MockDriver()
         stream_segment(seg, driver, dry_run=True)
-        # dry_run=True still calls move_absolute (with dry_run=True forwarded)
+        # dry_run=True still calls print_move (with dry_run=True forwarded)
         # but MockDriver records the call anyway
-        assert len(driver.moves) == 3  # all recorded
+        assert len(driver.print_moves) == 3  # all recorded
 
     def test_progress_callback_called(self) -> None:
         seg = self._simple_seg()
@@ -461,12 +503,14 @@ class TestStreamSegment:
         seg = self._simple_seg()
         driver = _MockDriver(fail_on_call=1)  # fail immediately
         laser = _MockLaser()
-        with pytest.raises(GCodeStreamAborted):
+        with pytest.raises(GCodeStreamAborted) as exc_info:
             stream_segment(seg, driver, laser_driver=laser, config=_CONFIG)
         # Retract: a ("rel", 0, 0, 3.0) should be in moves
         retract_moves = [m for m in driver.moves if isinstance(m[0], str) and m[0] == "rel"]
         assert len(retract_moves) == 1
         assert retract_moves[0][3] == pytest.approx(_CONFIG.retract_z_mm)
+        assert exc_info.value.retract_ok is True
+        assert exc_info.value.quickstop_attempted is False
 
     def test_abort_turns_laser_off(self) -> None:
         seg = self._simple_seg()
@@ -490,6 +534,145 @@ class TestStreamSegment:
         stream_segment(seg, driver)
         # M104 S200 should appear in raw_cmds
         assert any("M104" in cmd for cmd in driver.raw_cmds)
+
+    # --- AA-34 new tests ---
+
+    def test_retract_fails_then_quickstop(self) -> None:
+        """When move_relative raises, quickstop (M410) is attempted and
+        GCodeStreamAborted reports retract_ok=False, quickstop_attempted=True."""
+        seg = self._simple_seg()
+        driver = _MockDriver(fail_on_call=1, fail_move_relative=True)
+        laser = _MockLaser()
+        with pytest.raises(GCodeStreamAborted) as exc_info:
+            stream_segment(seg, driver, laser_driver=laser, config=_CONFIG)
+        aborted = exc_info.value
+        assert aborted.retract_ok is False
+        assert aborted.quickstop_attempted is True
+        assert driver.quickstops == 1
+        # Laser must still be turned off even though retract failed
+        assert not laser._commanded_on
+
+    def test_e_passthrough_absolute_mode(self) -> None:
+        """In M82 (absolute E) mode, E values are forwarded as-is to print_move."""
+        gcode = textwrap.dedent("""\
+            G90
+            M82
+            G92 E0
+            G1 X10 Y10 Z0.3 E0.5 F2400
+            G1 X20 Y10 Z0.3 E1.2
+        """)
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        stream_segment(seg, driver)
+        e_values = [m[3] for m in driver.print_moves]
+        assert e_values[0] == pytest.approx(0.5)
+        assert e_values[1] == pytest.approx(1.2)
+
+    def test_e_passthrough_relative_mode(self) -> None:
+        """In M83 (relative E) mode, E deltas are forwarded as-is to print_move."""
+        gcode = textwrap.dedent("""\
+            G90
+            M83
+            G1 X10 Y10 Z0.3 E0.3 F2400
+            G1 X20 Y10 Z0.3 E0.4
+        """)
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        stream_segment(seg, driver)
+        e_values = [m[3] for m in driver.print_moves]
+        assert e_values[0] == pytest.approx(0.3)
+        assert e_values[1] == pytest.approx(0.4)
+
+    def test_no_e_in_move_passes_none(self) -> None:
+        """Motion lines without E pass None for e to print_move."""
+        gcode = "G90\nG1 X10 Y10 Z0.3 F2400"
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        stream_segment(seg, driver)
+        assert len(driver.print_moves) == 1
+        assert driver.print_moves[0][3] is None  # e=None
+
+    def test_frame_transform_applied_to_streamed_moves(self) -> None:
+        """AA-34 AC#3: print-frame transform is applied to every streamed XYZ."""
+
+        class ShiftFrame:
+            frame_id = "shift_x+100"
+
+            def apply(self, xyz):
+                x, y, z = xyz
+                return (x + 100.0, y, z)
+
+        gcode = "G90\nG1 X10 Y10 Z0.3 F2400\nG1 X20 Y20 Z0.3"
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        stream_segment(seg, driver, frame=ShiftFrame())
+        # All X values should be shifted by +100
+        assert driver.print_moves[0][0] == pytest.approx(110.0)
+        assert driver.print_moves[1][0] == pytest.approx(120.0)
+
+    def test_start_position_queried_via_m114(self) -> None:
+        """AA-34: start position is queried via get_position (M114), not assumed 0,0,0."""
+        # Driver reports start pos (5.0, 10.0, 0.3)
+        gcode = textwrap.dedent("""\
+            G91
+            G1 X5 Y0 Z0 F2400
+        """)
+        seg = parse_segment(gcode)
+        driver = _MockDriver()  # _pos_x=5.0, _pos_y=10.0, _pos_z=0.3
+        stream_segment(seg, driver)
+        # Relative G1 X+5 from start (5,10,0.3) -> (10,10,0.3)
+        assert driver.print_moves[0][0] == pytest.approx(10.0)
+        assert driver.print_moves[0][1] == pytest.approx(10.0)
+
+    def test_start_position_assumed_zero_when_get_position_unavailable(self) -> None:
+        """When get_position fails, stream falls back to (0,0,0) and logs a warning."""
+
+        class NoPosMockDriver(_MockDriver):
+            def get_position(self, dry_run=False):
+                raise AttributeError("not available")
+
+        gcode = textwrap.dedent("""\
+            G91
+            G1 X5 Y0 Z0 F2400
+        """)
+        seg = parse_segment(gcode)
+        driver = NoPosMockDriver()
+        # Orchestrator 2026-10-24: live streaming must refuse, not assume (0,0,0).
+        with pytest.raises(Exception, match="(?i)start-position|M114"):
+            stream_segment(seg, driver)
+        assert driver.print_moves == []
+
+    def test_arc_g2_rejected_at_stream_time(self) -> None:
+        """G2 arc is rejected during streaming with GCodeArcRejected."""
+        from inchworm.gcode_intake import GCodeArcRejected
+        gcode = "G90\nG1 X0 Y0 Z0.3 F2400\nG2 X10 Y0 I5 J0"
+        seg = parse_segment(gcode)  # parse is OK (dialect accepts G2)
+        driver = _MockDriver()
+        with pytest.raises(GCodeStreamAborted) as exc_info:
+            stream_segment(seg, driver)
+        # The cause should be GCodeArcRejected
+        assert isinstance(exc_info.value.cause, GCodeArcRejected)
+        assert exc_info.value.cause.reason == "arc_not_linearised"
+
+    def test_arc_g3_rejected_at_stream_time(self) -> None:
+        """G3 arc is rejected during streaming with GCodeArcRejected."""
+        from inchworm.gcode_intake import GCodeArcRejected
+        gcode = "G90\nG1 X0 Y0 Z0.3 F2400\nG3 X10 Y0 I5 J0"
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        with pytest.raises(GCodeStreamAborted) as exc_info:
+            stream_segment(seg, driver)
+        assert isinstance(exc_info.value.cause, GCodeArcRejected)
+
+    def test_identity_frame_no_shift_in_streaming(self) -> None:
+        """IdentityPrintFrame leaves coordinates unchanged during streaming."""
+        gcode = "G90\nG1 X50 Y100 Z0.3 F2400"
+        seg = parse_segment(gcode)
+        driver = _MockDriver()
+        stream_segment(seg, driver, frame=IdentityPrintFrame())
+        assert driver.print_moves[0][0] == pytest.approx(50.0)
+        assert driver.print_moves[0][1] == pytest.approx(100.0)
+
 
 
 # ---------------------------------------------------------------------------

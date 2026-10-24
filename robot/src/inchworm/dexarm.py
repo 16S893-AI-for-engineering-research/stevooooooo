@@ -527,6 +527,75 @@ class DexArmDriver:
     # Rotrics-specific commands (unverified without live device)
     # ------------------------------------------------------------------
 
+    # --- AA-34 ---
+    def print_move(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        e: Optional[float] = None,
+        f: Optional[float] = None,
+        *,
+        dry_run: bool = False,
+    ) -> None:
+        """Issue a bounds-checked G1 print move carrying optional E (extrusion) and F (feedrate).
+
+        This is the **only** path through which segment G-code motion reaches
+        the DexArm during printing.  It enforces workspace bounds *before*
+        any byte is sent, so a misconfigured print-frame transform or
+        rogue G-code value cannot move the arm outside the safe envelope.
+
+        Parameters
+        ----------
+        x, y, z:
+            Target position in mm (arm frame, after print-frame transform).
+        e:
+            Extruder axis value in mm.  Passed through verbatim; the caller
+            (``stream_segment``) is responsible for resolving absolute vs
+            relative extrusion before this call.
+        f:
+            Feedrate in mm/min.  When ``None``, no ``F`` parameter is appended
+            and the firmware uses its current feedrate.
+        dry_run:
+            When ``True``, log the planned command without sending it.
+
+        Raises
+        ------
+        DexArmBoundsError
+            If the target XYZ falls outside the configured workspace.
+            **The move is never transmitted when this is raised.**
+        DexArmNoBoundsError
+            If no workspace is configured (fail-closed).
+        DexArmDisconnect
+            If the transport is closed or times out.
+        DexArmCommandError
+            If the firmware rejects the command.
+        """
+        self._require_open()
+        self._check_bounds(x, y, z)
+        # Build G1 command: "G1 X<x> Y<y> Z<z> [E<e>] [F<f>]"
+        cmd = f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}"
+        if e is not None:
+            cmd += f" E{e:.5f}"
+        if f is not None:
+            cmd += f" F{f:.3f}"
+        if dry_run:
+            self._emit(
+                "INFO", "dexarm_dry_run",
+                {"cmd": cmd, "x": x, "y": y, "z": z, "e": e, "feedrate": f},
+            )
+            return
+        with self._lock:
+            self._send_cmd("G90")   # ensure absolute XYZ mode
+            self._recv_ack("G90")
+            self._send_cmd(cmd)
+            self._recv_ack(cmd)
+        self._emit(
+            "INFO", "dexarm_print_move",
+            {"x": x, "y": y, "z": z, "e": e, "feedrate": f},
+        )
+    # --- AA-34 end ---
+
     # --- AA-10 ---
     def quickstop(self, *, dry_run: bool = False) -> None:
         """Send the Marlin M410 quickstop command to halt all motion immediately.
