@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 19:40'
+updated_date: '2026-10-24 22:51'
 labels: []
 milestone: m-1
 dependencies:
@@ -67,6 +67,8 @@ AA-9 fix (orchestrator review 2026-10-24): (1) Added joint_calibration.py - serv
 Orchestrator review 2026-10-24 of the fix: _read_present_pose_rad fabricated 0.0 rad on a read failure or missing servo ID, so the collision check validated a pose the arm is not in. LIVE mode now raises PresentPoseUnknownError (fail closed); the dry-run fallback is kept with a warning. Tests: test_live_present_pose_read_failure_fails_closed, test_dry_run_present_pose_read_failure_falls_back. Verified that the AST guard test exists and passes. 902 passed.
 
 Orchestrator verification 2026-10-24: AC#5 re-checked after the wave-3 fix and orchestrator hardening. `uv run pytest tests/test_ast_guard.py tests/test_motion_guard.py` all pass: the AST test proves no module outside {motion_guard, servo_bus, gripper_lock, torque (e-stop present-position hold only), joint_calibration} writes positions; homing and policy_actions route through GuardedArm; bypass_guard is the only documented override and it always logs a WARNING (test_bypass_guard_logs_warning); live present-pose read failure fails closed.
+
+LIVE 2026-10-24, left arm, torque-off manual sweep (owner), read-only recorder, 1324 samples per joint (robot/calibration_data/joint_ranges_left_2026-10-24.json). Servo-degree ranges: shoulder_pan 291.3->98.9 (168 deg, CROSSES the 4095/0 seam), shoulder_lift 134.0->291.0 (157), elbow_flex 168.4->3.2 (195, CROSSES), wrist_flex 41.8->245.8 (204), wrist_roll 148.8->27.6 (239, CROSSES), gripper 271.1->359.9 (89, ends at the seam). Servo EEPROM: position limits 0/4095, homing_offset 0x55 (IDs 1-3) / 0 (IDs 4-6). A first sweep with a non-wrap-aware recorder produced invalid 0-360 ranges; the recorder was fixed to unwrap continuous travel (test_unwrapped_range_across_seam). BLOCKER for live motion: three joints cross the encoder seam, so position-mode targets could travel the long way. Homing offsets must be recalibrated (LeRobot-style half-turn homing) before any position command; owner approval requested to write the EEPROM. AC#1 not yet checked (right arm pending; limits must be expressed after offset recalibration).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

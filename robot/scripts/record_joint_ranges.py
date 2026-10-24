@@ -54,9 +54,24 @@ class JointRange:
     samples: int = 1
     wrapped: bool = False
 
+    # Unwrapped (continuous) position in ticks relative to the start, so a
+    # joint whose travel crosses the 4095->0 seam gets a correct range.
+    # Orchestrator 2026-10-24: first left-arm sweep crossed the seam on 4 joints.
+    cont: int = 0
+    cont_lo: int = 0
+    cont_hi: int = 0
+
     def update(self, ticks: int) -> None:
-        if abs(ticks - self.last) > HALF_TURN:
+        d = ticks - self.last
+        if d > HALF_TURN:
+            d -= TICKS
             self.wrapped = True
+        elif d < -HALF_TURN:
+            d += TICKS
+            self.wrapped = True
+        self.cont += d
+        self.cont_lo = min(self.cont_lo, self.cont)
+        self.cont_hi = max(self.cont_hi, self.cont)
         self.last = ticks
         self.lo = min(self.lo, ticks)
         self.hi = max(self.hi, ticks)
@@ -64,8 +79,17 @@ class JointRange:
 
     def to_dict(self) -> dict:
         deg = lambda t: round(t * 360.0 / TICKS, 2)  # noqa: E731
+        lo_abs = (self.start + self.cont_lo) % TICKS
+        hi_abs = (self.start + self.cont_hi) % TICKS
         return {
             "servo_id": self.servo_id, "start_ticks": self.start,
+            # Wrap-aware range: travel from the start position, unwrapped.
+            "travel_lo_ticks_rel_start": self.cont_lo,
+            "travel_hi_ticks_rel_start": self.cont_hi,
+            "travel_span_deg": deg(self.cont_hi - self.cont_lo),
+            "range_lo_servo_deg": deg(lo_abs), "range_hi_servo_deg": deg(hi_abs),
+            "crosses_seam": (self.start + self.cont_lo) < 0 or (self.start + self.cont_hi) >= TICKS,
+            "raw_min_max_INVALID_if_wrapped": True,
             "min_ticks": self.lo, "max_ticks": self.hi,
             "min_servo_deg": deg(self.lo), "max_servo_deg": deg(self.hi),
             "span_deg": deg(self.hi - self.lo), "samples": self.samples,

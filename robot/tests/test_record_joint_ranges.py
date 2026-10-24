@@ -21,3 +21,17 @@ def test_tracks_min_max_and_flags_wrap():
 
 def test_dry_run_exits_zero_without_hardware():
     assert rjr.main(["--arm", "left"]) == 0
+
+
+def test_unwrapped_range_across_seam():
+    # start 100 ticks, sweep down through 0 to 4000 (i.e. -196 ticks), then up to 300
+    seq = iter([100, 50, 4090, 4000, 4050, 10, 300])
+    rec = rjr.Recorder(lambda sid: next(seq), {"j": 1})
+    rec.start()
+    for _ in range(6):
+        rec.poll()
+    r = rec.ranges["j"].to_dict()
+    assert r["travel_lo_ticks_rel_start"] == -196
+    assert r["travel_hi_ticks_rel_start"] == 200
+    assert r["crosses_seam"] is True
+    assert abs(r["travel_span_deg"] - 396 * 360 / 4096) < 0.1
