@@ -296,7 +296,8 @@ def main() -> int:
             "  Owner must confirm both grippers are LOCKED before proceeding.\n"
         )
 
-        backend = get_backend(cfg)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(cfg)
         transport_left = backend.open_serial("arm_left")
         transport_right = backend.open_serial("arm_right")
 

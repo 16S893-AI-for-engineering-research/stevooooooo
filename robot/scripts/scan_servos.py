@@ -101,7 +101,8 @@ def _live_scan(
     from inchworm.backends import create_backend, BackendError
 
     try:
-        backend = create_backend(config)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(config)
     except BackendError as exc:
         print(f"ERROR: cannot create hardware backend: {exc}", file=sys.stderr)
         sys.exit(1)

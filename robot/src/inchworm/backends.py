@@ -771,3 +771,20 @@ class MockMjpegBackend(Backend):
 
 
 # --- AA-14 end ---
+
+
+# --- live-backend ---
+def live_backend(config: "HardwareConfig") -> "Backend":
+    """Backend for a script's ``--live`` path: ALWAYS the real hardware backend.
+
+    Orchestrator 2026-10-24: scripts previously used create_backend(cfg),
+    which honours ``backend: mock`` in hardware.yaml. A ``--live`` run would
+    then silently talk to mocks and "verify" nothing. A live run that asks
+    for hardware must get hardware, or fail loudly. An explicit
+    INCHWORM_BACKEND=mock override is refused for live runs.
+    """
+    raw = os.environ.get(BACKEND_ENV_VAR, "").strip().lower()
+    if raw == BackendName.MOCK.value:
+        raise BackendError(f"--live requested but {BACKEND_ENV_VAR}=mock is set; refusing")
+    return HardwareBackend(config)
+# --- live-backend end ---

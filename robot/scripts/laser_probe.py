@@ -64,7 +64,8 @@ def main() -> int:
         print(f"  Protocol: {Lcus1Protocol.name} (UNVERIFIED)")
         print(f"  ON bytes:  {list(Lcus1Protocol._ON)}")
         print(f"  OFF bytes: {list(Lcus1Protocol._OFF)}")
-        backend = create_backend(config)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(config)
     else:
         print("DRY-RUN mode (mock backend). No hardware touched.")
         backend = MockBackend(config)

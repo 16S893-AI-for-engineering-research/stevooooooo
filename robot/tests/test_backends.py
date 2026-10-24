@@ -321,3 +321,22 @@ def test_get_backend_alias(config):
 
 
 # --- serial-transport end ---
+
+
+# --- Orchestrator 2026-10-24: --live paths always use real hardware ---
+def test_live_backend_ignores_mock_config_and_refuses_mock_env(monkeypatch, default_config_for_live=None):
+    import pytest
+    from inchworm.backends import BackendError, HardwareBackend, live_backend
+    from inchworm.config import load_config
+    cfg = load_config()  # hardware.yaml says backend: mock
+    monkeypatch.delenv("INCHWORM_BACKEND", raising=False)
+    assert isinstance(live_backend(cfg), HardwareBackend)
+    monkeypatch.setenv("INCHWORM_BACKEND", "mock")
+    with pytest.raises(BackendError, match="refusing"):
+        live_backend(cfg)
+
+
+def test_conftest_blocks_real_serial():
+    import pytest, serial
+    with pytest.raises(AssertionError, match="REAL serial port"):
+        serial.Serial("/dev/ttyACM0")

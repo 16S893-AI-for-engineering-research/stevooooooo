@@ -185,7 +185,8 @@ def _measure_live(arm: str, joints: list[str]) -> None:
         logger.warning("No gripper servo ID; using placeholder 6 for ArmServoBus.")
         joint_id_map["gripper"] = 6
 
-    backend = get_backend(cfg)
+    from inchworm.backends import live_backend  # --live always real hardware
+    backend = live_backend(cfg)
     transport = backend.open_serial(f"arm_{arm}")
     bus = ArmServoBus(
         transport=transport,

@@ -360,7 +360,8 @@ def main(argv: list[str] | None = None) -> int:
         joint_id_map = _build_joint_id_map_or_refuse(cfg, role)
 
         # 2. Open serial transport via backend (respects mock/hardware env).
-        backend = get_backend(cfg)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(cfg)
         transport = backend.open_serial(role)
 
         # 3. Build servo bus.

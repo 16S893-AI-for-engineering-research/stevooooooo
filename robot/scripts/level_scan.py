@@ -163,7 +163,8 @@ def main() -> int:
     if args.live:
         print("WARNING: --live mode. Real hardware will move. Owner supervision required.")
         print(f"  standoff_z_mm = {scan_cfg.standoff_z_mm} (None = FAIL CLOSED)")
-        backend = create_backend(config)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(config)
     else:
         print("DRY-RUN mode (mock backend). No hardware touched.")
         backend = MockBackend(config)

@@ -102,7 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         # Note: hardware backend is not fully implemented until AA-5 completion;
         # this path is provided for forward compatibility.
         try:
-            backend = create_backend(config)
+            from inchworm.backends import live_backend  # --live always real hardware
+            backend = live_backend(config)
         except Exception as exc:
             _LOG.error("Failed to create hardware backend: %s", exc)
             return 2

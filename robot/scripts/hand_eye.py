@@ -140,7 +140,8 @@ def _run_live(arm: str) -> None:
     gripper_id = servo_joints.get("gripper")
     joint_id_map["gripper"] = gripper_id if gripper_id is not None else 6
 
-    backend = get_backend(cfg)
+    from inchworm.backends import live_backend  # --live always real hardware
+    backend = live_backend(cfg)
     transport = backend.open_serial(f"arm_{arm_label}")
     bus = ArmServoBus(
         transport=transport,

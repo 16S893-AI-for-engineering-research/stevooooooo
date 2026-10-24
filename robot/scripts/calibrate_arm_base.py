@@ -165,7 +165,8 @@ def _run_live(device: str) -> None:
         else:
             joint_id_map["gripper"] = 6
 
-        backend = get_backend(cfg)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(cfg)
         transport = backend.open_serial(device)
         bus = ArmServoBus(
             transport=transport,
@@ -206,7 +207,8 @@ def _run_live(device: str) -> None:
         from inchworm.backends import get_backend
         from inchworm.dexarm import DexArmDriver
 
-        backend = get_backend(cfg)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(cfg)
         transport = backend.open_serial("dexarm")
         arm_driver = DexArmDriver(transport=transport, config=cfg.dexarm, dry_run=False)
 

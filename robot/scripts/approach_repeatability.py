@@ -138,7 +138,8 @@ def main() -> None:
         from inchworm.backends import get_backend
         from inchworm.servo_bus import ArmServoBus
 
-        backend = get_backend(cfg)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(cfg)
         arm_cfg = cfg.arms.left if args.arm == "left" else cfg.arms.right
         arm_role_tag = f"arm_{args.arm}"
         servo_joints_dict = arm_cfg.servo_joints.model_dump()

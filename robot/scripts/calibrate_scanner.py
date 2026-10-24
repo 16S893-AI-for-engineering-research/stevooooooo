@@ -641,7 +641,8 @@ def main() -> int:
 
         from inchworm.backends import create_backend
         config = load_config()
-        backend = create_backend(config)
+        from inchworm.backends import live_backend  # --live always real hardware
+        backend = live_backend(config)
     else:
         log.info("DRY-RUN mode (mock backend). No hardware touched.")
         from inchworm.backends import MockBackend

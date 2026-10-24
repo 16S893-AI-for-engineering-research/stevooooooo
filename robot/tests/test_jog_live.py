@@ -175,7 +175,7 @@ class TestLiveRefusesUnverifiedCalibration:
         fake_backend = _make_fake_backend(uncalib_cfg)
 
         with patch.object(jog, "load_config", return_value=uncalib_cfg), \
-             patch("inchworm.backends.get_backend", return_value=fake_backend):
+             patch("inchworm.backends.live_backend", return_value=fake_backend):
             with pytest.raises(SystemExit) as exc_info:
                 jog.main(["--arm", "left", "--delta", "0.0,0.0,0.01", "--live"])
         assert exc_info.value.code == 4, (
@@ -189,7 +189,7 @@ class TestLiveRefusesUnverifiedCalibration:
         fake_backend = _make_fake_backend(cfg)
 
         with patch.object(jog, "load_config", return_value=cfg), \
-             patch("inchworm.backends.get_backend", return_value=fake_backend):
+             patch("inchworm.backends.live_backend", return_value=fake_backend):
             with pytest.raises(SystemExit) as exc_info:
                 jog.main(["--arm", "left", "--delta", "0.0,0.0,0.01", "--live"])
         assert exc_info.value.code == 4
@@ -242,7 +242,7 @@ class TestLiveVerifiedWiresGuardedArm:
         with patch.object(jog, "load_config", return_value=verified_cfg), \
              patch.object(_mg_mod, "build_guarded_arm", side_effect=spy_build_guarded_arm), \
              patch.object(_sb_mod, "ArmServoBus", SpyArmServoBus), \
-             patch("inchworm.backends.get_backend", return_value=fake_backend):
+             patch("inchworm.backends.live_backend", return_value=fake_backend):
             ret = jog.main([
                 "--arm", "left",
                 "--delta", "0.02,0.0,0.0",
@@ -298,7 +298,7 @@ class TestLiveVerifiedWiresGuardedArm:
         with patch.object(jog, "load_config", return_value=verified_cfg), \
              patch.object(_mg_mod, "build_guarded_arm", side_effect=capturing_build), \
              patch.object(_sb_mod, "ArmServoBus", NoOpArmServoBus), \
-             patch("inchworm.backends.get_backend", return_value=fake_backend):
+             patch("inchworm.backends.live_backend", return_value=fake_backend):
             ret = jog.main([
                 "--arm", "left",
                 "--delta", "0.0,0.02,0.0",
@@ -330,8 +330,8 @@ class TestDryRunUnchanged:
         assert ret == 0
 
     def test_dry_run_never_opens_backend(self) -> None:
-        """Dry-run must never call get_backend."""
-        with patch("inchworm.backends.get_backend") as mock_gb:
+        """Dry-run must never call live_backend."""
+        with patch("inchworm.backends.live_backend") as mock_gb:
             ret = jog.main(["--arm", "left", "--delta", "0.01,0.0,0.0"])
         assert ret == 0
         mock_gb.assert_not_called()
