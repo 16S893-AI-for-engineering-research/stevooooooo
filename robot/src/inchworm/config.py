@@ -757,6 +757,232 @@ class LaserLineConfigSchema(_Strict):
 
 
 # --- AA-31 end ---
+# --- AA-30 ---
+
+
+class ScannerCalibrationSchema(BaseModel):
+    """Scanner calibration result stored in hardware config (AA-30).
+
+    This block is written by ``scripts/calibrate_scanner.py`` and read by
+    :func:`inchworm.scanner_calibration.load_calibration`.  All sub-fields
+    are ``Optional`` with ``None`` defaults; a missing block means no
+    calibration has been performed.
+
+    ``unverified: true`` means the owner has not yet validated and accepted the
+    calibration result.  Live triangulation fails closed when ``unverified`` is
+    ``True``.
+    """
+
+    model_config = ConfigDict(extra="allow", frozen=True, strict=False)
+
+    # ISO date string YYYY-MM-DD of the calibration session.
+    calibration_date: Optional[str] = None
+    # Human-readable target description (e.g. "chessboard 9x6 25mm").
+    target_description: Optional[str] = None
+    # Free-form operator notes.
+    notes: Optional[str] = None
+    # True until owner reviews and accepts the calibration.
+    unverified: bool = True
+
+
+# --- AA-30 end ---
+
+
+# --- AA-18 ---
+
+
+class ApproachConfig(_Strict):
+    """AA-18 coarse approach planner configuration.
+
+    Defines the pre-insertion pose as a standoff and orientation offset
+    relative to the attachment-point frame from AA-15.  This is the
+    *single definition* later used by AA-20, AA-23, and AA-26 for policy
+    training and rollout.
+
+    All values are ``unverified: true`` until measured in AA-16.
+    Live mode fails closed when ``unverified`` is True.
+
+    Standoff and orientation
+    ------------------------
+    ``standoff_m`` is the TCP offset along the attachment-point z-axis
+    (positive = away from the tube bore) at the pre-insertion pose.
+
+    ``orientation_rpy_rad`` is the RPY rotation of the TCP frame relative
+    to the attachment-point frame at the pre-insertion pose.  ``[0,0,0]``
+    means the TCP z-axis is aligned with the attachment-point z-axis (into
+    the bore); adjust after AA-16 measurement.
+
+    Tolerance
+    ---------
+    ``pose_tolerance_m`` and ``pose_tolerance_rad`` define the acceptance
+    window for the achieved pre-insertion pose (FK of read-back joints vs
+    planned pose).  Tighten after hardware measurement.
+
+    Waypoints
+    ---------
+    ``waypoints_q_rad`` is a list of intermediate joint configurations
+    (5-DoF each) that the planner inserts between present pose and the
+    pre-insertion pose.  Empty list = direct path.  All UNVERIFIED.
+
+    Retreat
+    -------
+    ``retreat_q_rad`` is the safe joint configuration to command on abort.
+    ``None`` means no retreat pose has been measured; live mode fails closed.
+    """
+
+    # Standoff distance along attachment-point z-axis (metres).
+    # Positive = away from the tube bore (toward the arm base).
+    # UNVERIFIED: placeholder — measure in AA-16.
+    standoff_m: float = Field(default=0.05, gt=0)
+    # RPY orientation of TCP at pre-insertion pose relative to attachment-point frame.
+    # UNVERIFIED: placeholder [0,0,0] = aligned with attachment bore.
+    orientation_rpy_rad: List[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    # IK position tolerance for convergence (metres).
+    ik_tolerance_m: float = Field(default=1e-3, gt=0)
+    # IK orientation tolerance for convergence (radians).
+    ik_tolerance_rad: float = Field(default=1e-2, gt=0)
+    # Tolerance for pose-achievement check after motion (metres).
+    # FK of read-back joints vs planned pre-insertion pose.
+    # UNVERIFIED: placeholder — tighten after hardware measurement.
+    pose_tolerance_m: float = Field(default=5e-3, gt=0)
+    # Orientation tolerance for pose-achievement check (radians).
+    pose_tolerance_rad: float = Field(default=0.1, gt=0)
+    # Intermediate waypoints (5-DoF each, radians) between current and target.
+    # Empty = direct path.  UNVERIFIED: all placeholders.
+    waypoints_q_rad: List[List[float]] = Field(default_factory=list)
+    # Safe retreat pose on abort (5-DoF, radians).
+    # None = not yet measured; live mode fails closed.
+    retreat_q_rad: Optional[List[float]] = None
+    # True until AA-16 measures standoff, orientation, and retreat pose.
+    unverified: bool = True
+
+    @model_validator(mode="after")
+    def _validate_shapes(self) -> "ApproachConfig":
+        if len(self.orientation_rpy_rad) != 3:
+            raise ValueError(
+                f"orientation_rpy_rad must have 3 elements, got "
+                f"{len(self.orientation_rpy_rad)}"
+            )
+        for i, wp in enumerate(self.waypoints_q_rad):
+            if len(wp) != 5:
+                raise ValueError(
+                    f"waypoints_q_rad[{i}] must have 5 elements, got {len(wp)}"
+                )
+        if self.retreat_q_rad is not None and len(self.retreat_q_rad) != 5:
+            raise ValueError(
+                f"retreat_q_rad must have 5 elements, got {len(self.retreat_q_rad)}"
+            )
+        return self
+
+
+# --- AA-18 end ---
+# --- AA-16 ---
+
+
+class AA16RigidCalibration(_Strict):
+    """Result of one rigid-transform calibration step (AA-16).
+
+    ``unverified: true`` until an owner-supervised hardware session measures
+    and confirms the transform.  Live motion using this transform FAILS CLOSED
+    when ``unverified`` is True.
+
+    ``ts_iso``
+        ISO 8601 UTC timestamp of when the calibration was performed.
+    ``method``
+        Solver used (e.g. ``"kabsch"`` or ``"hand_eye_park_martin"``).
+    ``residual_m``
+        RMS residual in metres; NaN if not applicable.
+    ``residual_rad``
+        RMS rotation residual in radians; NaN if not applicable.
+    """
+
+    transform: Optional[List[List[float]]] = None    # 4×4 as nested list; null = not yet measured
+    method: Optional[str] = None
+    residual_m: Optional[float] = None
+    residual_rad: Optional[float] = None
+    ts_iso: Optional[str] = None
+    n_samples: Optional[int] = None
+    notes: Optional[str] = None
+    unverified: bool = True
+
+
+class AA16TubeAxisCalibration(_Strict):
+    """Result of the tube-axis line fit (AA-16 solver c).
+
+    ``unverified: true`` until owner-supervised.
+    """
+
+    axis_direction: Optional[List[float]] = None     # unit vector (chassis frame)
+    axis_point: Optional[List[float]] = None         # point on axis (centroid), metres
+    residual_m: Optional[float] = None
+    lattice_origin_in_chassis: Optional[List[float]] = None
+    pitch_estimate_m: Optional[float] = None
+    n_samples: Optional[int] = None
+    ts_iso: Optional[str] = None
+    method: Optional[str] = None
+    notes: Optional[str] = None
+    unverified: bool = True
+
+
+class AA16CalibrationConfig(_Strict):
+    """AA-16 chassis-arm-tube calibration results.
+
+    All sub-blocks are ``None`` until the corresponding calibration script has
+    been run and the owner has accepted the results.  The loader (see
+    :func:`~inchworm.calibration.check_calibration_age`) warns when any block
+    is absent or has an outdated timestamp.
+
+    ``max_calibration_age_days``
+        Maximum acceptable calibration age in days.  0 disables the check.
+    """
+
+    left_arm_base: Optional[AA16RigidCalibration] = None
+    right_arm_base: Optional[AA16RigidCalibration] = None
+    dexarm_base: Optional[AA16RigidCalibration] = None
+    left_wrist_camera: Optional[AA16RigidCalibration] = None
+    right_wrist_camera: Optional[AA16RigidCalibration] = None
+    tube_axis: Optional[AA16TubeAxisCalibration] = None
+    # Maximum calibration age before loader warning. 0 = check disabled.
+    max_calibration_age_days: int = Field(default=90, ge=0)
+
+
+# --- AA-16 end ---
+
+
+# --- AA-32 ---
+
+
+class LevelingConfigSchema(_Strict):
+    """Configuration for the AA-32 leveling scan and surface fit.
+
+    Loaded from the ``leveling`` block in hardware.yaml.  All values are
+    **unverified** defaults; calibrate against hardware.
+
+    Field semantics match :class:`inchworm.leveling.ScanConfig`.
+    """
+
+    # Standoff Z (mm, DexArm arm frame). null = unverified; live mode fails closed.
+    standoff_z_mm: Optional[float] = None          # unverified: true
+    # Raster grid extent and resolution.
+    scan_x_min_mm: float = Field(default=-30.0)    # unverified: true
+    scan_x_max_mm: float = Field(default=30.0)     # unverified: true
+    scan_y_min_mm: float = Field(default=100.0)    # unverified: true
+    scan_y_max_mm: float = Field(default=160.0)    # unverified: true
+    scan_x_steps: int = Field(default=5, ge=2)     # unverified: true
+    scan_y_steps: int = Field(default=7, ge=2)     # unverified: true
+    feedrate_mm_min: Optional[float] = Field(default=1500.0, gt=0)  # unverified: true
+    settle_wait_s: float = Field(default=0.05, ge=0)  # unverified: true
+    # RANSAC thresholds.
+    ransac_inlier_threshold_mm: float = Field(default=0.5, gt=0)  # unverified: true
+    ransac_trials: int = Field(default=200, ge=1)   # unverified: true
+    # Refusal thresholds.
+    min_valid_points: int = Field(default=10, ge=1)            # unverified: true
+    min_inlier_fraction: float = Field(default=0.5, gt=0, le=1)  # unverified: true
+    max_residual_rms_mm: float = Field(default=0.5, gt=0)       # unverified: true
+    max_uncertainty_mm: float = Field(default=0.2, gt=0)        # unverified: true
+
+
+# --- AA-32 end ---
 
 
 class HardwareConfig(_Strict):
@@ -795,6 +1021,21 @@ class HardwareConfig(_Strict):
     # --- AA-31 ---
     laser_line: Optional[LaserLineConfigSchema] = None
     # --- AA-31 end ---
+    # --- AA-18 ---
+    approach: Optional["ApproachConfig"] = None
+    # --- AA-18 end ---
+    # --- AA-16 ---
+    calibration: Optional["AA16CalibrationConfig"] = None
+    # --- AA-16 end ---
+    # --- AA-24 ---
+    seating_detector: Optional["SeatingDetectorConfigSchema"] = None
+    # --- AA-24 end ---
+    # --- AA-30 ---
+    scanner_calibration: Optional["ScannerCalibrationSchema"] = None
+    # --- AA-30 end ---
+    # --- AA-32 ---
+    leveling: Optional["LevelingConfigSchema"] = None
+    # --- AA-32 end ---
 
     @model_validator(mode="before")
     @classmethod
@@ -807,6 +1048,57 @@ class HardwareConfig(_Strict):
                     f"this loader supports {SUPPORTED_SCHEMA_VERSION}"
                 )
         return data
+
+
+# --- AA-24 ---
+
+
+class SeatingDetectorConfigSchema(_Strict):
+    """AA-24 seating detector thresholds loaded from hardware.yaml.
+
+    All thresholds default to ``None`` (not yet measured).  Null threshold →
+    the detector returns UNCERTAIN for that signal (fail-closed).
+    Thresholds must be derived from recorded data using
+    ``scripts/record_seating_traces.py --live`` and
+    ``scripts/record_seating_traces.py --fit``.
+
+    See :class:`~inchworm.seating.SeatingDetectorConfig` for field semantics.
+    """
+
+    # --- Position band (degrees) ---
+    # Lower bound of the gripper-servo position band where seating is expected.
+    # null = position signal not checked.  unverified: true
+    seated_position_low_deg: Optional[float] = None    # unverified: true
+    # Upper bound of the position band.  null = not checked.  unverified: true
+    seated_position_high_deg: Optional[float] = None   # unverified: true
+
+    # --- Load-rise ---
+    # Minimum peak |load_raw| over the window considered a 'load-rise'.
+    # null = load-rise signal not checked.  unverified: true
+    load_rise_threshold_raw: Optional[int] = None      # unverified: true
+
+    # --- Settling ---
+    # Number of tail samples for settling variance computation.
+    settle_window_samples: int = Field(default=5, ge=1)
+    # Maximum allowed position variance (deg^2) over the settle window.
+    # null = settling not checked.  unverified: true
+    settle_variance_deg2: Optional[float] = None       # unverified: true
+
+    # --- Window size ---
+    # Minimum number of samples required; fewer -> UNCERTAIN.
+    min_window_samples: int = Field(default=3, ge=1)
+
+    # --- Probe policy ---
+    # Maximum probe-and-re-evaluate cycles before returning UNCERTAIN.
+    max_probe_attempts: int = Field(default=2, ge=0)
+
+    # --- Supervisor loop rate (Hz) ---
+    # Documented supervisor loop rate; used to bound detection latency.
+    # Matches hold_tick interval of 20 ms (50 Hz).  unverified: true
+    supervisor_loop_rate_hz: float = Field(default=50.0, gt=0)
+
+
+# --- AA-24 end ---
 
 
 def _format_validation_error(source: str, err: ValidationError) -> str:

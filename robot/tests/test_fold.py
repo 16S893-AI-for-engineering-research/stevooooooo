@@ -594,11 +594,8 @@ class TestNamedPoseIntegration:
         from inchworm.config import parse_config
         import yaml
 
-        raw = yaml.safe_load(
-            open(
-                "/home/stevotimp/worktrees/893/pi-worktree-cc2ee3cd-67ac-45ac-b7d0-542cfcb12323-s0-0/robot/config/hardware.yaml"
-            ).read()
-        )
+        from inchworm.config import DEFAULT_CONFIG_PATH
+        raw = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text())
         raw.pop("fold_sequence", None)
         cfg_no_fold = parse_config(raw)
 

@@ -666,3 +666,121 @@ laser_line:
   # Rows used for background estimate: 0 = all rows outside the window.
   background_rows: 0
 # --- AA-31 end ---
+
+# --- AA-18 ---
+# AA-18 coarse approach planner: pre-insertion pose definition.
+# Standoff and orientation are relative to the attachment-point frame (AA-15).
+# This is the SINGLE definition used by AA-20, AA-23, and AA-26.
+# ALL VALUES UNVERIFIED: measure in AA-16 calibration session.
+approach:
+  # Standoff from attachment-point origin along z-axis (positive = away from bore).
+  # UNVERIFIED placeholder: measure in AA-16.
+  standoff_m: 0.05
+  # TCP orientation at pre-insertion pose (RPY radians, attachment-point frame).
+  # [0, 0, 0] = aligned with attachment bore z-axis.
+  # UNVERIFIED placeholder.
+  orientation_rpy_rad: [0.0, 0.0, 0.0]
+  # IK convergence tolerances.
+  ik_tolerance_m: 0.001
+  ik_tolerance_rad: 0.01
+  # Pose-achievement tolerance after motion (FK of read-back joints vs planned).
+  # UNVERIFIED: tighten after hardware measurement.
+  pose_tolerance_m: 0.005
+  pose_tolerance_rad: 0.1
+  # Intermediate waypoints (empty = direct path). UNVERIFIED placeholders.
+  waypoints_q_rad: []
+  # Safe retreat pose on abort (5-DoF, radians).
+  # null = not yet measured; live mode fails closed.
+  retreat_q_rad: null
+  # True until AA-16 measures real standoff, orientation, and retreat pose.
+  unverified: true
+# --- AA-18 end ---
+# --- AA-16 ---
+# AA-16 chassis-arm-tube calibration results.
+# All sub-blocks are null until the corresponding calibration script is run
+# and the owner accepts the results.  The calibration loader warns when any
+# required block is absent or older than max_calibration_age_days.
+# Run scripts/calibrate_arm_base.py --live, scripts/hand_eye.py --live, and
+# scripts/tube_axis.py --live (owner supervision required) to populate these.
+calibration:
+  # Maximum acceptable calibration age in days. 0 disables the check.
+  max_calibration_age_days: 90
+  # Left arm base-to-chassis rigid transform.
+  # null = not yet measured; run scripts/calibrate_arm_base.py --live
+  left_arm_base: null  # unverified: true
+  # Right arm base-to-chassis rigid transform.
+  right_arm_base: null  # unverified: true
+  # DexArm base-to-chassis rigid transform.
+  dexarm_base: null  # unverified: true
+  # Left wrist camera pose in left arm end-effector frame (hand-eye).
+  left_wrist_camera: null  # unverified: true
+  # Right wrist camera pose in right arm end-effector frame (hand-eye).
+  right_wrist_camera: null  # unverified: true
+  # Tube axis in chassis frame (PCA line fit through attachment-point centres).
+  tube_axis: null  # unverified: true
+# --- AA-16 end ---
+# --- AA-24 ---
+# Insertion seating detector thresholds (AA-24).
+# All thresholds are null (unverified) until derived from recorded data.
+# With null thresholds the detector returns UNCERTAIN, never SEATED (fail-closed).
+# Derive thresholds with: scripts/record_seating_traces.py --fit <dataset.jsonl>
+# Record labelled data with: scripts/record_seating_traces.py --live
+seating_detector:
+  # Position band for the gripper servo at the seated position (degrees).
+  # null = position signal not checked.  unverified: true
+  seated_position_low_deg: null   # unverified: true
+  seated_position_high_deg: null  # unverified: true
+  # Minimum peak |load_raw| over the evaluation window (sign-magnitude decoded).
+  # null = load-rise signal not checked.  unverified: true
+  load_rise_threshold_raw: null   # unverified: true
+  # Tail-window length for settling variance (samples).
+  settle_window_samples: 5
+  # Maximum position variance (deg^2) over the settle tail.
+  # null = settling not checked.  unverified: true
+  settle_variance_deg2: null      # unverified: true
+  # Minimum window samples required before evaluating.
+  min_window_samples: 3
+  # Maximum probe-and-re-evaluate attempts before returning UNCERTAIN.
+  max_probe_attempts: 2
+  # Supervisor loop rate (Hz); matches hold_tick interval 20 ms = 50 Hz.
+  # unverified: true — confirm from hardware session.
+  supervisor_loop_rate_hz: 50.0
+# --- AA-24 end ---
+# --- AA-30 ---
+# Scanner calibration result (AA-30). Written by scripts/calibrate_scanner.py.
+# All sub-fields are null until a live calibration session is run.
+# Set unverified: false after the owner reviews and accepts the calibration.
+# Live triangulation (AA-31) fails closed when unverified is true or block is absent.
+scanner_calibration:
+  calibration_date: null       # YYYY-MM-DD; null = not yet calibrated
+  target_description: null     # e.g. "chessboard 9x6 inner corners, 25mm squares"
+  notes: null
+  unverified: true             # set false after owner validates the result
+  # Sub-blocks (intrinsics, laser_plane, sensitivity, hand_eye) are null until
+  # calibrate_scanner.py --live writes them.  Do not edit these by hand.
+# --- AA-30 end ---
+# --- AA-32 ---
+# Leveling scan configuration (AA-32).
+# All values are UNVERIFIED defaults; calibrate against hardware.
+# standoff_z_mm is null (unverified); live mode fails closed until set.
+leveling:
+  # Standoff Z (mm, DexArm arm frame). null = unverified; live mode fails closed.
+  standoff_z_mm: null   # unverified: true
+  # Raster grid extent (mm, DexArm arm frame). unverified: true
+  scan_x_min_mm: -30.0
+  scan_x_max_mm:  30.0
+  scan_y_min_mm: 100.0
+  scan_y_max_mm: 160.0
+  scan_x_steps: 5
+  scan_y_steps: 7
+  feedrate_mm_min: 1500.0   # unverified: true
+  settle_wait_s: 0.05       # unverified: true
+  # RANSAC plane fit thresholds. unverified: true
+  ransac_inlier_threshold_mm: 0.5
+  ransac_trials: 200
+  # Refusal thresholds. unverified: true
+  min_valid_points: 10
+  min_inlier_fraction: 0.5
+  max_residual_rms_mm: 0.5
+  max_uncertainty_mm: 0.2
+# --- AA-32 end ---

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-24 18:11'
+updated_date: '2026-10-24 18:39'
 labels: []
 milestone: m-2
 dependencies:
@@ -92,6 +92,8 @@ Test evidence:
   uv run python scripts/fold_cycle.py --cycles 10 -> dry-run 10 cycles OK
 
 AC#1 and AC#4: UNCHECKED (hardware ACs)
+
+Orchestrator 2026-10-24: removed a hard-coded worktree path in test_build_fold_sequencer_missing_fold_sequence_raises (it now uses DEFAULT_CONFIG_PATH).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
