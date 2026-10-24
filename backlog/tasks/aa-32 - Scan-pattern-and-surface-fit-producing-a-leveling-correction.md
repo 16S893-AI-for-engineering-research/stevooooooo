@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:13'
-updated_date: '2026-10-24 18:39'
+updated_date: '2026-10-24 19:18'
 labels: []
 milestone: m-5
 dependencies:
@@ -33,13 +33,13 @@ See doc-1 sections 1, 3 and 5.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A scan pattern moves the DexArm through a documented path at the calibrated standoff, capturing profiles with the arm settled at each sample, and completes within a recorded duration
-- [ ] #2 Profiles are stitched using DexArm position feedback into a single point set in the print frame
-- [ ] #3 A geometric fit appropriate to the printed tube end (documented and justified, for example plane plus tube-axis or cylinder fit) yields a Z offset and two tilt angles with residuals and an estimated uncertainty
-- [ ] #4 The fit rejects outliers and refuses to emit a correction when coverage, residual or uncertainty thresholds are not met, returning a typed failure instead
+- [x] #2 Profiles are stitched using DexArm position feedback into a single point set in the print frame
+- [x] #3 A geometric fit appropriate to the printed tube end (documented and justified, for example plane plus tube-axis or cylinder fit) yields a Z offset and two tilt angles with residuals and an estimated uncertainty
+- [x] #4 The fit rejects outliers and refuses to emit a correction when coverage, residual or uncertainty thresholds are not met, returning a typed failure instead
 - [ ] #5 Repeatability of the computed correction is measured over at least 10 scans of an undisturbed part and reported, and meets or explains its relationship to a 0.2 mm Z target
 - [ ] #6 A known tilt and a known Z shift introduced deliberately are recovered to within a reported tolerance
-- [ ] #7 The laser is on only during capture and off for the rest of the sequence, enforced via AA-29
-- [ ] #8 Tests cover stitching, fitting on synthetic surfaces with known parameters, outlier rejection and the refusal path
+- [x] #7 The laser is on only during capture and off for the rest of the sequence, enforced via AA-29
+- [x] #8 Tests cover stitching, fitting on synthetic surfaces with known parameters, outlier rejection and the refusal path
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -64,4 +64,6 @@ AC#6 judgment: the synthetic tilt/Z recovery test satisfies the computation corr
 Files: src/inchworm/leveling.py (NEW), tests/test_leveling.py (NEW), scripts/level_scan.py (NEW), src/inchworm/config.py (AA-32 markers appended), config/hardware.yaml (AA-32 markers appended).
 
 Orchestrator review 2026-10-24 (P0 functional/safety): run_scan used 'with laser:' and assumed __enter__ switches the laser on. The real LaserDriver.__enter__ does nothing; only __exit__ switches it off. So real scans would have captured with the laser DARK, and the mock laser hid this by turning on in __enter__. Fixed: run_scan calls laser.on() explicitly inside the context (live only). The mock now mirrors the real driver, the interleave test runs the live path, and the new test test_run_scan_real_laser_driver_on_during_capture_off_after uses the real LaserDriver and checks the relay bytes (on during each of 4 captures, OFF last). 1065 passed.
+
+Orchestrator re-verification 2026-10-24 (the worker's AC checks were lost in the patch merge): `uv run pytest tests/test_leveling.py` -> 24 passed. TestStitchProfiles 5 (AC#2), TestFitSurface 7 (AC#3: z_err 0.0004 mm, tilt err < 0.02 deg, residual RMS and uncertainty reported), outlier/refusal tests 4 (AC#4 RANSAC + LevelingRefused), TestRunScanLaserEnforcement + test_run_scan_real_laser_driver_on_during_capture_off_after 5 (AC#7, real LaserDriver relay bytes), AC#8 union. ACs #1, #5 and #6 need hardware.
 <!-- SECTION:NOTES:END -->

@@ -1,11 +1,11 @@
 ---
 id: AA-20
 title: Code-policy-code handoff contract and supervisor skeleton
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-24 18:21'
+updated_date: '2026-10-24 19:21'
 labels: []
 milestone: m-2
 dependencies:
@@ -33,13 +33,13 @@ See doc-1 section 9.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A documented contract specifies the observation provided to the policy, the action space it may command, the pose at which control is handed over, the success and abort conditions, and what code guarantees on either side
-- [ ] #2 The action space excludes the gripper servo entirely, and the supervisor rejects or filters any action touching it
-- [ ] #3 The supervisor enforces a hard step and wall-clock limit, a Cartesian workspace bound around the target attachment point, and per-step action magnitude clamping, aborting on violation
-- [ ] #4 On abort the supervisor retracts the arm to a safe pose, logs a typed abort event with the triggering condition, and returns control to code without operator input
-- [ ] #5 A retry policy with a bounded attempt count and a documented escalation (re-approach, then halt the cycle) is implemented and logged
-- [ ] #6 A stub policy implementing the contract allows the full handoff path to be exercised end to end against the mock backend with no trained model present
-- [ ] #7 Tests cover handover, success return, each abort trigger, gripper-action rejection, retry escalation and final halt
+- [x] #1 A documented contract specifies the observation provided to the policy, the action space it may command, the pose at which control is handed over, the success and abort conditions, and what code guarantees on either side
+- [x] #2 The action space excludes the gripper servo entirely, and the supervisor rejects or filters any action touching it
+- [x] #3 The supervisor enforces a hard step and wall-clock limit, a Cartesian workspace bound around the target attachment point, and per-step action magnitude clamping, aborting on violation
+- [x] #4 On abort the supervisor retracts the arm to a safe pose, logs a typed abort event with the triggering condition, and returns control to code without operator input
+- [x] #5 A retry policy with a bounded attempt count and a documented escalation (re-approach, then halt the cycle) is implemented and logged
+- [x] #6 A stub policy implementing the contract allows the full handoff path to be exercised end to end against the mock backend with no trained model present
+- [x] #7 Tests cover handover, success return, each abort trigger, gripper-action rejection, retry escalation and final halt
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,12 @@ See doc-1 section 9.
 Implementation complete. New modules: policy_contract.py, supervisor.py, stub_policy.py, tests/test_supervisor.py. PolicySupervisorConfig added to config.py and hardware.yaml under AA-20 markers. 45 new tests, 812 total pass. All software ACs verified by test output. AC#1-#7 all covered. No hardware ACs exist for this task.
 
 Orchestrator review 2026-10-24 hardening: (1) the workspace bound used bare np.deg2rad(servo_deg), which ignores the AA-9 per-joint calibration and made the Cartesian bound meaningless; live mode now REQUIRES an injected joint_deg_to_rad (ValueError otherwise). (2) Seated but lock failed: new AbortReason.LOCK_FAILED, HALT without retract or retry, because the gripper may be partly engaged. (3) An exception from the policy, frame source or executor previously escaped mid-attempt; it now retracts and aborts with STEP_EXCEPTION. (4) Retract-unsafe errors are typed RetractUnsafeError and always propagate. Tests: test_live_supervisor_requires_calibrated_joint_conversion, test_lock_failure_after_seating_halts_without_retract, test_policy_exception_retracts_and_aborts. 902 passed.
+
+Orchestrator re-verification 2026-10-24 (the worker's AC checks were lost in the patch merge): `uv run pytest tests/test_supervisor.py` -> 48 passed. TestContractSpec 11 (AC#1 contract in policy_contract.py), TestGripperBlock 5 (AC#2), TestStepLimit/WallTime/Workspace/Clamping 7 (AC#3), TestAbortRetract/TestTypedAbortEvent 6 (AC#4), TestRetryPolicy 5 (AC#5), TestEndToEnd 3 with StubPolicy (AC#6), TestAllAbortTriggers 8 plus the orchestrator hardening tests (AC#7).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Code-policy-code handoff contract (policy_contract.py) and PolicySupervisor with StubPolicy. It enforces step, wall-clock, Cartesian-workspace and per-step clamp limits, retracts and logs typed aborts, retries with re-approach then halts, rejects any gripper action, and uses an injected seating detector and lock (never the policy's own output). Orchestrator hardening: live mode requires a calibrated joint conversion; seated-but-lock-failed halts without retract; exceptions retract; unsafe retract always propagates. Verified: tests/test_supervisor.py 48 passed; full suite 1406 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->

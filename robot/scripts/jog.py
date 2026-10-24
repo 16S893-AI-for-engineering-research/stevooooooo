@@ -220,24 +220,17 @@ def main(argv: list[str] | None = None) -> int:
     # In dry-run mode we use q=zeros as the "current" configuration.
     # In live mode we would read from the servo bus.
     if args.live:
-        # Hardware path: read current joint positions from servo bus.
-        # HARDWARE ONLY — never executed in dry-run / mock mode.
-        logger.warning(
-            "LIVE mode requested — opening servo bus for arm '%s'.", arm_name
+        # Orchestrator 2026-10-24: the previous live branch called
+        # non-existent APIs (ServoBusDriver, get_backend,
+        # write_joint_positions_rad) and would have bypassed AA-9 GuardedArm.
+        # Live jog is REFUSED until it is wired through
+        # motion_guard.build_guarded_arm with verified joint calibration and
+        # limits (owner-supervised hardware session).
+        logger.error(
+            "LIVE jog is not wired yet: it must go through AA-9 GuardedArm with "
+            "verified joint calibration and limits. Refusing."
         )
-        try:
-            from inchworm.backends import get_backend
-            from inchworm.servo_bus import ServoBusDriver
-            backend = get_backend(cfg)
-            bus = ServoBusDriver(
-                backend=backend,
-                arm_cfg=cfg.arms.left if arm_name == "left" else cfg.arms.right,
-                arm_role=arm_name,
-            )
-            q_current = bus.read_joint_positions_rad()
-        except Exception as exc:
-            logger.error("Failed to read joint positions in live mode: %s", exc)
-            return 1
+        return 4
     else:
         logger.info("[DRY-RUN] Using q_current = zeros (5) as current configuration.")
         q_current = np.zeros(5, dtype=np.float64)
@@ -333,27 +326,8 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[DRY-RUN complete — no motion commanded]")
         return 0
 
-    # --- Live motion execution ---
-    # HARDWARE ONLY — never reaches this point in dry-run mode.
-    logger.info("Executing trajectory on arm '%s' (T=%.3f s)...", arm_name, traj.T)
-    try:
-        from inchworm.backends import get_backend
-        from inchworm.servo_bus import ServoBusDriver
-        backend = get_backend(cfg)
-        bus = ServoBusDriver(
-            backend=backend,
-            arm_cfg=cfg.arms.left if arm_name == "left" else cfg.arms.right,
-            arm_role=arm_name,
-        )
-        for t, q_step in sample_trajectory(traj, dt=args.dt):
-            # Never command the gripper joint (index not in 5-DOF chain)
-            bus.write_joint_positions_rad(q_step)
-        logger.info("Trajectory complete.")
-    except Exception as exc:
-        logger.error("Motion execution failed: %s", exc)
-        return 1
-
-    return 0
+    # Live execution intentionally unreachable (refused above).
+    return 4
 
 
 if __name__ == "__main__":

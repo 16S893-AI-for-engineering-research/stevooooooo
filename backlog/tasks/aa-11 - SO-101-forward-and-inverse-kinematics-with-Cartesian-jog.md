@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-24 17:56'
+updated_date: '2026-10-24 19:21'
 labels: []
 milestone: m-1
 dependencies:
@@ -102,3 +102,13 @@ Orchestrator review 2026-10-24: the IK default tolerance was exactly 1 mm (_DEFA
 
 AA-9 implemented (motion_guard.py): the jog.py collision_check_hook has been wired to the real AA-9 MotionGuard (_aa9_collision_check in jog.py). AA-11 AC#4 (collision hook wired) can now be checked by the orchestrator by reviewing jog.py and running uv run pytest tests/test_motion_guard.py::TestJogAA9Integration -v.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @orchestrator
+created: 2026-10-24 19:21
+---
+Orchestrator 2026-10-24: scripts/jog.py's --live path called non-existent APIs (ServoBusDriver, get_backend, write_joint_positions_rad) and would have bypassed GuardedArm. Live jog is now REFUSED (exit 4) until it is wired through motion_guard.build_guarded_arm; dry-run uses the real AA-9 check_pose. AC#4 remains unchecked: live jog does not exist yet.
+---
+<!-- COMMENTS:END -->
