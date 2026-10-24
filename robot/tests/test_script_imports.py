@@ -45,6 +45,9 @@ def test_script_inchworm_imports_resolve(script):
 #: Scripts that require a sub-command to run in dry-run (default args won't work).
 #: Map script-name -> argv to pass instead of [].
 _DRY_RUN_ARGV: dict[str, list[str]] = {
+    # attach_usb queries the LIVE usbipd device list even in --dry-run, so its
+    # result depends on what is powered on. Smoke-test --help instead.
+    "attach_usb.py": ["--help"],
     # record_seating_traces.py requires a sub-command; use fit with a dummy
     # file that triggers the argparse path without opening hardware.
     # We use --help for simplicity since fit requires a real file argument.

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:08'
-updated_date: '2026-10-24 19:45'
+updated_date: '2026-10-24 21:18'
 labels: []
 milestone: m-0
 dependencies:
@@ -159,6 +159,8 @@ No two roles share a dev node (duplicate invariant: pass).
 TEST RUN: uv run pytest: 252 passed, 0 failed (222 pre-existing + 24 test_vhci + 6 new test_discovery).
 
 Orchestrator live check 2026-10-24 ~11:45 EDT. I detached all three cameras and re-attached them in REVERSED order (10-2, then 11-4, then 9-4). The vhci local ports changed: 10-2 went to 1-5, 11-4 to 1-6, 9-4 to 1-7. Discovery followed the BusId correctly: cam_left=/dev/video4 (ID_PATH vhci usb-0:7, which is BusId 9-4), cam_right=/dev/video0, cam_scanner=/dev/video2. Before the fix, the same input labelled one node as both cameras. 252 tests pass. Follow-up observed: the first 'usbipd attach' for 10-2 twice returned without the device appearing in vhci status. A retry succeeded. attach_usb.py does not verify presence after attaching (no vhci check), so it can report OK falsely. Logged here and not fixed in AA-5.
+
+Orchestrator 2026-10-24 (owner asked whether a power cycle changes USB connections): discovery for the BusId-identified cameras now also checks that the device at the configured BusId has the expected VID:PID (expected_vid_pid in vhci.resolve_busid_to_video_node), and refuses with 'dock port changed' if a different device sits on that port after a reboot or re-cabling. Test test_busid_holding_wrong_device_is_refused. Made test_attach_usb and the attach_usb smoke test hermetic (they read the live /sys and usbipd, and failed when the owner powered off the DexArm). 1496 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

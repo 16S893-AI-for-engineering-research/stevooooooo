@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 19:51'
+updated_date: '2026-10-24 21:18'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -68,6 +68,7 @@ The orchestrator must independently verify every safety-relevant change, and mus
 
 Order matters: each step unblocks the next. All scripts are in `robot/scripts/`, dry-run by default, `--live` explicit.
 1. **Attach and discover:** `uv run python scripts/attach_usb.py` then `uv run python -m inchworm.discover`. Expect 7/7 attached.
+   - **After any power-off or reboot:** usbipd *binds* persist (no admin step is needed again), but devices must be **re-attached** to WSL each time, so run attach_usb.py. Linux node numbers (`/dev/ttyACM*`, `/dev/video*`) and WSL vhci ports change on every attach; the code never relies on them. Arms, DexArm and scanner camera are identified by USB serial; the relay by its unique VID:PID; the two arm cameras by **Windows BusId = physical dock port** (9-4 left, 10-2 right), now cross-checked against VID:PID. BusIds stay the same as long as the dock is plugged into the **same laptop USB port** and each cable stays in its **same dock port**. If the dock moves to another laptop port, the BusIds change: run `usbipd list`, update `windows_busid` for cam_left/cam_right in hardware.yaml, and re-confirm which camera is which.
 2. **Relay protocol (AA-29 #1):** `uv run python scripts/laser_probe.py --live`. Confirm that LCUS-1 `A0 01 01 A2` / `A0 01 00 A1` and 9600 baud switch the laser. Record whether the relay reports state (AA-29 #5).
 3. **Servo IDs (AA-8 #2, #4):** `uv run python scripts/scan_servos.py --live --persist`, then `--benchmark` (>= 20 Hz).
 4. **Joint limits and calibration (AA-9 #1):** `uv run python scripts/measure_limits.py --live --arm left` / `--arm right` (torque-off manual sweep). Also measure per-joint zero offset and sign, then set `unverified: false`.

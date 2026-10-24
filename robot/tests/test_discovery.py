@@ -164,6 +164,11 @@ def _make_video_iface(
     """Create sysfs entries for a USB video device at local_busid."""
     iface_path = usb_devices_dir / local_busid / f"{local_busid}:1.0" / "video4linux"
     iface_path.mkdir(parents=True)
+    # Orchestrator 2026-10-24: real sysfs exposes idVendor/idProduct; discovery
+    # now checks them. Arm cams (1-5, 1-6) are 32e6:9251; the scanner is 0c45:6366.
+    vid, pid = ("0c45", "6366") if local_busid == "1-7" else ("32e6", "9251")
+    (usb_devices_dir / local_busid / "idVendor").write_text(vid + "\n")
+    (usb_devices_dir / local_busid / "idProduct").write_text(pid + "\n")
     # Capture node (index 0)
     (iface_path / capture_node).mkdir()
     _make_v4l_index(v4l_class_dir, capture_node, "0")
@@ -963,3 +968,18 @@ class TestGracefulDegradation:
         by_role = {r.role: r for r in results}
 
         assert by_role["cam_scanner"].status is DeviceStatus.ABSENT
+
+
+
+# --- Orchestrator 2026-10-24: a different device on the camera's dock port is refused ---
+def test_busid_holding_wrong_device_is_refused(tmp_path):
+    import pytest
+    from inchworm.vhci import resolve_busid_to_video_node
+    status = ("hub port sta spd dev      sockfd local_busid\n"
+              "hs  0004 006 003 00090004 000003 1-5\n")
+    vhci, usb, v4l = _make_vhci_sysfs(tmp_path, status)
+    (usb / "1-5" / "idVendor").write_text("1a86\n")
+    (usb / "1-5" / "idProduct").write_text("7523\n")
+    with pytest.raises(LookupError, match="dock port changed"):
+        resolve_busid_to_video_node("9-4", expected_vid_pid="32e6:9251",
+                                    vhci_status_path=vhci, usb_devices_dir=usb, v4l_class_dir=v4l)

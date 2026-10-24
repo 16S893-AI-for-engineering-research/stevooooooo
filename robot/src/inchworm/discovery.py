@@ -400,6 +400,7 @@ def _probe_usbip_busid(
     try:
         dev_node = resolve_busid_to_video_node(
             windows_busid,
+            expected_vid_pid=identity.vid_pid,
             vhci_status_path=vhci_status_path,
             usb_devices_dir=usb_devices_dir,
             v4l_class_dir=v4l_class_dir,

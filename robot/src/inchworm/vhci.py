@@ -162,6 +162,7 @@ def _find_capture_node(
 def resolve_busid_to_video_node(
     windows_busid: str,
     *,
+    expected_vid_pid: Optional[str] = None,
     vhci_status_path: Path = VHCI_STATUS_PATH,
     usb_devices_dir: Path = USB_DEVICES_DIR,
     v4l_class_dir: Path = VIDEO4LINUX_CLASS_DIR,
@@ -219,6 +220,26 @@ def resolve_busid_to_video_node(
         raise BusIdNotFoundError(windows_busid)
 
     local_busid = dev_map[dev_hex]
+
+    # Orchestrator 2026-10-24: BusIds are positional (dock port). After a
+    # reboot or re-cabling, a different device may sit at the configured
+    # BusId. Refuse unless that device has the expected VID:PID.
+    if expected_vid_pid is not None:
+        dev_dir = usb_devices_dir / local_busid
+        try:
+            vid = (dev_dir / "idVendor").read_text().strip().lower()
+            pid = (dev_dir / "idProduct").read_text().strip().lower()
+        except OSError as err:
+            raise LookupError(
+                f"BusId {windows_busid!r}: cannot read VID:PID of local device "
+                f"{local_busid!r}: {err}"
+            ) from err
+        if f"{vid}:{pid}" != expected_vid_pid.lower():
+            raise LookupError(
+                f"BusId {windows_busid!r} now holds {vid}:{pid}, expected "
+                f"{expected_vid_pid}; the device on that dock port changed. "
+                "Re-check the cabling and update windows_busid in hardware.yaml."
+            )
 
     # Find the capture node.
     dev_node = _find_capture_node(local_busid, usb_devices_dir, v4l_class_dir)

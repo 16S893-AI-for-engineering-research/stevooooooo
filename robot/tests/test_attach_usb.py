@@ -328,8 +328,12 @@ class TestAttachAll:
         ok_proc.stdout = ""
 
         with patch("subprocess.run", return_value=ok_proc):
+            # Orchestrator 2026-10-24: hermetic. A fake vhci status lists
+            # every BusId as attached, instead of reading the real /sys (the
+            # test failed when the DexArm was powered off).
             results = attach_usb.attach_all(
-                config, dry_run=False, state_json_path=state_json_file
+                config, dry_run=False, state_json_path=state_json_file,
+                vhci_status_reader=_all_busids_vhci_status,
             )
         by_role = {r.role: r for r in results}
         dexarm = by_role["dexarm"]
@@ -340,6 +344,13 @@ class TestAttachAll:
 # ---------------------------------------------------------------------------
 # main() exit codes
 # ---------------------------------------------------------------------------
+
+def _all_busids_vhci_status() -> str:
+    from inchworm.vhci import _busid_to_dev_hex
+    busids = ["9-2", "9-3", "9-4", "10-2", "10-4", "11-3", "11-4"]
+    rows = [f"hs  {i:04d} 006 003 {_busid_to_dev_hex(b)} 000003 1-{i+1}" for i, b in enumerate(busids)]
+    return "hub port sta spd dev      sockfd local_busid\n" + "\n".join(rows) + "\n"
+
 
 class TestMainExitCode:
     def test_main_returns_nonzero_on_missing_device(self, config, tmp_path: Path):
