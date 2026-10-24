@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 17:14'
+updated_date: '2026-10-24 17:41'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -55,7 +55,12 @@ git log --oneline -5
 
 ## 4. Next action
 
-Software halves (mock backend, no hardware I/O) of **AA-8** (SO-101 servo bus), **AA-12** (DexArm G-code) and **AA-29** (relay laser fail-safe), one at a time, each with a Sonnet review. Their hardware ACs stay unchecked until an owner-supervised session, with dry runs first.
+**Owner standing instruction (2026-10-24):** keep running wave after wave of hardware-free work without check-ins. The owner may be away and does not want time wasted. Stop only when the remaining work needs the owner or hardware, then summarize. The owner is not available for a hardware session for a while.
+
+Wave in flight: AA-14 (camera capture), AA-10 (homing and e-stop, software half), AA-11 (kinematics, software half; vendored SO-101 URDF in `robot/vendor/so101/`).
+Next waves: AA-17 (gripper lock state machine), AA-15 (frame and lattice model), AA-9 (limits and collision, software half); then AA-20 (handoff supervisor), AA-18 and AA-19 software halves; then AA-31 (laser line extraction, offline), AA-24 and AA-22/23 software scaffolding.
+
+Owner hardware session (when available, about 1 h): servo ID scan (`scripts/scan_servos.py --live`), relay protocol (`scripts/laser_probe.py --live`), DexArm homing and workspace measurement, a low-speed left/right arm motion test, camera FPS (AA-14), and FK pose checks (AA-11).
 
 ## 5. Decisions already made (do not silently revisit)
 
