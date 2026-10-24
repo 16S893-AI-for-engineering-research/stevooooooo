@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 17:41'
+updated_date: '2026-10-24 19:41'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-24 by the orchestrator, at the commit that first adds `robot/`. 252 tests pass. All 7 devices are attached and resolve via discovery.
+**Last verified:** 2026-10-24 by the orchestrator at commit `aa931b1`. 1462 tests pass (`cd robot && uv run pytest`). All hardware-free work is done; the remaining ACs need the owner, the robot or a trained model.
 
 ## 1. Resume in 60 seconds
 
@@ -41,26 +41,54 @@ git log --oneline -5
 
 ## 2. Where the project stands
 
-- **Done:** AA-4, AA-5, AA-6, AA-7, AA-37, and AA-12 (DexArm G-code driver; mock-verified only, with real-device behaviour exercised by AA-13; the workspace box is marked `unverified: true`).
-- **Software half done, hardware ACs pending:** AA-8 (servo bus: ACs #2 live ID scan and #4 20 Hz benchmark; run `scripts/scan_servos.py --live`), AA-29 (laser relay: #1 protocol is unverified LCUS-1, so run `scripts/laser_probe.py --live`; #3 waits on AA-10 e-stop; #5 because LCUS-1 cannot report state).
-- **Lessons recorded:** agent self-audits passed three real safety bugs (camera lock per device, bounds fail-open and the raw-motion regex, laser max-on not enforced). The orchestrator must independently check every safety-relevant change.
-- Parallel lanes run in managed worktrees. The orchestrator applies the returned patches with `git apply --3way` and runs the full suite before committing.
-- Package: `robot/src/inchworm/`, tests in `robot/tests/` (461 pass), config in `robot/config/hardware.yaml`.
+**Software for every subsystem exists and is tested against mocks.** Done: AA-4, 5, 6, 7, 12, 15, 20, 22 (9/9, In Progress only pending finalization), 28, 33, 37. Every other started task has its software ACs checked with test evidence; only hardware-, owner- or model-dependent ACs remain open. Not started (they need hardware or a trained model end to end): AA-13, 25, 27, 35, 36, 38, 39.
 
-## 3. Blocked right now / pending owner input
+Modules in `robot/src/inchworm/`:
+- **Devices:** discovery (cameras by usbipd BusId via vhci), PySerialTransport, servo_bus, dexarm, laser, camera_arbiter, camera_capture.
+- **Motion:** kinematics (vendored SO-101 URDF), trajectory, joint_calibration, motion_guard, homing, torque, estop, fold, approach.
+- **Gripper:** gripper_lock (the sole token holder), policy_actions.
+- **Cycle:** frames, cycle, recovery, supervisor, policy_contract, policy_runner, seating.
+- **Vision and leveling:** laser_line, scanner_calibration, leveling, print_frame, gcode_intake, calibration.
+- **Data:** teleop_capture, lerobot_adapter, plus a separate `robot/lerobot_env/` (Python 3.12, lerobot 0.6.1, CUDA works; ACT training step about 1.7 GB at 480x640 bs8).
 
-- Left/right arm mapping is still owner-reported. It needs a supervised low-speed motion test before any trajectory runs.
-- The tube fixture for demonstrations (decision-1) is a physical owner deliverable under AA-23 AC#4.
-- The single-camera invariant stands until AA-38 has measured concurrency and the owner decides.
+**Review lessons (keep applying):** agent self-audits and Haiku reviews repeatedly passed real safety bugs:
+- camera lock per device
+- laser max-on not enforced
+- DexArm bounds fail-open and a raw-motion regex hole
+- a laser that never switched on during scans because of a mock mismatch
+- arm-frame clearance computed in the wrong frame
+- fail-open on missing readings in four places
+- live script paths calling non-existent APIs
+- synthetic calibration committed into config/
+- AC checks lost in worktree patches, plus an agent adding pseudo-ACs
 
-## 4. Next action
+The orchestrator must independently verify every safety-relevant change, and must re-check AC state after applying any worktree patch.
 
-**Owner standing instruction (2026-10-24):** keep running wave after wave of hardware-free work without check-ins. The owner may be away and does not want time wasted. Stop only when the remaining work needs the owner or hardware, then summarize. The owner is not available for a hardware session for a while.
+## 3. Owner hardware session checklist (about 2-3 h, dry-run first, owner supervising every first live motion)
 
-Wave in flight: AA-14 (camera capture), AA-10 (homing and e-stop, software half), AA-11 (kinematics, software half; vendored SO-101 URDF in `robot/vendor/so101/`).
-Next waves: AA-17 (gripper lock state machine), AA-15 (frame and lattice model), AA-9 (limits and collision, software half); then AA-20 (handoff supervisor), AA-18 and AA-19 software halves; then AA-31 (laser line extraction, offline), AA-24 and AA-22/23 software scaffolding.
+Order matters: each step unblocks the next. All scripts are in `robot/scripts/`, dry-run by default, `--live` explicit.
+1. **Attach and discover:** `uv run python scripts/attach_usb.py` then `uv run python -m inchworm.discover`. Expect 7/7 attached.
+2. **Relay protocol (AA-29 #1):** `uv run python scripts/laser_probe.py --live`. Confirm that LCUS-1 `A0 01 01 A2` / `A0 01 00 A1` and 9600 baud switch the laser. Record whether the relay reports state (AA-29 #5).
+3. **Servo IDs (AA-8 #2, #4):** `uv run python scripts/scan_servos.py --live --persist`, then `--benchmark` (>= 20 Hz).
+4. **Joint limits and calibration (AA-9 #1):** `uv run python scripts/measure_limits.py --live --arm left` / `--arm right` (torque-off manual sweep). Also measure per-joint zero offset and sign, then set `unverified: false`.
+5. **Gripper bands (AA-17 #1):** `uv run python scripts/gripper_bands.py --live --arm arm_left` / `arm_right`.
+6. **Left/right confirmation:** low-speed jog of one joint per arm (live jog is refused until it is wired through GuardedArm; this is a follow-up before this step).
+7. **Named poses (AA-9 #4, AA-19 #1/#4):** neutral and folded_transit, then `scripts/fold_cycle.py --live --cycles 10`.
+8. **DexArm (AA-12 bounds, AA-13):** confirm 115200 baud and homing; measure the real workspace box (replace `unverified: true`); then the AA-13 repeatability suite.
+9. **Cameras (AA-14 #4, AA-38):** `scripts/camera_probe.py --live --role ...` for each role, then the concurrency measurement.
+10. **Calibration (AA-16, AA-30, AA-11 #3):** `scripts/calibrate_arm_base.py`, `hand_eye.py`, `tube_axis.py`, `calibrate_scanner.py --live`, `fk_verify.py --live`.
+11. **Approach and dry cycle (AA-18 #4, AA-21 #7):** `scripts/approach_repeatability.py --live --n 10`, `scripts/dry_cycle.py --live --cycles 5` (no tube).
+12. **Then:** tube fixture build (`robot/docs/tube_fixture.md`), seating traces (AA-24), teleop demos (AA-23), training (AA-25), rollout (AA-26), AA-27/35/36.
 
-Owner hardware session (when available, about 1 h): servo ID scan (`scripts/scan_servos.py --live`), relay protocol (`scripts/laser_probe.py --live`), DexArm homing and workspace measurement, a low-speed left/right arm motion test, camera FPS (AA-14), and FK pose checks (AA-11).
+## 4. Pending owner decisions
+
+1. **E-stop semantics (AA-10 #4):** the current provisional default is HOLD arms in place (torque on); release torque only on request or for overcurrent/overtemperature. Confirm, or choose limp.
+2. **Advance direction and which arm advances the tube (AA-21):** this is a config-driven choice, marked for confirmation.
+3. **Nozzle, material and print temperatures for the Cura profile (AA-34 #5):** see `robot/docs/cura_dexarm_profile.md`.
+4. **Tube fixture design** per `robot/docs/tube_fixture.md` (decision-1).
+5. Whether to relax the single-camera rule after AA-38 is measured.
+
+Known software follow-ups (small, hardware-adjacent): wire live jog through GuardedArm (AA-11 #4); add the missing `scripts/fault_inject_hw.py` (referenced in AA-28); make `attach_usb.py` verify that each device appears after `usbipd attach` (silent failures observed).
 
 ## 5. Decisions already made (do not silently revisit)
 

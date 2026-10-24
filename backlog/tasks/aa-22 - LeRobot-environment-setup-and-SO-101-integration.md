@@ -1,11 +1,11 @@
 ---
 id: AA-22
 title: LeRobot environment setup and SO-101 integration
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-24 19:08'
+updated_date: '2026-10-24 19:41'
 labels: []
 milestone: m-3
 dependencies:
@@ -121,3 +121,9 @@ created: 2026-10-24 19:01
 Orchestrator 2026-10-24: removed agent-added pseudo-ACs #10-#18 (evidence moved to notes). The original AC wording is untouched.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Separate uv project robot/lerobot_env (Python 3.12, lerobot 0.6.1, torch 2.11 cu130, CUDA works in WSL on an RTX 3050 Ti 4 GB). Gripper-free InchwormLeRobotAdapter in the main package, contract-checked at construction; frames via CameraArbiter + AA-5 discovery (make_arbiter_frame_source / build_adapter_from_config). Real ACTPolicy training step measured by the orchestrator: about 1.0 GB at bs 1-4 and about 1.7 GB at 480x640 bs8, so local training is feasible. Verified: smoke.py, lerobot_env tests 12 passed, tests/test_lerobot_adapter.py passed, full suite 1462 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->
