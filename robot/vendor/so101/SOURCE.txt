@@ -1,0 +1,2 @@
+a758567c3978dfeefe282ede0500085a48fe8f78 Tue Oct 6 09:26:52 2026 +0200
+Source: https://github.com/TheRobotStudio/SO-ARM100 Simulation/SO101/so101_new_calib.urdf (kinematics only; meshes omitted)
