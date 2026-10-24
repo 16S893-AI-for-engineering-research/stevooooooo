@@ -140,8 +140,21 @@ def main() -> None:
 
         backend = get_backend(cfg)
         arm_cfg = cfg.arms.left if args.arm == "left" else cfg.arms.right
+        arm_role_tag = f"arm_{args.arm}"
+        servo_joints_dict = arm_cfg.servo_joints.model_dump()
+        joint_id_map: dict[str, int] = {
+            k: v for k, v in servo_joints_dict.items() if v is not None
+        }
+        if "gripper" not in joint_id_map:
+            joint_id_map["gripper"] = 6  # placeholder — no gripper commanded here
         try:
-            bus = ArmServoBus(arm_cfg, backend=backend)
+            transport = backend.open_serial(arm_role_tag)
+            bus = ArmServoBus(
+                transport=transport,
+                role=arm_role_tag,
+                joint_id_map=joint_id_map,
+                dry_run=False,
+            )
         except Exception as exc:
             logger.error("Cannot open servo bus for %s arm: %s", args.arm, exc)
             sys.exit(1)

@@ -110,9 +110,11 @@ parser.add_argument(
 parser.add_argument(
     "--output",
     type=Path,
-    default=Path(__file__).resolve().parents[1] / "config" / "scanner_calibration.yaml",
+    default=None,
     metavar="PATH",
-    help="Output YAML file for calibration results.",
+    help="Output YAML file. Default: robot/config/scanner_calibration.yaml for --live, "
+         "robot/out/scanner_calibration.dryrun.yaml for dry-run (synthetic data must never "
+         "land in config/).",
 )
 
 
@@ -726,6 +728,14 @@ def main() -> int:
     )
 
     cal_dict = save_calibration(cal)
+    # Orchestrator 2026-10-24: dry-run produces SYNTHETIC calibration and must
+    # never overwrite the real config file that live code loads.
+    _robot = Path(__file__).resolve().parents[1]
+    if args.output is None:
+        args.output = (_robot / "config" / "scanner_calibration.yaml") if args.live \
+            else (_robot / "out" / "scanner_calibration.dryrun.yaml")
+    elif not args.live and args.output.resolve().parent == (_robot / "config").resolve():
+        raise SystemExit("refusing to write dry-run (synthetic) calibration into robot/config/")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as fh:
         yaml.dump(cal_dict, fh, default_flow_style=False, allow_unicode=True)

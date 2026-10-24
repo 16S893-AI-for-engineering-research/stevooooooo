@@ -111,12 +111,39 @@ class ServoJointMap(_Strict):
     gripper: Optional[int] = None
 
 
+# --- serial-transport ---
+
+
+class SerialDeviceSettings(_Strict):
+    """Optional per-device serial port settings.
+
+    When ``None`` (the default for every device's ``serial`` field), the driver
+    uses the hard-coded per-role defaults documented in
+    :class:`~inchworm.backends.PySerialTransport`.
+
+    Set in hardware.yaml under the device's ``serial:`` key.  ``unverified``
+    entries are placeholder values that have not been confirmed on hardware.
+    """
+
+    # Baud rate (bits/s).  null → use the per-role default.
+    baudrate: Optional[int] = None
+    # Read timeout (seconds).  null → use the per-role default (0.1 s).
+    timeout_s: Optional[float] = None
+
+
+# --- serial-transport end ---
+
+
 class ArmConfig(_Strict):
     adapter_chip: str
     role_verification: Literal["owner_reported", "motion_verified"]
     identity: DeviceIdentity
     # Populated by scan_servos.py --live; all null until the owner runs the scan.
     servo_joints: ServoJointMap = Field(default_factory=ServoJointMap)
+    # --- serial-transport ---
+    # Per-device serial settings (baudrate, timeout_s).  None → use role defaults.
+    serial: Optional[SerialDeviceSettings] = None
+    # --- serial-transport end ---
 
 
 class ArmsConfig(_Strict):
@@ -164,6 +191,10 @@ class DexArmConfig(_Strict):
     # --- AA-12 ---
     workspace: Optional[DexArmWorkspace] = None
     # --- AA-12 end ---
+    # --- serial-transport ---
+    # Per-device serial settings (baudrate, timeout_s).  None → use role defaults.
+    serial: Optional[SerialDeviceSettings] = None
+    # --- serial-transport end ---
 
 
 class CameraConfig(_Strict):
@@ -181,6 +212,10 @@ class CamerasConfig(_Strict):
 class RelayConfig(_Strict):
     adapter_chip: str
     identity: DeviceIdentity
+    # --- serial-transport ---
+    # Per-device serial settings (baudrate, timeout_s).  None → use role defaults.
+    serial: Optional[SerialDeviceSettings] = None
+    # --- serial-transport end ---
 
 
 class LaserDesign(_Strict):

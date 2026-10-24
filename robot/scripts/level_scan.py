@@ -219,7 +219,7 @@ def main() -> int:
                 # Live: inject real capture callables.
                 # The caller would provide AA-14/AA-31 callables; for now
                 # we capture a frame from the scanner camera and extract via AA-31.
-                from inchworm.camera_capture import CameraCapturePipeline
+                from inchworm.camera_capture import open_capture
                 from inchworm.camera_arbiter import CameraArbiter
                 from inchworm.laser_line import (
                     LaserLineConfig,
@@ -229,12 +229,12 @@ def main() -> int:
                 )
                 import numpy as np
 
-                arbiter = CameraArbiter(backend, config)
+                arbiter = CameraArbiter(backend)
                 calib = default_laser_calibration()
 
                 def capture_fn():
-                    with arbiter.open("camera_scanner") as cam:
-                        raw = cam.read_frame()
+                    with arbiter.acquire("camera_scanner") as transport:
+                        raw = transport.read_frame()
                     # Decode MJPEG to numpy
                     import cv2
                     buf = np.frombuffer(raw, dtype=np.uint8)

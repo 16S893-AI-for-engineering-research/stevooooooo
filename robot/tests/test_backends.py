@@ -9,8 +9,10 @@ from inchworm.backends import (
     BackendError,
     HardwareBackend,
     MockBackend,
+    PySerialTransport,
     create_backend,
     device_table,
+    get_backend,
     selected_backend_name,
 )
 from inchworm.config import BackendName, load_config
@@ -109,13 +111,213 @@ def test_wrong_device_kind_rejected(config):
         backend.open_camera("dexarm")
 
 
-def test_hardware_backend_refuses_to_open_devices(config):
+def test_hardware_backend_refuses_cameras(config):
+    """HardwareBackend still refuses camera opens (requires AA-6 arbiter).
+
+    Serial devices are now opened via discovery + PySerialTransport; cameras
+    still require the AA-6 CameraArbiter.
+    """
     backend = HardwareBackend(config)
-    with pytest.raises(BackendError, match="not implemented yet"):
-        backend.open_serial("arm_left")
     # --- AA-14 ---
-    # HardwareBackend._open_camera now raises BackendError with a different
-    # message directing callers to V4L2CameraTransport.open().
+    # HardwareBackend._open_camera raises BackendError directing callers to
+    # V4L2CameraTransport.open().
     with pytest.raises(BackendError):
         backend.open_camera("camera_scanner")
     # --- AA-14 end ---
+
+
+# --- serial-transport ---
+
+
+class _FakeSerial:
+    """Minimal fake serial.Serial for monkeypatching."""
+
+    def __init__(self, *, port, baudrate, bytesize, parity, stopbits, timeout, exclusive):
+        self.port = port
+        self.baudrate = baudrate
+        self.exclusive = exclusive
+        self.is_open = True
+        self._rx = bytearray()
+        self.written = []
+
+    def write(self, data: bytes) -> int:
+        self.written.append(bytes(data))
+        return len(data)
+
+    def read(self, size: int) -> bytes:
+        chunk = bytes(self._rx[:size])
+        del self._rx[:size]
+        return chunk
+
+    def close(self) -> None:
+        self.is_open = False
+
+
+_ROLE_BAUD = {
+    "arm_left": 1_000_000,
+    "arm_right": 1_000_000,
+    "dexarm": 115_200,
+    "relay": 9_600,
+}
+
+
+def _make_fake_serial_module(captured: list):
+    """Return a fake 'serial' module whose Serial records construction kwargs."""
+    import types
+    m = types.SimpleNamespace()
+    m.EIGHTBITS = 8
+    m.PARITY_NONE = "N"
+    m.STOPBITS_ONE = 1
+
+    class FakeSerialCls:
+        def __init__(self, **kwargs):
+            captured.append(kwargs)
+            self._fake = _FakeSerial(**kwargs)
+            self.is_open = self._fake.is_open
+            self.baudrate = kwargs["baudrate"]
+            self.exclusive = kwargs["exclusive"]
+            self.port = kwargs["port"]
+            self.written = self._fake.written
+
+        def write(self, data):
+            return self._fake.write(data)
+
+        def read(self, size):
+            return self._fake.read(size)
+
+        def close(self):
+            self._fake.close()
+            self.is_open = False
+
+    class FakeSerialException(Exception):
+        pass
+
+    m.Serial = FakeSerialCls
+    m.SerialException = FakeSerialException
+    return m
+
+
+@pytest.mark.parametrize("device,expected_baud", [
+    ("arm_left",  1_000_000),
+    ("arm_right", 1_000_000),
+    ("dexarm",    115_200),
+    ("relay",     9_600),
+])
+def test_pyserial_transport_discovery_role_and_baud(monkeypatch, config, device, expected_baud):
+    """PySerialTransport calls require_device with the right role and opens at the expected baud."""
+    captured_nodes = []
+    captured_serial = []
+
+    def fake_require_device(role, *args, **kwargs):
+        captured_nodes.append(role)
+        return f"/dev/fake_{role}"
+
+    fake_serial_mod = _make_fake_serial_module(captured_serial)
+
+    import sys
+    sys.modules["serial"] = fake_serial_mod  # type: ignore[assignment]
+
+    try:
+        transport = PySerialTransport.open(device, f"/dev/fake_{device}", None)
+    finally:
+        del sys.modules["serial"]
+
+    assert len(captured_serial) == 1
+    kwargs = captured_serial[0]
+    assert kwargs["baudrate"] == expected_baud
+    assert kwargs["exclusive"] is True
+    assert kwargs["port"] == f"/dev/fake_{device}"
+
+
+def test_pyserial_transport_exclusive_flag(monkeypatch):
+    """PySerialTransport always opens with exclusive=True."""
+    captured = []
+    fake_serial_mod = _make_fake_serial_module(captured)
+    import sys
+    sys.modules["serial"] = fake_serial_mod  # type: ignore[assignment]
+    try:
+        PySerialTransport.open("arm_left", "/dev/ttyUSB0", None)
+    finally:
+        del sys.modules["serial"]
+    assert captured[0]["exclusive"] is True
+
+
+def test_pyserial_transport_config_baud_override(monkeypatch):
+    """A per-device serial config block overrides the default baud rate."""
+    captured = []
+    fake_serial_mod = _make_fake_serial_module(captured)
+
+    import types
+    fake_cfg = types.SimpleNamespace(baudrate=500_000, timeout_s=None)
+
+    import sys
+    sys.modules["serial"] = fake_serial_mod  # type: ignore[assignment]
+    try:
+        PySerialTransport.open("arm_left", "/dev/ttyUSB0", fake_cfg)
+    finally:
+        del sys.modules["serial"]
+
+    assert captured[0]["baudrate"] == 500_000
+
+
+def test_hardware_backend_serial_calls_discovery(monkeypatch, config):
+    """HardwareBackend._open_serial calls require_device with the correct role."""
+    discovered_roles = []
+    captured_serial = []
+
+    def fake_require_device(role, *args, **kwargs):
+        discovered_roles.append(role)
+        return f"/dev/fake_{role}"
+
+    fake_serial_mod = _make_fake_serial_module(captured_serial)
+
+    import sys
+    sys.modules["serial"] = fake_serial_mod  # type: ignore[assignment]
+    monkeypatch.setattr("inchworm.discovery.require_device", fake_require_device)
+
+    try:
+        hw_config = config.model_copy(update={"backend": BackendName.HARDWARE})
+        backend = HardwareBackend(hw_config)
+        transport = backend.open_serial("arm_left")
+    finally:
+        del sys.modules["serial"]
+
+    assert "arm_left" in discovered_roles
+    assert len(captured_serial) == 1
+    assert captured_serial[0]["port"] == "/dev/fake_arm_left"
+
+
+@pytest.mark.parametrize("device,expected_role", [
+    ("arm_left",  "arm_left"),
+    ("arm_right", "arm_right"),
+    ("dexarm",    "dexarm"),
+    ("relay",     "relay"),
+])
+def test_hardware_backend_discovery_role_mapping(monkeypatch, config, device, expected_role):
+    """Backend device names map to the correct discovery role names."""
+    discovered = []
+    captured = []
+
+    def fake_require_device(role, *args, **kwargs):
+        discovered.append(role)
+        return "/dev/fake"
+
+    import sys
+    sys.modules["serial"] = _make_fake_serial_module(captured)  # type: ignore[assignment]
+    monkeypatch.setattr("inchworm.discovery.require_device", fake_require_device)
+
+    try:
+        hw_config = config.model_copy(update={"backend": BackendName.HARDWARE})
+        HardwareBackend(hw_config).open_serial(device)
+    finally:
+        del sys.modules["serial"]
+
+    assert discovered == [expected_role]
+
+
+def test_get_backend_alias(config):
+    """get_backend(cfg) is equivalent to create_backend(cfg)."""
+    assert type(get_backend(config)) is type(create_backend(config))
+
+
+# --- serial-transport end ---

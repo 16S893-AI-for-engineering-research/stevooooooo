@@ -130,11 +130,11 @@ def _record_live(
     set INCHWORM_BACKEND=hardware or configure the device to get real data.
     """
     from inchworm.config import load_config
-    from inchworm.backends import resolve_backend
+    from inchworm.backends import get_backend
     from inchworm.servo_bus import ArmServoBus
 
     cfg = load_config()
-    backend = resolve_backend(cfg)
+    backend = get_backend(cfg)
     transport = backend.open_serial(arm_role)
 
     role_cfg = cfg.arms.left if arm_role == "arm_left" else cfg.arms.right

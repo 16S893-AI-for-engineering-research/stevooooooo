@@ -52,6 +52,54 @@ relay and camera logic runs with zero hardware attached.
 with device discovery (AA-5) and the per-device drivers (AA-8, AA-12, AA-14,
 AA-29). Camera transports must go through the AA-6 single-camera arbiter.
 
+<!-- --- serial-transport --- -->
+## Serial transport (PySerialTransport)
+
+`HardwareBackend._open_serial` is implemented via `PySerialTransport`, which
+wraps pyserial (≥ 3.5) and is used for all serial devices (SO-101 arms, DexArm,
+relay).
+
+**Device node resolution** always goes through
+`inchworm.discovery.require_device(role)` — never a raw path or guessed
+`/dev/ttyUSBN` node.
+
+**Port always opened with `exclusive=True`** to prevent accidental multi-process
+bus sharing.
+
+**Read timeouts** return the bytes received so far; the AA-8/AA-12 protocol
+drivers handle short reads.
+
+**Per-role default baud rates (8N1 framing in all cases):**
+
+| Device      | Baud rate | Source / status                                   |
+|-------------|-----------|---------------------------------------------------|
+| arm_left    | 1,000,000 | Feetech STS3215 factory default (rustypot/LeRobot) |
+| arm_right   | 1,000,000 | Feetech STS3215 factory default (rustypot/LeRobot) |
+| dexarm      | 115,200   | Rotrics firmware docs — **UNVERIFIED**             |
+| relay       | 9,600     | CH340 LCUS-1 factory default — **UNVERIFIED**      |
+
+Override any of these in `config/hardware.yaml` under the device's `serial:` key:
+
+```yaml
+arms:
+  left:
+    serial:
+      baudrate: 1000000  # override if needed
+      timeout_s: 0.1
+```
+
+**Top-level helper for scripts:**
+
+```python
+from inchworm.config import load_config
+from inchworm.backends import get_backend
+
+cfg = load_config()
+backend = get_backend(cfg)           # same as create_backend(cfg)
+serial = backend.open_serial("arm_left")  # hardware: opens /dev node via AA-5 discovery
+```
+<!-- --- serial-transport end --- -->
+
 ## Device identity
 
 Devices are keyed on `vendor_id:product_id` plus `usb_serial` wherever the

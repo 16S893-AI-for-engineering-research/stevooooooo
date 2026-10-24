@@ -162,13 +162,35 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         from inchworm.backends import get_backend
-        from inchworm.servo_bus import ServoBusDriver
+        from inchworm.servo_bus import ArmServoBus
         backend = get_backend(cfg)
-        bus = ServoBusDriver(
-            backend=backend,
-            arm_cfg=cfg.arms.left if arm_name == "left" else cfg.arms.right,
-            arm_role=arm_name,
+        arm_cfg = cfg.arms.left if arm_name == "left" else cfg.arms.right
+        servo_joints_dict = arm_cfg.servo_joints.model_dump()
+        joint_id_map: dict[str, int] = {
+            k: v for k, v in servo_joints_dict.items() if v is not None
+        }
+        if "gripper" not in joint_id_map:
+            joint_id_map["gripper"] = 6  # placeholder
+        _JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
+        transport = backend.open_serial(f"arm_{arm_name}")
+        bus = ArmServoBus(
+            transport=transport,
+            role=f"arm_{arm_name}",
+            joint_id_map=joint_id_map,
+            dry_run=False,
         )
+
+        def _read_joint_positions_rad() -> np.ndarray:
+            """Read present positions from the bus and return as a 5-vector (rad)."""
+            import math as _math
+            all_states = bus.read_all_joint_states()
+            q = np.array([
+                (all_states[j].position_deg - 180.0) * (_math.pi / 180.0)
+                if j in all_states else 0.0
+                for j in _JOINT_NAMES
+            ], dtype=np.float64)
+            return q
+
     except Exception as exc:
         logger.error("Failed to open servo bus: %s", exc)
         return 1
@@ -194,7 +216,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             break
 
         try:
-            q_measured = bus.read_joint_positions_rad()
+            q_measured = _read_joint_positions_rad()
         except Exception as exc:
             logger.error("Failed to read joint positions: %s", exc)
             continue

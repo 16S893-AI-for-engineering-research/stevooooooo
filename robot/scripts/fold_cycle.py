@@ -300,10 +300,17 @@ def main() -> int:
         transport_left = backend.open_serial("arm_left")
         transport_right = backend.open_serial("arm_right")
 
+        def _joint_map(arm_cfg) -> dict:
+            raw = arm_cfg.servo_joints.model_dump()
+            jmap = {k: v for k, v in raw.items() if v is not None}
+            if "gripper" not in jmap:
+                jmap["gripper"] = 6  # placeholder
+            return jmap
+
         bus_left = ArmServoBus(transport_left, role="arm_left",
-                               joint_id_map=cfg.arms.left.servo_joints.__dict__)
+                               joint_id_map=_joint_map(cfg.arms.left))
         bus_right = ArmServoBus(transport_right, role="arm_right",
-                                joint_id_map=cfg.arms.right.servo_joints.__dict__)
+                                joint_id_map=_joint_map(cfg.arms.right))
 
         guarded_left = GuardedArm(bus_left, guard_left, live=True)
         guarded_right = GuardedArm(bus_right, guard_right, live=True)

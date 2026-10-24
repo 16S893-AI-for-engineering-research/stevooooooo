@@ -11,6 +11,9 @@ dependencies = [
     "opencv-python-headless>=4.8",
     "numpy>=1.24",
     # --- AA-14 end ---
+    # --- serial-transport ---
+    "pyserial>=3.5",
+    # --- serial-transport end ---
     # --- AA-11 ---
     # numpy is used by inchworm.kinematics (FK/IK) and inchworm.trajectory
     # (trapezoidal joint-space planner).  No ROS or heavy deps; numpy only.

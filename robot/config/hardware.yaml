@@ -53,6 +53,14 @@ arms:
       wrist_flex: null
       wrist_roll: null
       gripper: null
+    # --- serial-transport ---
+    # Serial port settings for the left arm (Feetech STS3215 bus).
+    # baudrate: 1000000 is the STS3215 factory default (rustypot / LeRobot).
+    # timeout_s: 0.1 s is the default; short reads are handled by the AA-8 driver.
+    serial:
+      baudrate: 1000000
+      timeout_s: 0.1
+    # --- serial-transport end ---
   right:
     adapter_chip: CH343
     role_verification: owner_reported
@@ -73,6 +81,13 @@ arms:
       wrist_flex: null
       wrist_roll: null
       gripper: null
+    # --- serial-transport ---
+    # Serial port settings for the right arm (Feetech STS3215 bus).
+    # baudrate: 1000000 is the STS3215 factory default (rustypot / LeRobot).
+    serial:
+      baudrate: 1000000
+      timeout_s: 0.1
+    # --- serial-transport end ---
 
 dexarm:
   identity:
@@ -98,6 +113,14 @@ dexarm:
     # then set unverified to false.
     unverified: true
   # --- AA-12 end ---
+  # --- serial-transport ---
+  # Serial port settings for the DexArm (Rotrics STM32 CDC).
+  # baudrate: 115200 — UNVERIFIED: taken from Rotrics firmware docs;
+  # confirm and update in first live session.
+  serial:
+    baudrate: 115200
+    timeout_s: 0.1
+  # --- serial-transport end ---
 
 cameras:
   left_arm:
@@ -171,6 +194,14 @@ relay:
     linux_by_id: usb-1a86_USB_Serial-if00-port0
     linux_by_path: platform-vhci_hcd.0-usb-0:4:1.0-port0
     windows_busid_observed: "9-2"
+  # --- serial-transport ---
+  # Serial port settings for the relay (CH340 LCUS-1).
+  # baudrate: 9600 — UNVERIFIED: CH340 LCUS-1 factory default;
+  # confirm and update in first live session.
+  serial:
+    baudrate: 9600
+    timeout_s: 0.1
+  # --- serial-transport end ---
 
 # --- AA-10 ---
 homing:
