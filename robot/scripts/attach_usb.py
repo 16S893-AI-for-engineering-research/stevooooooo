@@ -7,8 +7,12 @@ devices), then calls::
 
     powershell.exe -NoProfile -Command "usbipd attach --wsl --busid X"
 
-for every device.  Reports per-device success or failure and exits nonzero if
-any required device is missing from the Windows device list or fails to attach.
+for every device.  After each attach, verifies that the device appears in
+``/sys/devices/platform/vhci_hcd.0/status`` (polling up to
+``ATTACH_VERIFY_TIMEOUT_S`` with ``ATTACH_VERIFY_POLL_S`` intervals).  If the
+device does not appear within the timeout, the attach is retried once.  Reports
+per-device ``[OK]``, ``[RETRY-OK]``, or ``[FAIL]`` and exits nonzero if any
+device fails.
 
 BusIds are never hardcoded; they are resolved fresh from ``usbipd state`` each
 run because usbipd BusIds change across reconnects.
@@ -24,6 +28,10 @@ Options
 --config     Path to hardware.yaml (default: robot/config/hardware.yaml).
 --state-json Path to a JSON file containing the output of ``usbipd state``
              (for testing without a Windows host).
+--vhci-status
+             Path to the vhci_hcd status file
+             (default: /sys/devices/platform/vhci_hcd.0/status).
+             Intended for testing; do not use in production.
 """
 
 from __future__ import annotations
@@ -32,9 +40,10 @@ import argparse
 import json
 import subprocess
 import sys
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 # Allow running directly from the repository root without installing the package.
 _HERE = Path(__file__).resolve()
@@ -42,6 +51,21 @@ _ROBOT_ROOT = _HERE.parents[1]
 sys.path.insert(0, str(_ROBOT_ROOT / "src"))
 
 from inchworm.config import HardwareConfig, load_config  # noqa: E402
+from inchworm.vhci import (
+    VHCI_STATUS_PATH,
+    _busid_to_dev_hex,
+    _parse_vhci_status,
+)
+
+# ---------------------------------------------------------------------------
+# Tunable constants
+# ---------------------------------------------------------------------------
+
+#: Seconds to poll vhci status after each attach before giving up / retrying.
+ATTACH_VERIFY_TIMEOUT_S: float = 5.0
+
+#: Polling interval for vhci presence check.
+ATTACH_VERIFY_POLL_S: float = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +106,9 @@ class _AttachResult:
 
     success: bool
     """True if the attach command succeeded (or device was already attached)."""
+
+    retried: bool
+    """True if the first vhci verification failed and the attach was retried."""
 
     message: str
     """Human-readable status message."""
@@ -233,12 +260,89 @@ def _device_specs_from_config(config: HardwareConfig) -> list[_DeviceSpec]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# vhci presence verification
+# ---------------------------------------------------------------------------
+
+
+def _busid_present_in_vhci(
+    busid: str,
+    vhci_status_reader: Callable[[], str],
+) -> bool:
+    """Return True if *busid* appears as an attached entry in vhci_hcd status.
+
+    Parameters
+    ----------
+    busid:
+        Windows BusId string (e.g. ``"9-4"``).
+    vhci_status_reader:
+        Callable that returns the current text of the vhci_hcd status file.
+        Injected so tests can monkeypatch without touching the filesystem.
+    """
+    try:
+        text = vhci_status_reader()
+    except OSError:
+        return False
+    try:
+        dev_map = _parse_vhci_status(text)
+    except Exception:
+        return False
+    dev_hex = _busid_to_dev_hex(busid)
+    return dev_hex in dev_map
+
+
+def _wait_for_vhci(
+    busid: str,
+    vhci_status_reader: Callable[[], str],
+    *,
+    timeout_s: float = ATTACH_VERIFY_TIMEOUT_S,
+    poll_s: float = ATTACH_VERIFY_POLL_S,
+) -> bool:
+    """Poll vhci status until *busid* appears or the timeout expires.
+
+    Returns True if the device is seen before the deadline, False otherwise.
+    """
+    deadline = time.monotonic() + timeout_s
+    while True:
+        if _busid_present_in_vhci(busid, vhci_status_reader):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(poll_s, remaining))
+
+
+# ---------------------------------------------------------------------------
+# Attach logic
+# ---------------------------------------------------------------------------
+
+
 def _attach_device(
     spec: _DeviceSpec,
     devices: list[dict],
     dry_run: bool,
+    *,
+    vhci_status_reader: Optional[Callable[[], str]] = None,
+    verify_timeout_s: float = ATTACH_VERIFY_TIMEOUT_S,
+    verify_poll_s: float = ATTACH_VERIFY_POLL_S,
 ) -> _AttachResult:
-    """Resolve BusId and attach one device.  Returns an :class:`_AttachResult`."""
+    """Resolve BusId and attach one device.  Returns an :class:`_AttachResult`.
+
+    After a live (non-dry-run) attach command succeeds, the device's BusId is
+    verified against ``/sys/devices/platform/vhci_hcd.0/status``.  If absent
+    after *verify_timeout_s*, the attach is retried once.  The final label is
+    ``[OK]``, ``[RETRY-OK]``, or ``[FAIL]``.
+
+    Parameters
+    ----------
+    vhci_status_reader:
+        Optional callable returning the vhci status text.  Defaults to reading
+        :data:`inchworm.vhci.VHCI_STATUS_PATH`.  Override in tests.
+    """
+    if vhci_status_reader is None:
+        _vhci_path = VHCI_STATUS_PATH
+        vhci_status_reader = lambda: _vhci_path.read_text()  # noqa: E731
+
     busid = _resolve_busid(spec, devices)
 
     if busid is None:
@@ -248,6 +352,7 @@ def _attach_device(
             found=False,
             already_attached=False,
             success=False,
+            retried=False,
             message=(
                 f"[MISSING] {spec.role}: not found in usbipd device list "
                 f"(VID:PID {spec.vid}:{spec.pid}, serial={spec.usb_serial!r}). "
@@ -262,6 +367,7 @@ def _attach_device(
             found=True,
             already_attached=True,
             success=True,
+            retried=False,
             message=f"[OK]      {spec.role}: already attached (BusId {busid})",
         )
 
@@ -274,20 +380,13 @@ def _attach_device(
             found=True,
             already_attached=False,
             success=True,  # dry-run counts as would-succeed
+            retried=False,
             message=f"[DRY-RUN] {spec.role}: would attach BusId {busid} — {' '.join(cmd[3:])}",
         )
 
+    # --- first attach attempt ---
     result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode == 0:
-        return _AttachResult(
-            role=spec.role,
-            busid=busid,
-            found=True,
-            already_attached=False,
-            success=True,
-            message=f"[OK]      {spec.role}: attached BusId {busid}",
-        )
-    else:
+    if result.returncode != 0:
         stderr = result.stderr.strip()
         return _AttachResult(
             role=spec.role,
@@ -295,11 +394,75 @@ def _attach_device(
             found=True,
             already_attached=False,
             success=False,
+            retried=False,
             message=(
                 f"[FAIL]    {spec.role}: usbipd attach BusId {busid} failed "
                 f"(exit {result.returncode}): {stderr}"
             ),
         )
+
+    # Attach command succeeded — verify the device appears in vhci status.
+    if _wait_for_vhci(
+        busid,
+        vhci_status_reader,
+        timeout_s=verify_timeout_s,
+        poll_s=verify_poll_s,
+    ):
+        return _AttachResult(
+            role=spec.role,
+            busid=busid,
+            found=True,
+            already_attached=False,
+            success=True,
+            retried=False,
+            message=f"[OK]      {spec.role}: attached BusId {busid}",
+        )
+
+    # --- vhci not seen: retry once ---
+    result2 = subprocess.run(cmd, capture_output=True, text=True)
+    if result2.returncode != 0:
+        stderr2 = result2.stderr.strip()
+        return _AttachResult(
+            role=spec.role,
+            busid=busid,
+            found=True,
+            already_attached=False,
+            success=False,
+            retried=True,
+            message=(
+                f"[FAIL]    {spec.role}: retry attach BusId {busid} failed "
+                f"(exit {result2.returncode}): {stderr2}"
+            ),
+        )
+
+    if _wait_for_vhci(
+        busid,
+        vhci_status_reader,
+        timeout_s=verify_timeout_s,
+        poll_s=verify_poll_s,
+    ):
+        return _AttachResult(
+            role=spec.role,
+            busid=busid,
+            found=True,
+            already_attached=False,
+            success=True,
+            retried=True,
+            message=f"[RETRY-OK] {spec.role}: attached BusId {busid} (needed retry)",
+        )
+
+    return _AttachResult(
+        role=spec.role,
+        busid=busid,
+        found=True,
+        already_attached=False,
+        success=False,
+        retried=True,
+        message=(
+            f"[FAIL]    {spec.role}: BusId {busid} never appeared in vhci status "
+            f"after attach + retry (timeout {verify_timeout_s:.1f} s)"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -312,12 +475,38 @@ def attach_all(
     *,
     dry_run: bool = False,
     state_json_path: Optional[Path] = None,
+    vhci_status_reader: Optional[Callable[[], str]] = None,
+    verify_timeout_s: float = ATTACH_VERIFY_TIMEOUT_S,
+    verify_poll_s: float = ATTACH_VERIFY_POLL_S,
 ) -> list[_AttachResult]:
-    """Attach all required devices and return per-device results."""
+    """Attach all required devices and return per-device results.
+
+    Parameters
+    ----------
+    vhci_status_reader:
+        Optional callable returning the current vhci_hcd status text.
+        Defaults to reading :data:`inchworm.vhci.VHCI_STATUS_PATH`.
+        Pass a custom reader in tests to avoid touching the filesystem.
+    verify_timeout_s:
+        How long (seconds) to wait for a device to appear in vhci status
+        after an attach before retrying.
+    verify_poll_s:
+        Polling interval (seconds) for vhci presence checks.
+    """
     state = _get_usbipd_state_json(state_json_path)
     devices: list[dict] = state.get("Devices", [])
     specs = _device_specs_from_config(config)
-    return [_attach_device(spec, devices, dry_run) for spec in specs]
+    return [
+        _attach_device(
+            spec,
+            devices,
+            dry_run,
+            vhci_status_reader=vhci_status_reader,
+            verify_timeout_s=verify_timeout_s,
+            verify_poll_s=verify_poll_s,
+        )
+        for spec in specs
+    ]
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -341,13 +530,32 @@ def main(argv: Optional[list[str]] = None) -> int:
         metavar="PATH",
         help="Use this JSON file as usbipd state output instead of running powershell.exe.",
     )
+    parser.add_argument(
+        "--vhci-status",
+        metavar="PATH",
+        help=(
+            "Path to the vhci_hcd status file "
+            "(default: /sys/devices/platform/vhci_hcd.0/status). "
+            "Intended for testing."
+        ),
+    )
     args = parser.parse_args(argv)
 
     config = load_config(args.config)
     state_json_path = Path(args.state_json) if args.state_json else None
 
+    vhci_status_reader: Optional[Callable[[], str]] = None
+    if args.vhci_status:
+        _vhci_path = Path(args.vhci_status)
+        vhci_status_reader = lambda: _vhci_path.read_text()  # noqa: E731
+
     try:
-        results = attach_all(config, dry_run=args.dry_run, state_json_path=state_json_path)
+        results = attach_all(
+            config,
+            dry_run=args.dry_run,
+            state_json_path=state_json_path,
+            vhci_status_reader=vhci_status_reader,
+        )
     except RuntimeError as err:
         print(f"ERROR: {err}", file=sys.stderr)
         return 1

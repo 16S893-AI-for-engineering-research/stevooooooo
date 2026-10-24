@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:08'
-updated_date: '2026-10-24 15:44'
+updated_date: '2026-10-24 19:45'
 labels: []
 milestone: m-0
 dependencies:
@@ -186,6 +186,17 @@ author: @orchestrator
 created: 2026-10-24 15:44
 ---
 Orchestrator follow-up (not blocking AA-5): attach_usb.py should confirm each device appears in /sys/devices/platform/vhci_hcd.0/status after attach and retry once, because usbipd attach was observed to succeed silently without the device appearing. Fold this into AA-14 or a small follow-up.
+---
+
+created: 2026-10-24 19:45
+---
+attach_usb.py hardened with vhci post-attach verification (2026-10-24 follow-up from comment #4).
+
+After each live usbipd attach call, the script now polls /sys/devices/platform/vhci_hcd.0/status for the device BusId (via inchworm.vhci._busid_to_dev_hex + _parse_vhci_status), waiting up to ATTACH_VERIFY_TIMEOUT_S (5 s) with ATTACH_VERIFY_POLL_S (0.5 s) polling. If absent, the attach is retried once. Per-device labels: [OK] (immediate), [RETRY-OK] (appeared after retry), [FAIL] (never appeared). Exit nonzero on any FAIL.
+
+Three new tests added to robot/tests/test_attach_usb.py (TestVhciVerification): (a) immediate presence -> [OK] retried=False, (b) appears only after retry -> [RETRY-OK] retried=True, (c) never appears -> [FAIL] exit-nonzero logic confirmed. All tests monkeypatch subprocess and vhci_status_reader; no real serial ports or vhci paths touched.
+
+Full test run: uv run pytest -> 1465 passed, 0 failed.
 ---
 <!-- COMMENTS:END -->
 

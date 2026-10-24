@@ -17,26 +17,37 @@ Live motion (REQUIRES HARDWARE, owner supervision)::
 
     uv run python scripts/jog.py --arm left --delta 0.01,0.0,0.0 --live
 
+Live motion at half speed::
+
+    uv run python scripts/jog.py --arm left --delta 0.01,0.0,0.0 --live --speed-scale 0.5
+
 Notes
 -----
 *   Gripper servo is **never** commanded by this script.  The gripper is
     reserved for the AA-17 state machine via the AA-8 gripper_channel token.
-*   Collision check: calls ``collision_check_hook(arm, q_target)`` which
-    currently always returns ``None`` (no collision detected).  This hook
-    is a placeholder for AA-9.  AC#4 remains unchecked until AA-9 is
-    implemented.
+*   Collision check: motion_guard.MotionGuard.check_trajectory is called on
+    every live jog via GuardedArm before any servo write.
 *   AA-7 telemetry: jog events are logged via the AA-7 SessionLogger when
     ``--live`` is active.  Dry-run logs to stdout only.
 
-Hardware-only motion: ``--live`` flag
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Live jog path (AA-9 wired)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When ``--live`` is passed the script:
-  1. Loads hardware config and opens the servo bus backend.
-  2. Reads current joint angles from the arm.
-  3. Runs IK to find the target configuration.
-  4. Plans a trapezoidal trajectory.
-  5. Sends each waypoint to the servo bus.
-Never commands the gripper servo.
+  1. Loads hardware config and opens the servo bus backend via
+     ``inchworm.backends.get_backend(cfg).open_serial(role)``.
+  2. Builds ``ArmServoBus(joint_id_map from config servo_joints)`` —
+     refuses if any of joints 1-5 is null (not yet scanned).
+  3. Builds ``GuardedArm`` via
+     ``motion_guard.build_guarded_arm(bus, cfg, role, live=True)`` with
+     joint calibration — refuses if any calibration value is missing or
+     unverified (fail-closed).
+  4. Reads present joint angles via ``GuardedArm._read_present_pose_rad()``.
+  5. Runs IK to find the target configuration.
+  6. Plans a trapezoidal trajectory scaled by ``--speed-scale``.
+  7. Validates the full present→target trajectory via
+     ``GuardedArm.check_trajectory_rad``.
+  8. Streams each time-parameterised sample via
+     ``GuardedArm.write_positions_rad`` (joints 1-5 only; never the gripper).
 """
 
 from __future__ import annotations
@@ -44,6 +55,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -66,15 +78,15 @@ logging.basicConfig(
 logger = logging.getLogger("jog")
 
 # ---------------------------------------------------------------------------
-# AA-9 collision check hook (placeholder)
+# AA-9 collision check hook (dry-run fallback only)
 # ---------------------------------------------------------------------------
 
 
 def collision_check_hook(arm: str, q: np.ndarray) -> Optional[str]:
     """Check for collisions before commanding motion.
 
-    This is a **placeholder** for the AA-9 collision envelope.  It always
-    returns ``None`` (no collision) until AA-9 is implemented.
+    Dry-run fallback used when ``cfg.motion_guard`` is None.
+    The real AA-9 guard is used when ``motion_guard`` is present.
 
     Parameters
     ----------
@@ -87,14 +99,8 @@ def collision_check_hook(arm: str, q: np.ndarray) -> Optional[str]:
     -------
     str or None
         Collision description string if a collision is detected, else ``None``.
-
-    .. note::
-        AC#4 (collision envelope) is unchecked pending AA-9.
     """
-    # --- AA-9 hook ---
-    # Replace this body with the AA-9 collision check when available.
     return None
-    # --- AA-9 hook end ---
 
 
 # --- AA-9 ---
@@ -204,33 +210,183 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0.02,
         help="Trajectory sample interval (seconds).  Default 0.02 (50 Hz).",
     )
+    p.add_argument(
+        "--speed-scale",
+        dest="speed_scale",
+        type=float,
+        default=0.2,
+        metavar="SCALE",
+        help=(
+            "Scale trajectory velocity and acceleration limits by this factor "
+            "(0.0 < SCALE <= 1.0).  Default 0.2 (20%% of configured maximum).  "
+            "Use 1.0 for full-speed motion."
+        ),
+    )
     return p
+
+
+# ---------------------------------------------------------------------------
+# Live-path helpers
+# ---------------------------------------------------------------------------
+
+# Joint names for joints 1-5 (arm joints, gripper excluded).
+_ARM_JOINT_NAMES = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+)
+
+
+def _build_joint_id_map_or_refuse(cfg, role: str) -> dict[str, int]:
+    """Build the joint_id_map for one arm from config.
+
+    Checks that all five arm joints (1-5) have non-null IDs in the config.
+    The gripper is included in the map with a fallback ID of 6 when not set
+    (so ArmServoBus can be constructed; the gripper is never written).
+
+    Returns the map or raises SystemExit(4) with a diagnostic message.
+    """
+    arm_cfg = cfg.arms.left if role == "arm_left" else cfg.arms.right
+    sj = arm_cfg.servo_joints
+    null_joints = [j for j in _ARM_JOINT_NAMES if getattr(sj, j) is None]
+    if null_joints:
+        logger.error(
+            "LIVE jog REFUSED: the following arm joints have null servo IDs in config "
+            "(run scripts/scan_servos.py --live and populate hardware.yaml): %s",
+            ", ".join(null_joints),
+        )
+        sys.exit(4)
+    joint_map: dict[str, int] = {j: getattr(sj, j) for j in _ARM_JOINT_NAMES}
+    gripper_id = sj.gripper if sj.gripper is not None else 6
+    joint_map["gripper"] = gripper_id
+    return joint_map
+
+
+def _check_calibration_or_refuse(guarded_arm, role: str) -> None:
+    """Check that all joint calibrations are present and verified.
+
+    Inspects the ``ArmCalibration`` inside GuardedArm and exits 4 if any
+    joint is missing ``zero_offset_deg`` or is marked ``unverified=True``.
+    """
+    calib = guarded_arm._calibration  # type: ignore[attr-defined]
+    if calib is None:
+        logger.error(
+            "LIVE jog REFUSED (%s): no servo calibration block in config. "
+            "Run the calibration procedure and populate "
+            "motion_guard.servo_calibration in hardware.yaml.",
+            role,
+        )
+        sys.exit(4)
+
+    if not calib.is_live_ok:
+        missing = []
+        from inchworm.motion_guard import JOINT_NAMES
+        for i, name in enumerate(JOINT_NAMES):
+            p = calib.get(i)
+            if p.zero_offset_deg is None:
+                missing.append(f"{name} (zero_offset_deg is null)")
+            elif p.unverified:
+                missing.append(f"{name} (unverified=True)")
+        logger.error(
+            "LIVE jog REFUSED (%s): joint calibration is missing or unverified. "
+            "Populate motion_guard.servo_calibration in hardware.yaml and set "
+            "unverified: false.  Missing/unverified: %s",
+            role,
+            "; ".join(missing) if missing else "all joints",
+        )
+        sys.exit(4)
+
+
+def _check_limits_or_refuse(guarded_arm, role: str) -> None:
+    """Check that joint limits are present and verified.
+
+    Inspects the MotionGuard inside GuardedArm and exits 4 if any limits
+    are unverified (null or unverified=True).
+    """
+    limits = guarded_arm.guard.limit_guard.limits  # type: ignore[attr-defined]
+    if not limits.live_ok:
+        from inchworm.motion_guard import JOINT_NAMES
+        missing = []
+        for i, name in enumerate(JOINT_NAMES):
+            lo = limits.lower_rad[i]
+            hi = limits.upper_rad[i]
+            if lo is None or hi is None:
+                missing.append(f"{name} (null)")
+        msg = "; ".join(missing) if missing else "limits are marked unverified"
+        logger.error(
+            "LIVE jog REFUSED (%s): soft joint limits are UNVERIFIED. "
+            "Run scripts/measure_limits.py --live, populate hardware.yaml, "
+            "set unverified: false.  Detail: %s",
+            role,
+            msg,
+        )
+        sys.exit(4)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    # --- Validate speed_scale ---
+    speed_scale = args.speed_scale
+    if not (0.0 < speed_scale <= 1.0):
+        parser.error(
+            f"--speed-scale must be in (0.0, 1.0], got {speed_scale}"
+        )
+
     # --- Load config and build kinematic chain ---
     cfg = load_config()
     chain = build_chain(cfg.so101_kinematics)
     arm_name = args.arm
+    role = f"arm_{arm_name}"  # "arm_left" or "arm_right"
 
     # --- Determine current joint configuration ---
     # In dry-run mode we use q=zeros as the "current" configuration.
-    # In live mode we would read from the servo bus.
+    # In live mode we open the servo bus, build GuardedArm, and read the bus.
+    guarded_arm = None
+
     if args.live:
-        # Orchestrator 2026-10-24: the previous live branch called
-        # non-existent APIs (ServoBusDriver, get_backend,
-        # write_joint_positions_rad) and would have bypassed AA-9 GuardedArm.
-        # Live jog is REFUSED until it is wired through
-        # motion_guard.build_guarded_arm with verified joint calibration and
-        # limits (owner-supervised hardware session).
-        logger.error(
-            "LIVE jog is not wired yet: it must go through AA-9 GuardedArm with "
-            "verified joint calibration and limits. Refusing."
-        )
-        return 4
+        # -----------------------------------------------------------------
+        # Live path: open backend, build ArmServoBus, build GuardedArm,
+        # refuse if calibration or limits are missing/unverified.
+        # -----------------------------------------------------------------
+        from inchworm.backends import get_backend
+        from inchworm.servo_bus import ArmServoBus
+        from inchworm.motion_guard import build_guarded_arm
+
+        # 1. Build joint_id_map from config — refuse if any joint 1-5 is null.
+        joint_id_map = _build_joint_id_map_or_refuse(cfg, role)
+
+        # 2. Open serial transport via backend (respects mock/hardware env).
+        backend = get_backend(cfg)
+        transport = backend.open_serial(role)
+
+        # 3. Build servo bus.
+        bus = ArmServoBus(transport, role=role, joint_id_map=joint_id_map)
+
+        # 4. Build GuardedArm (wires MotionGuard + ArmCalibration).
+        # NOTE: build_guarded_arm uses arm_name ("left"/"right"), not the
+        # backend role ("arm_left"/"arm_right"), for config lookups.
+        guarded_arm = build_guarded_arm(bus, cfg, arm_name, live=True)
+
+        # 5. Refuse if calibration is missing or unverified (fail-closed).
+        _check_calibration_or_refuse(guarded_arm, role)
+
+        # 6. Refuse if joint limits are missing or unverified (fail-closed).
+        _check_limits_or_refuse(guarded_arm, role)
+
+        # 7. Read present pose from bus through GuardedArm.
+        try:
+            q_current = guarded_arm._read_present_pose_rad()
+        except Exception as exc:
+            logger.error(
+                "LIVE jog REFUSED (%s): cannot read present pose: %s", role, exc
+            )
+            return 4
+        logger.info("[LIVE] Read present pose from %s: %s rad", role, np.round(q_current, 4))
+
     else:
         logger.info("[DRY-RUN] Using q_current = zeros (5) as current configuration.")
         q_current = np.zeros(5, dtype=np.float64)
@@ -281,23 +437,32 @@ def main(argv: list[str] | None = None) -> int:
 
     q_target = ik_result.q
 
-    # --- Collision check (AA-9 hook) ---
-    # --- AA-9 ---
-    # Use the real AA-9 guard when the motion_guard config block is present.
-    if cfg.motion_guard is not None:
-        collision_msg = _aa9_collision_check(arm_name, q_target, cfg)
+    # --- Collision check (AA-9 hook, dry-run only) ---
+    # Live mode: collision is checked inside GuardedArm.write_positions_rad.
+    if not args.live:
+        # --- AA-9 ---
+        if cfg.motion_guard is not None:
+            collision_msg = _aa9_collision_check(arm_name, q_target, cfg)
+        else:
+            collision_msg = collision_check_hook(arm_name, q_target)
+        # --- AA-9 end ---
+        if collision_msg is not None:
+            logger.error("Collision check FAILED: %s", collision_msg)
+            return 3
     else:
-        collision_msg = collision_check_hook(arm_name, q_target)
-    # --- AA-9 end ---
-    if collision_msg is not None:
-        logger.error("Collision check FAILED: %s", collision_msg)
-        return 3
+        collision_msg = None
 
-    # --- Plan trajectory ---
+    # --- Plan trajectory (with speed_scale applied) ---
+    # Apply speed_scale to velocity and acceleration limits.
+    raw_limits = cfg.so101_kinematics.trajectory
+    scaled_limits = raw_limits.model_copy(update={
+        "max_velocity_rad_per_s": raw_limits.max_velocity_rad_per_s * speed_scale,
+        "max_acceleration_rad_per_s2": raw_limits.max_acceleration_rad_per_s2 * speed_scale,
+    })
     traj = plan_joint_trajectory(
         q_start=q_current,
         q_end=q_target,
-        limits=cfg.so101_kinematics.trajectory,
+        limits=scaled_limits,
         joint_names=chain.joint_names(),
     )
 
@@ -310,12 +475,15 @@ def main(argv: list[str] | None = None) -> int:
         print("  DRY-RUN JOG PLAN  (no hardware commands)")
     print("=" * 60)
     print(f"  arm          : {arm_name}")
+    print(f"  role         : {role}")
     print(f"  current_pos  : {current_pos}")
     print(f"  target_pos   : {target_pos}")
     print(f"  IK pos_err   : {ik_result.pos_err_m*1000:.4f} mm")
     print(f"  q_current    : {np.round(q_current, 4)}")
     print(f"  q_target     : {np.round(q_target, 4)}")
-    print(f"  collision     : {collision_msg or 'none (AA-9 guard active)'}")
+    print(f"  speed_scale  : {speed_scale:.2f}")
+    if not args.live:
+        print(f"  collision    : {collision_msg or 'none (AA-9 guard active)'}")
     print()
     print(traj.summary())
     print()
@@ -326,8 +494,39 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[DRY-RUN complete — no motion commanded]")
         return 0
 
-    # Live execution intentionally unreachable (refused above).
-    return 4
+    # -----------------------------------------------------------------
+    # Live execution: validate trajectory then stream waypoints.
+    # -----------------------------------------------------------------
+    # Validate the full present→target trajectory before starting.
+    traj_violation = guarded_arm.check_trajectory_rad(q_current, q_target)
+    if traj_violation is not None:
+        logger.error(
+            "LIVE jog REFUSED (%s): trajectory check FAILED: %s", role, traj_violation
+        )
+        return 3
+
+    logger.info(
+        "[LIVE] Streaming trajectory to %s: T=%.3f s, dt=%.3f s, samples=~%d",
+        role,
+        traj.T,
+        args.dt,
+        int(traj.T / args.dt) + 2,
+    )
+
+    # Stream time-parameterised samples via GuardedArm.write_positions_rad.
+    # Gripper is NEVER written — write_positions_rad only writes joints 1-5.
+    t_start = time.monotonic()
+    for t_traj, q_sample in sample_trajectory(traj, dt=args.dt):
+        t_elapsed = time.monotonic() - t_start
+        # Pace the stream: wait until it is time to send this sample.
+        t_wall_target = t_traj
+        sleep_s = t_wall_target - t_elapsed
+        if sleep_s > 0.002:
+            time.sleep(sleep_s)
+        guarded_arm.write_positions_rad(q_sample)
+
+    logger.info("[LIVE] Jog complete on %s", role)
+    return 0
 
 
 if __name__ == "__main__":

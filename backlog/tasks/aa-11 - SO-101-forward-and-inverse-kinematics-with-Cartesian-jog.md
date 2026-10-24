@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-24 19:21'
+updated_date: '2026-10-24 19:51'
 labels: []
 milestone: m-1
 dependencies:
@@ -36,7 +36,7 @@ See doc-1 sections 2, 3 and 8.
 - [x] #1 Forward kinematics maps joint angles to end-effector pose in a documented chassis-fixed frame, with link parameters taken from CAD and recorded in config
 - [x] #2 Inverse kinematics returns joint solutions for reachable targets, reports unreachable targets explicitly, and selects among multiple solutions by a documented deterministic rule that respects joint limits
 - [ ] #3 FK/IK round-trip accuracy is measured in simulation (sub-millimeter) and verified against at least five measured physical poses per arm with the residuals recorded in task notes
-- [ ] #4 A Cartesian jog CLI moves a chosen arm by a commanded delta or to an absolute pose, honouring joint limits and the collision envelope, with a dry-run mode that prints the plan without moving
+- [x] #4 A Cartesian jog CLI moves a chosen arm by a commanded delta or to an absolute pose, honouring joint limits and the collision envelope, with a dry-run mode that prints the plan without moving
 - [x] #5 Joint-space trajectory generation produces time-parameterized, velocity- and acceleration-limited motion rather than step commands
 - [x] #6 Tests cover FK/IK round trips, unreachable-target handling, limit-respecting solution choice and dry-run output
 <!-- AC:END -->
@@ -101,6 +101,10 @@ Unchecked pending AA-9.
 Orchestrator review 2026-10-24: the IK default tolerance was exactly 1 mm (_DEFAULT_TOL_M=1e-3), so 'sub-mm round trip' only measured the solver's stop threshold (observed max 0.98 mm). Tightened to 1e-5 m / 1e-3 rad and max_iter 500; the round-trip test now requires < 0.05 mm. Re-measured with test_fk_ik_round_trip_accuracy over 8 poses: max 0.0098 mm, mean 0.0067 mm. An extra 50-pose random sweep (orchestrator, seed 1) gave max 0.0096 mm, with 5/50 unreached from the zero seed (genuinely hard configurations, reported as unreachable rather than silently wrong). Full suite: 583 passed. AC#3 stays unchecked: physical-pose verification needs hardware.
 
 AA-9 implemented (motion_guard.py): the jog.py collision_check_hook has been wired to the real AA-9 MotionGuard (_aa9_collision_check in jog.py). AA-11 AC#4 (collision hook wired) can now be checked by the orchestrator by reviewing jog.py and running uv run pytest tests/test_motion_guard.py::TestJogAA9Integration -v.
+
+AC#4 can now be checked by the orchestrator: scripts/jog.py --live is wired through get_backend(cfg).open_serial(role), ArmServoBus(joint_id_map from config servo_joints; refuses if any joints 1-5 is null), and motion_guard.build_guarded_arm(bus, cfg, arm_name, live=True) with joint calibration (refuses live, listing missing/unverified values). Present pose read via GuardedArm._read_present_pose_rad(). Trajectory planned with --speed-scale (default 0.2, max 1.0). check_trajectory_rad validates present->target before streaming. Samples streamed via GuardedArm.write_positions_rad (joints 1-5 only; gripper never touched). Tests in tests/test_jog_live.py: (a) refusal with unverified calibration exits 4, (b) verified synthetic config writes go through GuardedArm only and never include gripper, (c) dry-run unchanged. All 1473 tests pass.
+
+Orchestrator verification 2026-10-24: scripts/jog.py --live is now wired through get_backend().open_serial -> ArmServoBus -> motion_guard.build_guarded_arm(live=True). It checks the trajectory (check_trajectory_rad) before motion, streams via GuardedArm.write_positions_rad (joints 1-5 only), and --speed-scale defaults to 0.2. It refuses (exit 4) with exact missing prerequisites. Against the real config it refused live with 'null servo IDs' and opened nothing (live rc=4). `uv run pytest tests/test_jog_live.py` 11 passed (refusal, writes only via GuardedArm, never the gripper, dry-run unchanged); the jog tests in test_kinematics pass. AC#3 (physical pose residuals) stays hardware-only.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

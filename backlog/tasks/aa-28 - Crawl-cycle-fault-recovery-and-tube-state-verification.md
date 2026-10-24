@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:13'
-updated_date: '2026-10-24 19:17'
+updated_date: '2026-10-24 19:47'
 labels: []
 milestone: m-4
 dependencies:
@@ -90,4 +90,6 @@ AC#7 covered by: TestCycleHooks + TestTubeStateVerifier + TestCycleStateCheckpoi
 Orchestrator 2026-10-24: the notes reference scripts/fault_inject_hw.py, which does NOT exist. The hardware re-run of the mid-advance servo fault and USB loss injections has no script yet; it is a follow-up before the owner session. AC#5 stays checked because it allows mock injection 'where hardware injection is unsafe', and each of the 5 faults has a mock injection test with its method recorded above.
 
 Orchestrator hardening 2026-10-24: TubeStateVerifier previously PASSED in live mode when no joint readings or chain were supplied (it only logged at debug level), so tube displacement went unchecked. It now refuses in live mode with a reason. Test test_live_verify_without_joint_readings_refuses.
+
+scripts/fault_inject_hw.py now exists (2026-10-24). Dry-run default, --live for hardware. Two procedures: (A) mid-advance servo fault — operator unplugs one arm TTL cable; script detects error, calls FaultResponder(MID_ADVANCE_SERVO_FAULT) -> ESTOP_HOLD_AND_HALT. (B) USB camera loss — operator unplugs a camera cable; script detects DeviceNotFoundError/DeviceNotAttachedError, calls FaultResponder(USB_DEVICE_LOSS) -> ESTOP_HOLD_AND_HALT. Script only observes and responds; never commands motion. JSON report written to session artifacts dir. Tests: tests/test_fault_inject_hw.py (17 tests). Full suite: 1482 passed.
 <!-- SECTION:NOTES:END -->
