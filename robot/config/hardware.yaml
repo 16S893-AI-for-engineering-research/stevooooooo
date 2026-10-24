@@ -43,6 +43,16 @@ arms:
       identify_by: usb_serial
       linux_by_id: usb-1a86_USB_Single_Serial_5B91045044-if00
       windows_busid_observed: "10-4"
+    # Joint-to-servo-ID map for the SO-101 left arm.
+    # Populated by a live bus scan (AA-8 scan_servos.py --live).
+    # All null until the owner runs the scan and assigns joint names.
+    servo_joints:
+      shoulder_pan: null
+      shoulder_lift: null
+      elbow_flex: null
+      wrist_flex: null
+      wrist_roll: null
+      gripper: null
   right:
     adapter_chip: CH343
     role_verification: owner_reported
@@ -53,6 +63,16 @@ arms:
       identify_by: usb_serial
       linux_by_id: usb-1a86_USB_Single_Serial_5B91030298-if00
       windows_busid_observed: "9-3"
+    # Joint-to-servo-ID map for the SO-101 right arm.
+    # Populated by a live bus scan (AA-8 scan_servos.py --live).
+    # All null until the owner runs the scan and assigns joint names.
+    servo_joints:
+      shoulder_pan: null
+      shoulder_lift: null
+      elbow_flex: null
+      wrist_flex: null
+      wrist_roll: null
+      gripper: null
 
 dexarm:
   identity:

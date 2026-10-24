@@ -95,10 +95,28 @@ class DeviceIdentity(_Strict):
         return f"{self.vendor_id}:{self.product_id}"
 
 
+class ServoJointMap(_Strict):
+    """Joint-to-servo-ID map for one arm.
+
+    All values are ``None`` until a live bus scan (``scan_servos.py --live``)
+    has been run and the owner has assigned joint names to the discovered IDs.
+    A ``None`` ID means the servo has not yet been located on the bus.
+    """
+
+    shoulder_pan: Optional[int] = None
+    shoulder_lift: Optional[int] = None
+    elbow_flex: Optional[int] = None
+    wrist_flex: Optional[int] = None
+    wrist_roll: Optional[int] = None
+    gripper: Optional[int] = None
+
+
 class ArmConfig(_Strict):
     adapter_chip: str
     role_verification: Literal["owner_reported", "motion_verified"]
     identity: DeviceIdentity
+    # Populated by scan_servos.py --live; all null until the owner runs the scan.
+    servo_joints: ServoJointMap = Field(default_factory=ServoJointMap)
 
 
 class ArmsConfig(_Strict):
