@@ -749,16 +749,16 @@ class TestMockBackendIntegration:
 
 
 class TestConfigServoJoints:
-    def test_config_loads_with_null_servo_joints(self):
-        """hardware.yaml loads cleanly with null servo_joint IDs."""
+    def test_config_loads_with_scanned_servo_joints(self):
+        """hardware.yaml carries the IDs from the 2026-10-24 live scan
+        (STS3215 x6 at IDs 1-6 on both arms)."""
         from inchworm.config import load_config
 
         config = load_config()
-        assert config.arms.left.servo_joints is not None
-        assert config.arms.right.servo_joints is not None
-        # All null initially
-        assert config.arms.left.servo_joints.gripper is None
-        assert config.arms.left.servo_joints.shoulder_pan is None
+        for arm in (config.arms.left, config.arms.right):
+            sj = arm.servo_joints
+            assert (sj.shoulder_pan, sj.shoulder_lift, sj.elbow_flex,
+                    sj.wrist_flex, sj.wrist_roll, sj.gripper) == (1, 2, 3, 4, 5, 6)
 
     def test_config_accepts_integer_servo_ids(self):
         """Config schema accepts non-null integer IDs once scanned."""

@@ -392,9 +392,20 @@ class PySerialTransport(SerialTransport):
     def read(self, size: int) -> bytes:
         if not self._port.is_open:
             raise BackendError(f"serial port for {self.device!r} is closed")
-        # Read with the configured timeout; returns whatever bytes arrived.
-        # Short reads are handled by the AA-8/AA-12 protocol drivers.
-        return self._port.read(size)  # type: ignore[return-value]
+        # Orchestrator fix 2026-10-24 (measured live: 811 ms per 6-servo read).
+        # pyserial read(size) BLOCKS until `size` bytes arrive or the timeout
+        # expires, and protocol drivers ask for up to 32 bytes while replies are
+        # ~21 bytes, so every read waited the full 0.1 s timeout. Return
+        # whatever is already buffered (at most `size`), and block for the
+        # timeout only when nothing has arrived yet.
+        waiting = self._port.in_waiting
+        if waiting:
+            return self._port.read(min(size, waiting))  # type: ignore[return-value]
+        first = self._port.read(1)  # waits up to timeout for the first byte
+        if not first:
+            return b""
+        more = self._port.in_waiting
+        return first + (self._port.read(min(size - 1, more)) if more and size > 1 else b"")
 
     def close(self) -> None:
         if self._port.is_open:

@@ -37,7 +37,7 @@ Status packet (response)::
 
 Register map (STS3215, verified against rustypot src/servo/feetech/sts3215.rs)
 -------------------------------------------------------------------------------
-  0x00  model number L/H       (2 bytes, read-only)
+  0x00  firmware major, 0x01 minor; 0x03 model number L/H (STS3215 = 777)
   0x28  torque enable          (1 byte,  write)
   0x2A  goal position L/H      (2 bytes, write)
   0x37  lock                   (1 byte,  write)
@@ -100,7 +100,7 @@ _INST_WRITE: int = 0x03
 _INST_SYNC_READ: int = 0x82
 
 # Register addresses (verified against rustypot src/servo/feetech/sts3215.rs)
-_REG_MODEL_L: int = 0x00        # model number low byte (2 bytes total)        [0]
+_REG_MODEL_L: int = 0x03        # model number L/H (2 bytes) [3]; STS3215 = 777. Registers 0-1 are firmware major/minor (rustypot sts3215.rs). Orchestrator fix 2026-10-24: read was at 0, verified live.
 _REG_TORQUE_ENABLE: int = 0x28  # torque enable (1 byte)                       [40]
 _REG_GOAL_POSITION: int = 0x2A  # goal position low byte (2 bytes)             [42]
 _REG_PRESENT_POSITION: int = 0x38  # present position low byte (2 bytes)       [56]
@@ -731,8 +731,16 @@ class ArmServoBus:
         _BLOCK_LEN = 15
         _CURRENT_OFFSET = 13  # 0x45 - 0x38
 
-        # Attempt sync-read first (more efficient on hardware)
-        raw_map = self._bus.sync_read(servo_ids, _REG_PRESENT_POSITION, _BLOCK_LEN)
+        # Orchestrator 2026-10-24, measured live on both arms: SYNC_READ
+        # replies collide on this bus (servo 3's reply is truncated by servo
+        # 4's, firmware 3.9 vs 3.10), so the parser waited out its deadline
+        # (~600 ms) and fell back anyway. Sequential per-servo block reads are
+        # reliable and fast: 6 servos x 15 B in a mean of 5.1 ms (~195 Hz),
+        # 0 errors over 200 cycles per arm. sync_read stays available but
+        # is not used here.
+        raw_map: Dict[int, bytes] = {}
+        for sid in servo_ids:
+            raw_map[sid] = self._bus.read_bytes(sid, _REG_PRESENT_POSITION, _BLOCK_LEN)
 
         result: Dict[str, JointState] = {}
         for joint_name, servo_id in self._joint_id_map.items():

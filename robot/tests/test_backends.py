@@ -340,3 +340,23 @@ def test_conftest_blocks_real_serial():
     import pytest, serial
     with pytest.raises(AssertionError, match="REAL serial port"):
         serial.Serial("/dev/ttyACM0")
+
+
+# --- Orchestrator 2026-10-24: PySerialTransport.read must not wait out the timeout ---
+def test_pyserial_transport_read_returns_buffered_bytes_without_waiting():
+    from inchworm.backends import PySerialTransport
+
+    class FakePort:
+        is_open = True
+        def __init__(self, data): self.buf = bytearray(data); self.blocking_reads = 0
+        @property
+        def in_waiting(self): return len(self.buf)
+        def read(self, n):
+            if n > len(self.buf): self.blocking_reads += 1  # would block until timeout
+            out = bytes(self.buf[:n]); del self.buf[:n]; return out
+
+    port = FakePort(b"\xff\xff\x01\x03\x00\x00\xfb")  # 7-byte reply, caller asks for 32
+    t = PySerialTransport.__new__(PySerialTransport)
+    t.device = "arm_left"; t._port = port
+    assert t.read(32) == b"\xff\xff\x01\x03\x00\x00\xfb"
+    assert port.blocking_reads == 0
