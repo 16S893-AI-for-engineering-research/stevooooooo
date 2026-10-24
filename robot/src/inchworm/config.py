@@ -555,10 +555,60 @@ class CollisionConfig(_Strict):
     keep_out_capsules: List[KeepOutCapsule] = Field(default_factory=list)
 
 
+class JointServoCalibration(_Strict):
+    """Per-joint servo calibration for one arm.
+
+    For each of the five joints, records the STS3215 servo degree value that
+    corresponds to URDF joint_rad = 0 (``zero_offset_deg``) and the sign of
+    the mapping (``sign``: +1 if increasing servo_deg → increasing joint_rad,
+    -1 otherwise).
+
+    All fields default to ``None`` (not yet measured).  ``unverified: true``
+    until an owner-supervised calibration session measures and confirms them.
+    Live conversion (via :mod:`inchworm.joint_calibration`) **fails closed**
+    when any field is null or when ``unverified`` is True.
+    """
+
+    # --- shoulder_pan ---
+    shoulder_pan_zero_offset_deg: Optional[float] = None   # unverified: true
+    shoulder_pan_sign: Optional[int] = None                # unverified: true
+    # --- shoulder_lift ---
+    shoulder_lift_zero_offset_deg: Optional[float] = None  # unverified: true
+    shoulder_lift_sign: Optional[int] = None               # unverified: true
+    # --- elbow_flex ---
+    elbow_flex_zero_offset_deg: Optional[float] = None     # unverified: true
+    elbow_flex_sign: Optional[int] = None                  # unverified: true
+    # --- wrist_flex ---
+    wrist_flex_zero_offset_deg: Optional[float] = None     # unverified: true
+    wrist_flex_sign: Optional[int] = None                  # unverified: true
+    # --- wrist_roll ---
+    wrist_roll_zero_offset_deg: Optional[float] = None     # unverified: true
+    wrist_roll_sign: Optional[int] = None                  # unverified: true
+    # True until a hardware session measures and sets all fields, then False.
+    unverified: bool = True
+    # How/when calibration was measured. null = not yet measured.
+    method: Optional[str] = None
+    measured_date: Optional[str] = None
+
+
+class ServoCalibrationConfig(_Strict):
+    """Per-arm servo calibration blocks for both SO-101 arms.
+
+    Used by :mod:`inchworm.joint_calibration` to convert between STS3215
+    servo degrees and URDF joint radians.  Both blocks default to ``None``
+    (no calibration measured yet); live motion is blocked until both are
+    populated with ``unverified: false``.
+    """
+
+    left_arm: Optional[JointServoCalibration] = None
+    right_arm: Optional[JointServoCalibration] = None
+
+
 class MotionGuardConfig(_Strict):
     """AA-9 motion guard configuration.
 
-    Contains per-arm soft joint limits, named poses, and the collision model.
+    Contains per-arm soft joint limits, named poses, the collision model,
+    and the per-joint servo calibration (servo-degree ↔ joint-radian mapping).
     If this block is absent from hardware.yaml, the guard uses URDF limits
     (from ``so101_kinematics``) and marks everything as unverified.
     """
@@ -570,10 +620,147 @@ class MotionGuardConfig(_Strict):
     collision: CollisionConfig = Field(default_factory=CollisionConfig)
     # Named poses used by the motion planner (neutral, folded_transit, etc.).
     named_poses: List[NamedPose] = Field(default_factory=list)
+    # Per-joint servo calibration (servo_deg ↔ joint_rad conversion).
+    # null = not yet measured; live conversion blocked until unverified: false.
+    servo_calibration: Optional[ServoCalibrationConfig] = None
 # --- AA-9 end ---
+# --- AA-20 ---
+
+
+class PolicySupervisorConfig(_Strict):
+    """Configuration for the AA-20 policy supervisor (PolicySupervisor).
+
+    All numeric limits are documented safe defaults; override in
+    ``hardware.yaml`` for the specific deployment.
+
+    ``workspace_radius_m``
+        Radius of the Cartesian sphere centred on the target attachment
+        point (in arm base frame) within which the TCP must remain.
+        UNVERIFIED placeholder — tighten after AA-16 calibration.
+
+    ``retract_pose_q_rad``
+        5-element joint configuration (radians, shoulder_pan first) the
+        supervisor commands on abort.  UNVERIFIED placeholder — must be
+        verified on hardware before live use.
+
+    ``max_action_magnitude_deg``
+        Per-step action magnitude clamp threshold (degrees).  Policy
+        outputs whose joint-space Euclidean norm exceeds this value are
+        *scaled down* to this magnitude before execution.  A WARNING is
+        logged on each clamp.
+
+    ``clamp_on_magnitude_violation``
+        When ``True`` (default), magnitude violations are clamped and
+        logged rather than triggering an abort.  Set to ``False`` to
+        abort instead.
+    """
+
+    # Maximum number of policy steps before abort.
+    max_steps: int = Field(default=200, ge=1)
+    # Maximum wall-clock time (seconds) before abort.
+    max_wall_time_s: float = Field(default=30.0, gt=0)
+    # Cartesian workspace radius around target attachment point (metres).
+    # UNVERIFIED placeholder — measure in AA-16.
+    workspace_radius_m: float = Field(default=0.15, gt=0)
+    # Per-step maximum action magnitude (degrees, Euclidean norm over 5 joints).
+    # UNVERIFIED placeholder.
+    max_action_magnitude_deg: float = Field(default=5.0, gt=0)
+    # When True, clamp magnitude violations; when False, abort instead.
+    clamp_on_magnitude_violation: bool = True
+    # Maximum retry attempts before halting the cycle.
+    max_retries: int = Field(default=2, ge=0)
+    # Safe retract pose (radians, 5-DoF).  UNVERIFIED placeholder.
+    # null → supervisor logs a WARNING and skips retract in dry-run,
+    # fails closed (raises) in live mode.
+    retract_pose_q_rad: Optional[List[float]] = None
+    # Flag: must be set to False after retract pose is verified on hardware.
+    retract_pose_unverified: bool = True
+
+
+# --- AA-20 end ---
+
+
+# --- AA-19 ---
+class FoldWaypoint(_Strict):
+    """One intermediate waypoint in the fold or unfold sequence (radians, 5-DoF).
+
+    ``q_rad`` is ordered [shoulder_pan, shoulder_lift, elbow_flex,
+    wrist_flex, wrist_roll], matching JOINT_NAMES in motion_guard.py.
+
+    ``description`` documents *why* this waypoint exists (clearance,
+    joint ordering rationale, etc.).
+
+    ``unverified: true`` until a hardware session confirms the waypoint
+    is collision-free and within safe joint limits.  Live motion FAILS
+    CLOSED on unverified waypoints.
+    """
+
+    q_rad: List[float]  # 5-DoF
+    description: str = ""
+    unverified: bool = True
+
+    @model_validator(mode="after")
+    def _five_dof(self) -> "FoldWaypoint":
+        if len(self.q_rad) != 5:
+            raise ValueError(
+                f"FoldWaypoint must have exactly 5 joint angles, got {len(self.q_rad)}"
+            )
+        return self
+
+
+class FoldSequenceConfig(_Strict):
+    """AA-19 fold/unfold sequence configuration.
+
+    Both ``fold_waypoints`` and ``unfold_waypoints`` are lists of
+    :class:`FoldWaypoint`.  Each waypoint is individually collision-checked
+    before execution.  The sequence is executed in list order; joints are
+    NOT moved simultaneously — each waypoint is a complete arm configuration.
+
+    ``unverified: true`` on any waypoint means live execution is blocked
+    for that waypoint until an owner-supervised hardware session confirms it.
+    """
+
+    # Ordered intermediate waypoints on the way TO folded_transit.
+    # The final waypoint is implicitly the folded_transit named pose from AA-9.
+    # ALL UNVERIFIED PLACEHOLDERS — owner must verify on hardware.
+    fold_waypoints: List[FoldWaypoint] = Field(default_factory=list)
+    # Ordered intermediate waypoints on the way FROM folded_transit.
+    # The start pose is implicitly the current arm position.
+    # ALL UNVERIFIED PLACEHOLDERS.
+    unfold_waypoints: List[FoldWaypoint] = Field(default_factory=list)
+# --- AA-19 end ---
+
+# --- AA-31 ---
+
+
+class LaserLineConfigSchema(_Strict):
+    """Thresholds for laser-line extraction (AA-31).
+
+    Loaded from the ``laser_line`` block in hardware.yaml.  All values are
+    **unverified** defaults; calibrate against real scanner frames.
+
+    Field semantics match :class:`inchworm.laser_line.LaserLineConfig`.
+    """
+
+    # Half-width (px) of the per-column search window. unverified: true
+    window_half_width_px: int = Field(default=15, ge=1)
+    # Min count of 255-valued rows to trigger SATURATED. unverified: true
+    saturated_plateau_px: int = Field(default=2, ge=1)
+    # Min SNR below which a column is WEAK. unverified: true
+    weak_snr_threshold: float = Field(default=3.0, gt=0)
+    # Fraction of peak above which a second peak triggers MULTI_PEAK. unverified: true
+    multi_peak_fraction: float = Field(default=0.4, gt=0, lt=1)
+    # Absolute minimum pixel value for the line to be considered present. unverified: true
+    min_peak_value: int = Field(default=20, ge=0)
+    # Rows used for background: 0 = all rows outside the window.
+    background_rows: int = Field(default=0, ge=0)
+
+
+# --- AA-31 end ---
 
 
 class HardwareConfig(_Strict):
+
     schema_version: int
     backend: BackendName = Field(strict=False)
     geometry: GeometryConfig
@@ -599,6 +786,15 @@ class HardwareConfig(_Strict):
     # --- AA-9 ---
     motion_guard: Optional["MotionGuardConfig"] = None
     # --- AA-9 end ---
+    # --- AA-20 ---
+    policy_supervisor: Optional["PolicySupervisorConfig"] = None
+    # --- AA-20 end ---
+    # --- AA-19 ---
+    fold_sequence: Optional["FoldSequenceConfig"] = None
+    # --- AA-19 end ---
+    # --- AA-31 ---
+    laser_line: Optional[LaserLineConfigSchema] = None
+    # --- AA-31 end ---
 
     @model_validator(mode="before")
     @classmethod

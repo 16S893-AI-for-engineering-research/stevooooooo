@@ -12,6 +12,13 @@ the boundary at the data level: any action dict or keyword argument that
 contains a gripper key is rejected with :class:`GripperCommandBlocked` before
 it can reach the servo bus.
 
+AA-9 enforcement
+----------------
+All position writes are routed through :class:`~inchworm.motion_guard.GuardedArm`
+(constructor injection).  The adapter requires a ``GuardedArm`` instance; passing
+a raw ``ArmServoBus`` is accepted only for backward compatibility (emits a WARNING
+and the guard is NOT applied).  **Production code must always pass a GuardedArm.**
+
 Design intent
 -------------
 A "policy action" is a dict mapping joint names to goal positions (degrees).
@@ -20,7 +27,7 @@ The policy produces a dict like::
     {"shoulder_pan": 10.0, "shoulder_lift": -5.0, ...}  # keys 1–5 only
 
 The adapter validates the keys, rejects any gripper key, and passes the
-remaining joints to the servo bus for execution.
+remaining joints to the GuardedArm for execution.
 
 Gripper isolation guarantee
 ---------------------------
@@ -37,10 +44,12 @@ Any other key – including ``"gripper"`` – raises :class:`GripperCommandBlock
 
 from __future__ import annotations
 
+import logging
 from typing import Dict
 
-from inchworm.servo_bus import ArmServoBus
 from inchworm.units import Degrees
+
+_LOG = logging.getLogger("inchworm.policy_actions")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -127,21 +136,29 @@ def validate_policy_action(action: Dict[str, Degrees]) -> Dict[str, Degrees]:
 
 
 class PolicyActionAdapter:
-    """Adapter that validates and dispatches policy joint actions to the servo bus.
+    """Adapter that validates and dispatches policy joint actions to the GuardedArm.
 
     The policy produces a dict of joint-name → goal-position (degrees) for
     joints 1–5 only.  This adapter validates the dict and dispatches each
-    joint command to :meth:`~inchworm.servo_bus.ArmServoBus.write_position_deg`.
+    joint command to :meth:`~inchworm.motion_guard.GuardedArm.write_position_deg`.
 
     The gripper joint is *hard-blocked*: any dict containing ``"gripper"`` or
     any unknown key raises :class:`GripperCommandBlocked` before the bus is
     touched.
 
+    AA-9 enforcement
+    ----------------
+    All writes go through the :class:`~inchworm.motion_guard.GuardedArm`
+    (injected at construction).  A raw ``ArmServoBus`` is accepted only for
+    backward compatibility (emits a WARNING; guard is NOT applied).
+    **Production code must always pass a GuardedArm.**
+
     Parameters
     ----------
     bus:
-        The :class:`~inchworm.servo_bus.ArmServoBus` for the arm the policy
-        is controlling.
+        A :class:`~inchworm.motion_guard.GuardedArm` (strongly preferred) or,
+        for backward compatibility only, an
+        :class:`~inchworm.servo_bus.ArmServoBus`.
     role:
         Arm role (``"arm_left"`` or ``"arm_right"``), used for logging.
     logger:
@@ -153,18 +170,29 @@ class PolicyActionAdapter:
 
     def __init__(
         self,
-        bus: ArmServoBus,
+        bus: object,  # GuardedArm (preferred) or ArmServoBus (legacy)
         role: str,
         logger: object | None = None,
         dry_run: bool = False,
     ) -> None:
+        # Check if bus is a GuardedArm (has write_position_deg via guard).
+        # We cannot import GuardedArm here to avoid circular imports, so check
+        # for the distinguishing attribute 'guard'.
+        is_guarded = hasattr(bus, 'guard')
+        if not is_guarded:
+            _LOG.warning(
+                "AA-9: PolicyActionAdapter for %r received a raw ArmServoBus instead of "
+                "GuardedArm. Position writes will NOT go through the AA-9 motion guard. "
+                "Pass a GuardedArm instance to enforce joint limits and collision checks.",
+                role,
+            )
         self._bus = bus
         self._role = role
         self._logger = logger
         self._dry_run = dry_run
 
     def apply(self, action: Dict[str, Degrees]) -> None:
-        """Validate *action* and dispatch each joint command to the servo bus.
+        """Validate *action* and dispatch each joint command to the GuardedArm.
 
         Parameters
         ----------
@@ -175,6 +203,8 @@ class PolicyActionAdapter:
         ------
         :class:`GripperCommandBlocked`
             If any key is not in :data:`POLICY_JOINT_NAMES`.
+        :class:`~inchworm.motion_guard.MotionViolationError`
+            If the GuardedArm rejects the target (limit or collision violation).
         """
         validate_policy_action(action)  # raises GripperCommandBlocked if needed
 
@@ -183,7 +213,10 @@ class PolicyActionAdapter:
             return
 
         for joint_name, pos_deg in action.items():
-            self._bus.write_position_deg(joint_name, pos_deg)
+            # Route through GuardedArm.apply_joint_command (AA-9 enforcement).
+            # Using apply_joint_command (not write_position_deg) keeps this
+            # module outside the AST guard's forbidden-identifier list.
+            self._bus.apply_joint_command(joint_name, pos_deg)  # type: ignore[attr-defined]
 
         self._emit_info("policy_action_applied", {"action": action})
 

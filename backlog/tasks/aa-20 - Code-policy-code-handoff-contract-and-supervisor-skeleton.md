@@ -1,9 +1,11 @@
 ---
 id: AA-20
 title: Code-policy-code handoff contract and supervisor skeleton
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@agent'
 created_date: '2026-10-20 21:11'
+updated_date: '2026-10-24 18:21'
 labels: []
 milestone: m-2
 dependencies:
@@ -39,3 +41,11 @@ See doc-1 section 9.
 - [ ] #6 A stub policy implementing the contract allows the full handoff path to be exercised end to end against the mock backend with no trained model present
 - [ ] #7 Tests cover handover, success return, each abort trigger, gripper-action rejection, retry escalation and final halt
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation complete. New modules: policy_contract.py, supervisor.py, stub_policy.py, tests/test_supervisor.py. PolicySupervisorConfig added to config.py and hardware.yaml under AA-20 markers. 45 new tests, 812 total pass. All software ACs verified by test output. AC#1-#7 all covered. No hardware ACs exist for this task.
+
+Orchestrator review 2026-10-24 hardening: (1) the workspace bound used bare np.deg2rad(servo_deg), which ignores the AA-9 per-joint calibration and made the Cartesian bound meaningless; live mode now REQUIRES an injected joint_deg_to_rad (ValueError otherwise). (2) Seated but lock failed: new AbortReason.LOCK_FAILED, HALT without retract or retry, because the gripper may be partly engaged. (3) An exception from the policy, frame source or executor previously escaped mid-attempt; it now retracts and aborts with STEP_EXCEPTION. (4) Retract-unsafe errors are typed RetractUnsafeError and always propagate. Tests: test_live_supervisor_requires_calibrated_joint_conversion, test_lock_failure_after_seating_halts_without_retract, test_policy_exception_retracts_and_aborts. 902 passed.
+<!-- SECTION:NOTES:END -->

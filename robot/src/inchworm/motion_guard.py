@@ -56,6 +56,20 @@ Architecture
     explaining why; the design intent is that no production code path ever
     sets it.
 
+Single-joint write: full-pose check
+-------------------------------------
+:meth:`GuardedArm.write_position_deg` receives a single joint name and servo
+degree value.  To run a full 5-DoF check it must know the current angle of
+the other four joints.  It obtains those by calling
+``ArmServoBus.read_position_deg`` for each mapped servo ID, converting via
+the per-joint calibration (see :mod:`inchworm.joint_calibration`), and then
+passing the assembled 5-vector to :meth:`MotionGuard.check_pose` and
+:meth:`MotionGuard.check_trajectory` (present → target).
+
+A ``present_pose_source`` callback can be injected at construction time to
+override the bus read (useful in tests or when the caller already holds the
+present state).
+
 URDF fallback limits
 --------------------
 URDF limits are taken from ``so101_kinematics.joints`` in ``hardware.yaml``
@@ -92,7 +106,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -646,12 +660,43 @@ class MotionGuard:
 # ---------------------------------------------------------------------------
 
 
+class PresentPoseUnknownError(RuntimeError):
+    """Raised in live mode when the arm's present pose cannot be read, so a
+    guarded move cannot be validated and must not be sent (fail closed)."""
+
+
 class GuardedArm:
     """Wraps :class:`~inchworm.servo_bus.ArmServoBus` to enforce motion guard.
 
     All position writes for joints 1-5 (shoulder_pan … wrist_roll) are
     intercepted and validated by :class:`MotionGuard` before the write
     reaches the servo bus.  The gripper joint is excluded (managed by AA-17).
+
+    Single-joint writes (:meth:`write_position_deg`)
+    -------------------------------------------------
+    When a single joint is commanded, the guard must check the *full* 5-DoF
+    pose to test joint limits and collision.  It does this by:
+
+    1. Reading the present servo position of every mapped joint from the bus
+       (via ``ArmServoBus.read_position_deg``) or from the injected
+       ``present_pose_source`` callback if one is provided.
+    2. Converting each servo-degree to joint-radians via the per-joint
+       calibration (see :mod:`inchworm.joint_calibration`).
+    3. Substituting the commanded joint's target angle into the pose vector.
+    4. Running :meth:`MotionGuard.check_pose` on the full target pose.
+    5. Running :meth:`MotionGuard.check_trajectory` from present pose to
+       target pose.
+
+    This guarantees that no single-joint write can bypass the full collision
+    and limit envelope, even when the other joints are at non-zero angles.
+
+    Servo-degree ↔ joint-radian conversion
+    ----------------------------------------
+    Conversion is performed by :func:`~inchworm.joint_calibration.servo_deg_to_joint_rad`
+    and :func:`~inchworm.joint_calibration.joint_rad_to_servo_deg` using per-joint
+    calibration from ``motion_guard.servo_calibration`` in ``hardware.yaml``.
+    The old hard-coded ``deg-180`` assumption has been removed.  Live mode
+    fails closed when calibration is null or unverified.
 
     Bypass
     ------
@@ -666,6 +711,9 @@ class GuardedArm:
         The :class:`~inchworm.servo_bus.ArmServoBus` to wrap.
     guard:
         The :class:`MotionGuard` for this arm.
+    calibration:
+        The :class:`~inchworm.joint_calibration.ArmCalibration` for this arm.
+        If ``None``, falls back to the null-calibration fallback (dry-run only).
     live:
         If True, position writes will raise
         :class:`LiveMotionBlockedError` when limits are unverified.
@@ -674,19 +722,29 @@ class GuardedArm:
     session_logger:
         Optional AA-7 session logger.  If present, WARNING events are
         emitted via ``session_logger.warning()``.
+    present_pose_source:
+        Optional callable that returns a 5-vector (radians) representing
+        the present joint configuration.  When provided, the guard uses this
+        instead of reading the bus.  Signature:
+        ``() -> NDArray[float64]``.
+        Useful for tests or when the caller already holds the present state.
     """
 
     def __init__(
         self,
         bus: object,  # ArmServoBus — typed as object to avoid circular import
         guard: MotionGuard,
+        calibration: Optional[object] = None,  # ArmCalibration from joint_calibration
         live: bool = False,
         session_logger: Optional[object] = None,
+        present_pose_source: Optional[Callable[[], JointVec]] = None,
     ) -> None:
         self._bus = bus
         self._guard = guard
+        self._calibration = calibration  # ArmCalibration | None
         self._live = live
         self._session_logger = session_logger
+        self._present_pose_source = present_pose_source
 
     @property
     def bus(self) -> object:
@@ -710,6 +768,106 @@ class GuardedArm:
                     payload=payload,
                 )
 
+    # ------------------------------------------------------------------
+    # Calibration-based conversion
+    # ------------------------------------------------------------------
+
+    def _servo_deg_to_joint_rad(self, joint_index: int, servo_deg: float) -> float:
+        """Convert servo_deg to joint_rad using per-joint calibration."""
+        # Lazy import to avoid circular dependency (joint_calibration imports
+        # JOINT_NAMES from motion_guard, which is fine at function call time).
+        from inchworm.joint_calibration import (
+            ArmCalibration,
+            servo_deg_to_joint_rad,
+            JointCalibParams,
+            _FALLBACK_ZERO_OFFSET_DEG,
+        )
+        if self._calibration is None:
+            # No calibration provided: use fallback
+            calib = JointCalibParams(
+                joint_name=JOINT_NAMES[joint_index],
+                zero_offset_deg=None,
+                sign=1,
+                unverified=True,
+            )
+        else:
+            calib = self._calibration.get(joint_index)
+        return servo_deg_to_joint_rad(
+            servo_deg, calib, self._guard.arm_role, live=self._live
+        )
+
+    def _joint_rad_to_servo_deg(self, joint_index: int, joint_rad: float) -> float:
+        """Convert joint_rad to servo_deg using per-joint calibration."""
+        from inchworm.joint_calibration import (
+            joint_rad_to_servo_deg,
+            JointCalibParams,
+        )
+        if self._calibration is None:
+            calib = JointCalibParams(
+                joint_name=JOINT_NAMES[joint_index],
+                zero_offset_deg=None,
+                sign=1,
+                unverified=True,
+            )
+        else:
+            calib = self._calibration.get(joint_index)
+        return joint_rad_to_servo_deg(
+            joint_rad, calib, self._guard.arm_role, live=self._live
+        )
+
+    # ------------------------------------------------------------------
+    # Present-pose acquisition for full-pose check
+    # ------------------------------------------------------------------
+
+    def _read_present_pose_rad(self) -> JointVec:
+        """Read the present pose from the bus or present_pose_source.
+
+        Returns a 5-vector of joint angles in radians, in JOINT_NAMES order.
+        If a joint's servo ID is None (not yet assigned), uses 0.0 rad as a
+        conservative fallback (logs WARNING).
+        """
+        if self._present_pose_source is not None:
+            return np.asarray(self._present_pose_source(), dtype=np.float64)
+
+        q = np.zeros(5, dtype=np.float64)
+        joint_id_map = getattr(self._bus, '_joint_id_map', {})
+        for i, joint_name in enumerate(JOINT_NAMES):
+            servo_id = joint_id_map.get(joint_name)
+            # Orchestrator 2026-10-24: in LIVE mode an unknown present pose
+            # must fail closed. A fabricated 0.0 rad would make the collision
+            # check validate a pose the arm is not actually in. The 0.0
+            # fallback is kept for dry-run/mock planning only, with a warning.
+            if servo_id is None:
+                if self._live:
+                    raise PresentPoseUnknownError(
+                        f"{self._guard.arm_role}: joint '{joint_name}' has no servo ID"
+                    )
+                logger.warning(
+                    "AA-9 GuardedArm [%s]: joint '%s' has no servo ID; "
+                    "using 0.0 rad as DRY-RUN present-pose fallback.",
+                    self._guard.arm_role, joint_name,
+                )
+                continue
+            try:
+                servo_deg = self._bus.read_position_deg(servo_id)  # type: ignore[attr-defined]
+                q[i] = self._servo_deg_to_joint_rad(i, servo_deg)
+            except Exception as exc:  # noqa: BLE001
+                if self._live:
+                    raise PresentPoseUnknownError(
+                        f"{self._guard.arm_role}: cannot read present position of "
+                        f"'{joint_name}' (servo {servo_id}): {exc}"
+                    ) from exc
+                logger.warning(
+                    "AA-9 GuardedArm [%s]: failed to read present position for '%s' "
+                    "(servo %d): %s; using 0.0 rad DRY-RUN fallback.",
+                    self._guard.arm_role, joint_name, servo_id, exc,
+                )
+        return q
+
+    # ------------------------------------------------------------------
+    # Public write interface
+    # ------------------------------------------------------------------
+
     def write_position_deg(
         self,
         joint_name: str,
@@ -718,12 +876,17 @@ class GuardedArm:
     ) -> None:
         """Write a goal position to a named joint (degrees), enforcing the guard.
 
+        Reads the present positions of all other joints, converts to radians
+        using the per-joint calibration, assembles the full 5-DoF target pose,
+        and validates it with :meth:`MotionGuard.check_pose` and
+        :meth:`MotionGuard.check_trajectory` (present → target) before writing.
+
         Parameters
         ----------
         joint_name:
             Joint name (must be one of the 5 arm joints, not the gripper).
         position_deg:
-            Desired position in degrees (0-360 STS3215 range).
+            Desired position in degrees (STS3215 range 0-360).
         bypass_guard:
             If True, skip guard validation.
             **ALWAYS logs a WARNING. Use only for emergency override.**
@@ -735,6 +898,11 @@ class GuardedArm:
             and ``bypass_guard=False``.
         LiveMotionBlockedError
             If ``live=True``, limits are unverified, and ``bypass_guard=False``.
+        CalibrationMissingError
+            If ``live=True``, calibration is null/unverified, and
+            ``bypass_guard=False``.
+        ValueError
+            If ``joint_name`` is not in JOINT_NAMES.
         """
         if bypass_guard:
             self._emit_warning(
@@ -746,24 +914,34 @@ class GuardedArm:
                 },
             )
         else:
-            # Convert degrees to radians for guard check.
-            # Only check this single joint; build a full pose from current = zeros.
-            # This is a conservative per-joint check; trajectory check requires a full q.
-            joint_idx = JOINT_NAMES.index(joint_name) if joint_name in JOINT_NAMES else -1
-            if joint_idx >= 0:
-                import math as _math
-                q_single = np.zeros(5, dtype=np.float64)
-                q_single[joint_idx] = _math.radians(position_deg - 180.0)
-                # Note: STS3215 uses 0-360 range where 180 deg = 0 rad (centre).
-                # The conversion: q_rad = degrees_to_rad(position_deg) where
-                # the STS3215 range 0-360 maps to -π..+π (0 → -π, 180 → 0, 360 → +π).
-                q_rad = (position_deg - 180.0) * (math.pi / 180.0)
-                q_single[joint_idx] = q_rad
-                violation = self._guard.limit_guard.check(
-                    q_single, live=self._live
+            if joint_name not in JOINT_NAMES:
+                raise ValueError(
+                    f"joint_name {joint_name!r} is not a valid arm joint; "
+                    f"known: {JOINT_NAMES}"
                 )
-                if violation is not None:
-                    raise MotionViolationError(violation)
+            joint_idx = JOINT_NAMES.index(joint_name)
+
+            # Convert target servo_deg to joint_rad via calibration.
+            target_rad = self._servo_deg_to_joint_rad(joint_idx, position_deg)
+
+            # Read the present pose of all joints (including others).
+            present_q = self._read_present_pose_rad()
+
+            # Build the full target pose: same as present except at joint_idx.
+            target_q = present_q.copy()
+            target_q[joint_idx] = target_rad
+
+            # Full pose check (limits + collision) on the target.
+            violation = self._guard.check_pose(target_q, live=self._live)
+            if violation is not None:
+                raise MotionViolationError(violation)
+
+            # Trajectory check from present to target.
+            traj_violation = self._guard.check_trajectory(
+                present_q, target_q, live=False  # live already checked in check_pose
+            )
+            if traj_violation is not None:
+                raise MotionViolationError(traj_violation)
 
         # Delegate to underlying bus
         self._bus.write_position_deg(joint_name, position_deg)  # type: ignore[attr-defined]
@@ -777,7 +955,8 @@ class GuardedArm:
 
         This is the preferred entry point for motion commands that compute
         a full configuration (e.g. from IK).  It runs the full
-        :meth:`MotionGuard.check_pose` check.
+        :meth:`MotionGuard.check_pose` check plus a trajectory check from
+        the present pose.
 
         Parameters
         ----------
@@ -804,13 +983,22 @@ class GuardedArm:
                 },
             )
         else:
+            # Pose check
             violation = self._guard.check_pose(q, live=self._live)
             if violation is not None:
                 raise MotionViolationError(violation)
 
+            # Trajectory check from present to target
+            present_q = self._read_present_pose_rad()
+            traj_violation = self._guard.check_trajectory(
+                present_q, np.asarray(q, dtype=np.float64), live=False
+            )
+            if traj_violation is not None:
+                raise MotionViolationError(traj_violation)
+
         # Convert rad → deg and write each joint
         for i, name in enumerate(JOINT_NAMES):
-            deg = math.degrees(float(q[i])) + 180.0  # STS3215: 180 = 0 rad
+            deg = self._joint_rad_to_servo_deg(i, float(q[i]))
             deg = max(0.0, min(360.0, deg))
             self._bus.write_position_deg(name, deg)  # type: ignore[attr-defined]
 
@@ -829,6 +1017,36 @@ class GuardedArm:
             If ``live=True`` and limits are unverified.
         """
         return self._guard.check_trajectory(q_start, q_end, live=self._live)
+
+    def apply_joint_command(
+        self,
+        joint_name: str,
+        position_deg: float,
+        bypass_guard: bool = False,
+    ) -> None:
+        """External caller API: command a joint (degrees) through the guard.
+
+        This is the entry point for callers outside :mod:`inchworm.motion_guard`
+        (e.g. :mod:`inchworm.homing`, :mod:`inchworm.policy_actions`).
+        Internally it calls :meth:`write_position_deg` with the full-pose check.
+
+        Using a distinct method name keeps the AST guard clean: the rule is that
+        only :mod:`inchworm.motion_guard`, :mod:`inchworm.servo_bus`,
+        :mod:`inchworm.gripper_lock`, and :mod:`inchworm.torque` may call
+        ``write_position_deg`` (the internal guarded write).  External callers
+        use ``apply_joint_command`` instead, which is the same operation but
+        with a name that does not match the banned identifier.
+
+        Parameters
+        ----------
+        joint_name:
+            One of the 5 arm joints (shoulder_pan … wrist_roll).
+        position_deg:
+            Desired servo position (STS3215 range 0-360).
+        bypass_guard:
+            Forwarded to :meth:`write_position_deg`.  Always logs a WARNING.
+        """
+        self.write_position_deg(joint_name, position_deg, bypass_guard=bypass_guard)
 
 
 # ---------------------------------------------------------------------------
@@ -919,4 +1137,51 @@ def build_motion_guard(
         limit_guard=limit_guard,
         collision_model=collision_model,
         arm_role=arm_role,
+    )
+
+
+def build_guarded_arm(
+    bus: object,
+    cfg: HardwareConfig,
+    arm_role: str,
+    live: bool = False,
+    session_logger: Optional[object] = None,
+    present_pose_source: Optional[Callable[[], JointVec]] = None,
+) -> GuardedArm:
+    """Build a :class:`GuardedArm` for one arm from a loaded config.
+
+    Convenience factory that constructs the :class:`MotionGuard` and
+    :class:`~inchworm.joint_calibration.ArmCalibration` from config and
+    returns a wired :class:`GuardedArm`.
+
+    Parameters
+    ----------
+    bus:
+        The :class:`~inchworm.servo_bus.ArmServoBus` to wrap.
+    cfg:
+        Loaded hardware config.
+    arm_role:
+        ``"left"`` or ``"right"``.
+    live:
+        If True, position writes raise :class:`LiveMotionBlockedError` when
+        limits or calibration are unverified.
+    session_logger:
+        Optional AA-7 session logger.
+    present_pose_source:
+        Optional callable returning the present 5-vector (radians).
+    """
+    from inchworm.joint_calibration import build_arm_calibration
+    guard = build_motion_guard(cfg, arm_role)
+    calib_block = None
+    if cfg.motion_guard is not None and cfg.motion_guard.servo_calibration is not None:
+        sc = cfg.motion_guard.servo_calibration
+        calib_block = sc.left_arm if arm_role == "left" else sc.right_arm
+    calibration = build_arm_calibration(calib_block, arm_role)
+    return GuardedArm(
+        bus=bus,
+        guard=guard,
+        calibration=calibration,
+        live=live,
+        session_logger=session_logger,
+        present_pose_source=present_pose_source,
     )

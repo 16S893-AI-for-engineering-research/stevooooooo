@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 18:01'
+updated_date: '2026-10-24 18:21'
 labels: []
 milestone: m-1
 dependencies:
@@ -62,14 +62,9 @@ See doc-1 sections 2, 3 and 10.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Implementation: NEW module inchworm/motion_guard.py (JointLimitGuard, CollisionModel, MotionGuard, GuardedArm, factory functions). Config blocks added to hardware.yaml and config.py under AA-9 markers. 33 new tests in tests/test_motion_guard.py; all 616 tests pass. jog.py wired to real AA-9 guard via _aa9_collision_check(). scripts/measure_limits.py added (dry-run default, --live flag).
+AA-9 fix (orchestrator review 2026-10-24): (1) Added joint_calibration.py - servo_deg<->joint_rad via zero_offset_deg+sign; live fails closed on null/unverified; removed hardcoded deg-180. (2) GuardedArm.write_position_deg reads present pose, builds full 5-DoF target, runs check_pose+check_trajectory. (3) homing.py routes live writes through GuardedArm.apply_joint_command (guarded_arms= injection), errors without it. (4) policy_actions.py routes writes through GuardedArm.apply_joint_command, warns on raw bus. (5) test_ast_guard.py: AST test enforces only {motion_guard,servo_bus,gripper_lock,torque,joint_calibration} may call write_position_deg. (6) 783/783 tests pass. AC#1,AC#4 unchecked (hardware required).
 
-AC#1: UNCHECKED - needs owner-supervised hardware session: uv run python scripts/measure_limits.py --live --arm left (and --arm right). Populate hardware.yaml with measured limits, method, measured_date, and set unverified: false.
-AC#2: CHECKED - test_out_of_limit_rejected and test_guard_blocks_out_of_limit_without_bypass pass (33/33 tests).
-AC#3: CHECKED - test_trajectory_interior_collision and box/capsule tests pass. 50-sample interpolation documented in motion_guard.py and hardware.yaml.
-AC#4: UNCHECKED - named poses 'neutral' and 'folded_transit' are in config but unverified=True. Needs owner-supervised hardware session to measure safe poses, then set unverified: false.
-AC#5: CHECKED - bypass_guard=True always logs WARNING (test_bypass_guard_logs_warning passes). GuardedArm is the single entry point.
-AC#6: CHECKED - in-limit acceptance (test_within_limits_accepted), out-of-limit rejection (test_out_of_limit_rejected), trajectory interior collision (test_trajectory_interior_collision) all pass.
+Orchestrator review 2026-10-24 of the fix: _read_present_pose_rad fabricated 0.0 rad on a read failure or missing servo ID, so the collision check validated a pose the arm is not in. LIVE mode now raises PresentPoseUnknownError (fail closed); the dry-run fallback is kept with a warning. Tests: test_live_present_pose_read_failure_fails_closed, test_dry_run_present_pose_read_failure_falls_back. Verified that the AST guard test exists and passes. 902 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

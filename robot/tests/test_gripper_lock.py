@@ -811,12 +811,23 @@ class TestPolicyActions:
         assert len(POLICY_JOINT_NAMES) == 5
 
     def test_policy_adapter_apply_calls_write(self):
-        """PolicyActionAdapter.apply dispatches to write_position_deg."""
+        """PolicyActionAdapter.apply dispatches through GuardedArm to the bus."""
+        import numpy as np
+        from inchworm.config import load_config
+        from inchworm.motion_guard import build_guarded_arm
         transport = _make_transport()
         bus = _make_bus(transport)
-        adapter = PolicyActionAdapter(bus=bus, role="arm_left", dry_run=False)
+        # Build a GuardedArm (live=False so unverified limits don't block).
+        # Provide present_pose_source to avoid bus reads in the guard check.
+        cfg = load_config()
+        guarded = build_guarded_arm(
+            bus=bus, cfg=cfg, arm_role="left", live=False,
+            present_pose_source=lambda: np.zeros(5),
+        )
+        adapter = PolicyActionAdapter(bus=guarded, role="arm_left", dry_run=False)
         transport.feed(_write_response(1))
-        adapter.apply({"shoulder_pan": 10.0})
+        # Use 180.0 deg (= 0 rad with fallback calibration) — within URDF limits.
+        adapter.apply({"shoulder_pan": 180.0})
         assert len(transport.written) >= 1
 
     def test_policy_adapter_apply_blocks_gripper(self):

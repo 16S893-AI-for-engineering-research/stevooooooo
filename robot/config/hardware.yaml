@@ -502,4 +502,167 @@ motion_guard:
         DO NOT run on hardware without owner supervision.
       q_rad: [0.0, 1.57, -1.57, 0.0, 0.0]
       unverified: true
+
+  # Per-joint servo calibration: servo-degree ↔ joint-radian conversion.
+  # zero_offset_deg: the servo degree value that maps to joint_rad = 0.
+  # sign: +1 if increasing servo_deg → increasing joint_rad, -1 otherwise.
+  # ALL VALUES ARE UNVERIFIED PLACEHOLDERS (null) until a calibration session
+  # measures the actual zero offsets and directions for each joint.
+  # Live conversion (inchworm.joint_calibration) FAILS CLOSED when null or
+  # unverified: true.
+  # Set unverified: false only after an owner-supervised session confirms all
+  # values for BOTH arms.
+  servo_calibration:
+    left_arm:
+      shoulder_pan_zero_offset_deg: null    # unverified: true
+      shoulder_pan_sign: null               # unverified: true
+      shoulder_lift_zero_offset_deg: null   # unverified: true
+      shoulder_lift_sign: null              # unverified: true
+      elbow_flex_zero_offset_deg: null      # unverified: true
+      elbow_flex_sign: null                 # unverified: true
+      wrist_flex_zero_offset_deg: null      # unverified: true
+      wrist_flex_sign: null                 # unverified: true
+      wrist_roll_zero_offset_deg: null      # unverified: true
+      wrist_roll_sign: null                 # unverified: true
+      unverified: true
+      method: null        # e.g. "manual zero-pose sweep, 2026-XX-XX"
+      measured_date: null # e.g. "2026-XX-XX"
+    right_arm:
+      shoulder_pan_zero_offset_deg: null    # unverified: true
+      shoulder_pan_sign: null               # unverified: true
+      shoulder_lift_zero_offset_deg: null   # unverified: true
+      shoulder_lift_sign: null              # unverified: true
+      elbow_flex_zero_offset_deg: null      # unverified: true
+      elbow_flex_sign: null                 # unverified: true
+      wrist_flex_zero_offset_deg: null      # unverified: true
+      wrist_flex_sign: null                 # unverified: true
+      wrist_roll_zero_offset_deg: null      # unverified: true
+      wrist_roll_sign: null                 # unverified: true
+      unverified: true
+      method: null
+      measured_date: null
 # --- AA-9 end ---
+# --- AA-20 ---
+# Policy supervisor configuration.
+# All numeric values are conservative documented defaults.
+# UNVERIFIED: retract_pose_q_rad and workspace_radius_m must be measured in
+# a hardware session before live use.
+policy_supervisor:
+  # Maximum number of policy steps per attempt before aborting.
+  max_steps: 200
+  # Maximum wall-clock time (seconds) for one policy attempt.
+  max_wall_time_s: 30.0
+  # Cartesian workspace radius around target attachment point (metres, arm base frame).
+  # UNVERIFIED placeholder — tighten after AA-16 calibration.
+  workspace_radius_m: 0.15
+  # Per-step action magnitude clamp threshold (degrees, Euclidean norm over 5 joints).
+  # UNVERIFIED placeholder.
+  max_action_magnitude_deg: 5.0
+  # When true, clamp magnitude violations; when false, abort instead.
+  clamp_on_magnitude_violation: true
+  # Maximum retry attempts (re-approach + retry policy loop) before halting.
+  max_retries: 2
+  # Safe retract pose (radians, 5-DoF: shoulder_pan, shoulder_lift, elbow_flex,
+  # wrist_flex, wrist_roll). null = not yet measured; supervisor fails closed
+  # in live mode and logs a WARNING in dry-run.
+  # UNVERIFIED: measure safe retract on hardware before setting unverified: false.
+  retract_pose_q_rad: null  # unverified: true
+  retract_pose_unverified: true
+# --- AA-20 end ---
+
+# --- AA-19 ---
+# AA-19: Fold/unfold sequence configuration.
+# Ordered waypoints for transitioning each arm between its current pose and
+# the folded_transit named pose from AA-9.  The sequence is NOT a simultaneous
+# interpolation; each waypoint is a complete 5-DoF configuration executed one
+# step at a time, each individually collision-checked.
+#
+# JOINT ORDER (documented, enforced by FoldSequencer):
+#   The sequence visits joints in proximal-to-distal order to prevent link
+#   collisions: shoulder_lift first (raises the arm clear of the chassis),
+#   then elbow_flex (tucks the forearm), then wrist_flex, then wrist_roll,
+#   then shoulder_pan last (final lateral alignment).
+#   This ordering is a design choice; owner must verify it on hardware.
+#
+# ALL VALUES ARE UNVERIFIED PLACEHOLDERS.
+# Owner: verify each waypoint on hardware before setting unverified: false.
+# Hardware session required; DO NOT run --live without owner supervision.
+fold_sequence:
+  # Waypoints on the way TO folded_transit pose.
+  # Executed in list order; final target is folded_transit from named_poses.
+  fold_waypoints:
+    # Step 1: Raise shoulder_lift to clear the chassis before tucking elbow.
+    # shoulder_pan=0, shoulder_lift=0.8rad (~46deg up), elbow/wrist neutral.
+    # UNVERIFIED: placeholder; measure safe intermediate on hardware.
+    - q_rad: [0.0, 0.8, 0.0, 0.0, 0.0]
+      description: >-
+        Raise shoulder_lift to clear chassis before elbow tuck.
+        Proximal-first ordering: shoulder clear, elbow still extended.
+        UNVERIFIED placeholder; verify on hardware before live use.
+      unverified: true
+    # Step 2: Begin elbow tuck while shoulder_lift still raised.
+    # UNVERIFIED: placeholder.
+    - q_rad: [0.0, 1.2, -0.8, 0.0, 0.0]
+      description: >-
+        Partial elbow tuck. Shoulder raised, elbow beginning to fold.
+        UNVERIFIED placeholder; verify on hardware before live use.
+      unverified: true
+    # Step 3: Full elbow tuck (approach folded_transit pose).
+    # Matches folded_transit q_rad from AA-9 named_poses.
+    # (FoldSequencer appends the folded_transit pose as the terminal waypoint.)
+    - q_rad: [0.0, 1.57, -1.57, 0.0, 0.0]
+      description: >-
+        Full fold: shoulder raised, elbow tucked. Matches folded_transit.
+        UNVERIFIED placeholder; this is the terminal waypoint.
+      unverified: true
+
+  # Waypoints on the way FROM folded_transit pose.
+  # Executed in list order; the arm ends in a coarse-approach-ready state.
+  unfold_waypoints:
+    # Step 1: Relax elbow from full tuck to partial, shoulder still raised.
+    # UNVERIFIED: placeholder.
+    - q_rad: [0.0, 1.2, -0.8, 0.0, 0.0]
+      description: >-
+        Partial unfold: relax elbow tuck, shoulder still raised.
+        Distal-first unfold order: release wrist/elbow before lowering shoulder.
+        UNVERIFIED placeholder; verify on hardware before live use.
+      unverified: true
+    # Step 2: Extend elbow to near-neutral while shoulder_lift is raised.
+    # UNVERIFIED: placeholder.
+    - q_rad: [0.0, 0.8, 0.0, 0.0, 0.0]
+      description: >-
+        Elbow extended, shoulder still raised. Prepare to lower shoulder.
+        UNVERIFIED placeholder; verify on hardware before live use.
+      unverified: true
+    # Step 3: Lower shoulder and return to neutral pose.
+    # UNVERIFIED: placeholder.
+    - q_rad: [0.0, 0.0, 0.0, 0.0, 0.0]
+      description: >-
+        Return to neutral pose (shoulder_pan=0, all joints near 0 rad).
+        UNVERIFIED placeholder; confirm approach-ready for coarse approach.
+      unverified: true
+# --- AA-19 end ---
+
+# --- AA-31 ---
+# Laser-line extraction thresholds (AA-31).  All values are UNVERIFIED defaults;
+# calibrate against real scanner frames before production use.
+# See inchworm.laser_line.LaserLineConfig for field semantics.
+laser_line:
+  # Half-width (px) of the per-column search window around the peak.
+  # unverified: true
+  window_half_width_px: 15
+  # Min count of 255-valued rows to trigger SATURATED flag.
+  # unverified: true
+  saturated_plateau_px: 2
+  # Min peak/background-rms SNR below which a column is WEAK.
+  # unverified: true
+  weak_snr_threshold: 3.0
+  # Fraction of peak above which a second peak triggers MULTI_PEAK.
+  # unverified: true
+  multi_peak_fraction: 0.4
+  # Absolute minimum pixel value for the line to be considered present.
+  # unverified: true
+  min_peak_value: 20
+  # Rows used for background estimate: 0 = all rows outside the window.
+  background_rows: 0
+# --- AA-31 end ---

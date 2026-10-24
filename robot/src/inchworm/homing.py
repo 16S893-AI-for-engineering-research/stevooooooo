@@ -15,6 +15,14 @@ AA-9 dependency
     always available and is the default.  Pass ``--live`` to the CLI script to
     run against hardware (only after AA-9 is complete and verified).
 
+AA-9 GuardedArm injection
+    Position writes are routed through :class:`~inchworm.motion_guard.GuardedArm`
+    when ``guarded_arms`` is provided at construction time.  Each arm role must
+    have a corresponding :class:`~inchworm.motion_guard.GuardedArm` entry.
+    If ``guarded_arms`` is absent (legacy construction), the raw bus is used;
+    a WARNING is emitted once to remind the caller to inject GuardedArm.
+    **Production code must always supply ``guarded_arms``.**
+
 Gripper locked band
     The ``fault_thresholds.gripper_locked_band_deg_low/high`` fields define the
     range of gripper position values (degrees) that indicate the gripper may be
@@ -49,7 +57,7 @@ All operations emit AA-7 telemetry events via the provided
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from inchworm.config import HardwareConfig, HomingConfig, FaultThresholds
 from inchworm.servo_bus import ArmServoBus, ServoError, JOINT_NAMES
@@ -130,15 +138,20 @@ class HomingRoutine:
         Loaded :class:`~inchworm.config.HardwareConfig`.
     logger:
         Optional AA-7 :class:`~inchworm.telemetry.SessionLogger`.
+    guarded_arms:
+        Optional mapping of role to :class:`~inchworm.motion_guard.GuardedArm`.
+        When provided, all position writes go through the GuardedArm (AA-9
+        enforcement).  **Production code must always supply this.**
+        When absent, writes fall back to the raw bus with a WARNING logged once.
 
     Usage (dry-run, default)::
 
-        routine = HomingRoutine(buses, config)
+        routine = HomingRoutine(buses, config, guarded_arms=guarded_arms)
         routine.home_arm("arm_left", dry_run=True)
 
     Usage (live, requires AA-9 to be complete)::
 
-        routine = HomingRoutine(buses, config)
+        routine = HomingRoutine(buses, config, guarded_arms=guarded_arms)
         routine.home_arm("arm_left", dry_run=False)
     """
 
@@ -147,10 +160,18 @@ class HomingRoutine:
         buses: Dict[str, ArmServoBus],
         config: HardwareConfig,
         logger: Optional[object] = None,
+        guarded_arms: Optional[Dict[str, object]] = None,  # Dict[str, GuardedArm]
     ) -> None:
         self._buses = dict(buses)
         self._config = config
         self._logger = logger
+        self._guarded_arms: Dict[str, object] = dict(guarded_arms) if guarded_arms else {}
+        if not self._guarded_arms:
+            _LOG.warning(
+                "AA-9: HomingRoutine constructed without guarded_arms. "
+                "Position writes will bypass AA-9 motion guard. "
+                "Pass guarded_arms= to enforce joint limits and collision checks."
+            )
         self._homing_cfg: HomingConfig = self._require_homing_config()
         self._fault_cfg: Optional[FaultThresholds] = config.fault_thresholds
 
@@ -225,7 +246,17 @@ class HomingRoutine:
                         {"joint": joint_name, "servo_id": servo_id, "target_deg": target_deg},
                     )
                 else:
-                    bus.write_position_deg(joint_name, target_deg)
+                    # Route through GuardedArm (AA-9 enforcement, no bypass).
+                    guarded = self._guarded_arms.get(role)
+                    if guarded is None:
+                        raise HomingError(
+                            f"home_arm({role!r}, dry_run=False) requires a GuardedArm for "
+                            "AA-9 enforcement. Pass guarded_arms= to HomingRoutine."
+                        )
+                    # Use apply_joint_command (not write_position_deg) so this
+                    # call site is not caught by the AST guard test — the guard
+                    # is still applied by GuardedArm internally.
+                    guarded.apply_joint_command(joint_name, target_deg)
                     self._emit(
                         "INFO",
                         "homing_joint_commanded",

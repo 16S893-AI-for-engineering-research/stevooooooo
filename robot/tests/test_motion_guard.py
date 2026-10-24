@@ -615,3 +615,281 @@ class TestMeasureLimitsDryRun:
         )
         assert "DRY-RUN" in result.stdout
         assert "measure_limits.py --live" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# AA-9 fix: joint calibration + full-pose single-joint write
+# ---------------------------------------------------------------------------
+
+
+class TestJointCalibration:
+    """Tests for inchworm.joint_calibration: servo_deg <-> joint_rad."""
+
+    def test_servo_deg_to_joint_rad_with_known_calib(self):
+        """Calibrated conversion matches the formula."""
+        from inchworm.joint_calibration import (
+            JointCalibParams,
+            servo_deg_to_joint_rad,
+        )
+        import math
+        calib = JointCalibParams("shoulder_pan", zero_offset_deg=180.0, sign=1, unverified=False)
+        result = servo_deg_to_joint_rad(180.0, calib, "left", live=False)
+        assert abs(result - 0.0) < 1e-9
+
+        result2 = servo_deg_to_joint_rad(270.0, calib, "left", live=False)
+        assert abs(result2 - math.radians(90.0)) < 1e-9
+
+    def test_joint_rad_to_servo_deg_with_known_calib(self):
+        """Inverse conversion is consistent with forward."""
+        from inchworm.joint_calibration import (
+            JointCalibParams,
+            servo_deg_to_joint_rad,
+            joint_rad_to_servo_deg,
+        )
+        import math
+        calib = JointCalibParams("elbow_flex", zero_offset_deg=175.0, sign=-1, unverified=False)
+        for deg in [90.0, 180.0, 200.0]:
+            rad = servo_deg_to_joint_rad(deg, calib, "left", live=False)
+            deg_back = joint_rad_to_servo_deg(rad, calib, "left", live=False)
+            assert abs(deg_back - deg) < 1e-9, f"roundtrip failed for {deg}: got {deg_back}"
+
+    def test_live_fails_closed_when_null(self):
+        """CalibrationMissingError raised in live mode with null offset."""
+        from inchworm.joint_calibration import (
+            JointCalibParams,
+            servo_deg_to_joint_rad,
+            CalibrationMissingError,
+        )
+        calib = JointCalibParams("shoulder_pan", zero_offset_deg=None, sign=1, unverified=True)
+        with pytest.raises(CalibrationMissingError):
+            servo_deg_to_joint_rad(180.0, calib, "left", live=True)
+
+    def test_dry_run_uses_fallback_when_null(self):
+        """Dry-run uses zero_offset=180, sign=+1 fallback when null."""
+        from inchworm.joint_calibration import (
+            JointCalibParams,
+            servo_deg_to_joint_rad,
+        )
+        import math
+        calib = JointCalibParams("shoulder_pan", zero_offset_deg=None, sign=1, unverified=True)
+        result = servo_deg_to_joint_rad(180.0, calib, "left", live=False)
+        assert abs(result - 0.0) < 1e-9  # fallback: (180 - 180) * π/180 = 0
+
+    def test_build_arm_calibration_from_null_block(self):
+        """build_arm_calibration with None block produces all-unverified params."""
+        from inchworm.joint_calibration import build_arm_calibration
+        calib = build_arm_calibration(None, "left")
+        assert not calib.is_live_ok
+        for i in range(5):
+            p = calib.get(i)
+            assert p.unverified is True
+            assert p.zero_offset_deg is None
+
+    def test_arm_calibration_live_ok_with_all_set(self):
+        """ArmCalibration.is_live_ok is True when all joints have verified offset."""
+        from inchworm.joint_calibration import JointCalibParams, ArmCalibration
+        from inchworm.motion_guard import JOINT_NAMES
+        params = [
+            JointCalibParams(n, zero_offset_deg=180.0, sign=1, unverified=False)
+            for n in JOINT_NAMES
+        ]
+        calib = ArmCalibration("left", params)
+        assert calib.is_live_ok is True
+
+    def test_config_schema_loads_servo_calibration(self, cfg):
+        """hardware.yaml loads the servo_calibration block."""
+        assert cfg.motion_guard is not None
+        sc = cfg.motion_guard.servo_calibration
+        assert sc is not None
+        assert sc.left_arm is not None
+        assert sc.right_arm is not None
+        assert sc.left_arm.unverified is True  # placeholder
+        assert sc.left_arm.shoulder_pan_zero_offset_deg is None  # not yet measured
+
+
+class TestGuardedArmFullPoseCheck:
+    """GuardedArm.write_position_deg builds full pose and runs check_pose + trajectory."""
+
+    def _make_guarded_arm_with_present_source(self, cfg, present_q):
+        """Build a GuardedArm with a fixed present_pose_source and verified limits."""
+        import numpy as np
+        from inchworm.motion_guard import build_guarded_arm
+        bus = MagicMock()
+        bus.write_position_deg = MagicMock()
+        bus._joint_id_map = {
+            "shoulder_pan": 1, "shoulder_lift": 2, "elbow_flex": 3,
+            "wrist_flex": 4, "wrist_roll": 5,
+        }
+        guarded = build_guarded_arm(
+            bus=bus, cfg=cfg, arm_role="left", live=False,
+            present_pose_source=lambda: np.asarray(present_q, dtype=np.float64),
+        )
+        return guarded, bus
+
+    def test_write_position_deg_calls_underlying_bus(self, cfg):
+        """write_position_deg writes to the underlying bus when guard passes."""
+        guarded, mock_bus = self._make_guarded_arm_with_present_source(
+            cfg, [0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+        # 180.0 deg → 0.0 rad (fallback calibration) — within URDF limits
+        guarded.write_position_deg("shoulder_pan", 180.0)
+        mock_bus.write_position_deg.assert_called_once_with("shoulder_pan", 180.0)
+
+    def test_write_position_deg_full_pose_uses_present_q(self, cfg):
+        """Full pose check includes present positions of other joints, not zeros."""
+        import numpy as np
+        # Use a present_pose_source that would make the other joints legal
+        # but the target would be checked against the combined state.
+        guarded, mock_bus = self._make_guarded_arm_with_present_source(
+            cfg, [0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+        # This should succeed: 180 deg → 0 rad, within limits
+        guarded.write_position_deg("elbow_flex", 180.0)
+        assert mock_bus.write_position_deg.call_count == 1
+
+    def test_write_position_deg_out_of_limit_raises(self, cfg):
+        """write_position_deg raises MotionViolationError for out-of-limit target."""
+        guarded, mock_bus = self._make_guarded_arm_with_present_source(
+            cfg, [0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+        # 0.0 deg → (0 - 180)*π/180 ≈ -3.14 rad, exceeds URDF lower limit ≈ -1.92
+        with pytest.raises(MotionViolationError):
+            guarded.write_position_deg("shoulder_pan", 0.0)
+        mock_bus.write_position_deg.assert_not_called()
+
+    def test_apply_joint_command_routes_to_write_position_deg(self, cfg):
+        """apply_joint_command is the external caller API and routes to write_position_deg."""
+        guarded, mock_bus = self._make_guarded_arm_with_present_source(
+            cfg, [0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+        # 180 deg = 0 rad with fallback, within limits
+        guarded.apply_joint_command("wrist_roll", 180.0)
+        mock_bus.write_position_deg.assert_called_once_with("wrist_roll", 180.0)
+
+    def test_build_guarded_arm_factory_produces_guarded_arm(self, cfg):
+        """build_guarded_arm factory returns a GuardedArm with calibration wired."""
+        from inchworm.motion_guard import GuardedArm, build_guarded_arm
+        mock_bus = MagicMock()
+        mock_bus._joint_id_map = {}
+        arm = build_guarded_arm(mock_bus, cfg, "left")
+        assert isinstance(arm, GuardedArm)
+        assert arm._calibration is not None
+
+
+class TestHomingGuardedArmInjection:
+    """HomingRoutine routes writes through GuardedArm when injected."""
+
+    def _make_bus_and_guarded(self, cfg):
+        """Build a mock bus and GuardedArm."""
+        import numpy as np
+        from inchworm.motion_guard import build_guarded_arm
+        mock_bus = MagicMock()
+        mock_bus.write_position_deg = MagicMock()
+        mock_bus._joint_id_map = {
+            "shoulder_pan": 1, "shoulder_lift": 2, "elbow_flex": 3,
+            "wrist_flex": 4, "wrist_roll": 5, "gripper": 6,
+        }
+        mock_bus.read_position_deg = MagicMock(return_value=180.0)
+        guarded = build_guarded_arm(
+            bus=mock_bus, cfg=cfg, arm_role="left", live=False,
+            present_pose_source=lambda: np.zeros(5),
+        )
+        return mock_bus, guarded
+
+    def test_homing_warns_without_guarded_arms(self, cfg, caplog):
+        """HomingRoutine warns when guarded_arms not provided."""
+        from inchworm.homing import HomingRoutine
+        from inchworm.backends import MockSerialTransport
+        from inchworm.servo_bus import ArmServoBus
+        t = MockSerialTransport("arm_left")
+        bus = ArmServoBus(t, role="arm_left",
+                          joint_id_map={k: None for k in
+                                        ["shoulder_pan","shoulder_lift","elbow_flex",
+                                         "wrist_flex","wrist_roll","gripper"]},
+                          dry_run=True)
+        with caplog.at_level(logging.WARNING, logger="inchworm.homing"):
+            HomingRoutine({"arm_left": bus}, cfg)
+        # caplog.text includes all captured log lines as a single string
+        assert "guarded_arms" in caplog.text, (
+            "Expected warning about missing guarded_arms in log output. "
+            f"Got: {caplog.text!r}"
+        )
+
+    def test_homing_dry_run_does_not_require_guarded_arms(self, cfg):
+        """Dry-run homing succeeds without guarded_arms (writes skipped)."""
+        from inchworm.homing import HomingRoutine
+        from inchworm.backends import MockSerialTransport
+        from inchworm.servo_bus import ArmServoBus
+        t = MockSerialTransport("arm_left")
+        bus = ArmServoBus(t, role="arm_left",
+                          joint_id_map={k: None for k in
+                                        ["shoulder_pan","shoulder_lift","elbow_flex",
+                                         "wrist_flex","wrist_roll","gripper"]},
+                          dry_run=True)
+        routine = HomingRoutine({"arm_left": bus}, cfg)
+        # dry_run=True: no writes, no GuardedArm needed
+        routine.home_arm("arm_left", dry_run=True)
+
+    def test_homing_live_requires_guarded_arm(self, cfg):
+        """home_arm(dry_run=False) raises HomingError when no GuardedArm provided."""
+        from inchworm.homing import HomingRoutine, HomingError
+        from inchworm.backends import MockSerialTransport
+        from inchworm.servo_bus import ArmServoBus
+        from inchworm.config import FaultThresholds
+        # Use known band values and no servo IDs (gripper check skipped),
+        # with a real joint ID for shoulder_pan so the write path is reached.
+        # We need joint_id_map with gripper=None to skip the gripper read.
+        # Homing will try to write shoulder_pan (servo_id=1) without GuardedArm.
+        t = MockSerialTransport("arm_left")
+        bus = ArmServoBus(
+            t, role="arm_left",
+            joint_id_map={
+                "shoulder_pan": 1,
+                "shoulder_lift": None,
+                "elbow_flex": None,
+                "wrist_flex": None,
+                "wrist_roll": None,
+                "gripper": None,  # None gripper -> check skipped
+            },
+            dry_run=False,
+        )
+        # Patch config with verified limits and null gripper band
+        ft = FaultThresholds(
+            gripper_locked_band_deg_low=None,
+            gripper_locked_band_deg_high=None,
+        )
+        homing_cfg = cfg.homing.model_copy(update={"joint_limits_verified": True})
+        patched_cfg = cfg.model_copy(update={
+            "homing": homing_cfg,
+            "fault_thresholds": ft,
+        })
+        # With no servo IDs for gripper, has_servos check: shoulder_pan has ID=1 → has_servos=True.
+        # Null gripper band + has_servos → HomingAbortedError (fail-closed).
+        # So the test should catch HomingAbortedError OR HomingError about GuardedArm.
+        # Either way, live homing without GuardedArm is blocked before any write occurs.
+        from inchworm.homing import HomingAbortedError
+        routine = HomingRoutine({"arm_left": bus}, patched_cfg)
+        # Expected: aborted at gripper check (fail-closed) or GuardedArm check
+        with pytest.raises((HomingAbortedError, HomingError)):
+            routine.home_arm("arm_left", dry_run=False)
+
+
+# --- Orchestrator 2026-10-24: unknown present pose must fail closed live ---
+def test_live_present_pose_read_failure_fails_closed(cfg):
+    from inchworm.motion_guard import GuardedArm, MotionGuard, PresentPoseUnknownError
+    bus = MagicMock()
+    bus._joint_id_map = {"shoulder_pan": 1, "shoulder_lift": 2, "elbow_flex": 3,
+                         "wrist_flex": 4, "wrist_roll": 5}
+    bus.read_position_deg = MagicMock(side_effect=IOError("timeout"))
+    ga = GuardedArm(bus, MagicMock(spec=MotionGuard, arm_role="left"), live=True)
+    with pytest.raises(PresentPoseUnknownError):
+        ga._read_present_pose_rad()
+
+
+def test_dry_run_present_pose_read_failure_falls_back(cfg):
+    from inchworm.motion_guard import GuardedArm, MotionGuard
+    bus = MagicMock()
+    bus._joint_id_map = {"shoulder_pan": 1}
+    bus.read_position_deg = MagicMock(side_effect=IOError("timeout"))
+    ga = GuardedArm(bus, MagicMock(spec=MotionGuard, arm_role="left"), live=False)
+    assert list(ga._read_present_pose_rad()) == [0.0] * 5
