@@ -1,0 +1,146 @@
+# Inchworm print-crawl robot: declarative hardware description.
+#
+# Data, not code. Later tasks (calibration, servo maps) write results back
+# here without touching logic. Loaded and validated by inchworm.config; unknown
+# or missing fields are rejected. Hardware facts come from doc-1; device
+# identities were observed during AA-37 on 2026-10-24.
+#
+# Units: millimeters and degrees. Every dimensional field carries its unit as a
+# name suffix (_mm, _deg, _mm_per_px). See robot/README.md.
+#
+# Device identity rules:
+#   - Key on vendor_id:product_id + usb_serial wherever the device reports a
+#     USB serial (identify_by: usb_serial).
+#   - Devices with no USB serial (relay, right-arm camera) can only be told
+#     apart by where they are plugged in (identify_by: port_path).
+#   - windows_busid_observed is informational only: usbipd BusIds are NOT
+#     stable across reconnects and must never be used as an identity key.
+
+schema_version: 1
+
+# Driver backend: "mock" (no hardware touched) or "hardware".
+# Overridden at runtime by the INCHWORM_BACKEND environment variable.
+backend: mock
+
+geometry:
+  # Attachment-point pitch along the tube axis, center to center (doc-1 s2).
+  attachment_pitch_mm: 183.676
+
+usb:
+  # Single USB 2.0 uplink shared by every device: only one camera may stream
+  # at a time (doc-1 s6). Hard system invariant, enforced by the AA-6 arbiter.
+  max_concurrent_camera_streams: 1
+
+arms:
+  left:
+    adapter_chip: CH343
+    # Owner-reported in AA-37; not yet verified by commanding motion.
+    role_verification: owner_reported
+    identity:
+      vendor_id: "1a86"
+      product_id: "55d3"
+      usb_serial: "5B91045044"
+      identify_by: usb_serial
+      linux_by_id: usb-1a86_USB_Single_Serial_5B91045044-if00
+      windows_busid_observed: "10-4"
+  right:
+    adapter_chip: CH343
+    role_verification: owner_reported
+    identity:
+      vendor_id: "1a86"
+      product_id: "55d3"
+      usb_serial: "5B91030298"
+      identify_by: usb_serial
+      linux_by_id: usb-1a86_USB_Single_Serial_5B91030298-if00
+      windows_busid_observed: "9-3"
+
+dexarm:
+  identity:
+    vendor_id: "0483"
+    product_id: "5740"
+    usb_serial: "306133643438"
+    identify_by: usb_serial
+    linux_by_id: usb-STMicroelectronics_STM32F407ZG_CDC_in_FS_Mode_306133643438-if00
+    windows_busid_observed: "11-3"
+
+cameras:
+  left_arm:
+    # doc-1 s4 specifies a Waveshare OV9281; the device enumerates as
+    # "openaicam" 32e6:9251. Recorded as an observation, not a model claim.
+    #
+    # CORRECTION (AA-5, 2026-10-24): BOTH openaicam 32e6:9251 cameras report
+    # USB serial 5423534724 to Linux (/sys/bus/usb/devices/1-5 and 1-6 both
+    # have serial=5423534724). udev cannot distinguish them; /dev/v4l/by-id
+    # is ambiguous. The only stable distinguisher is the Windows usbipd BusId,
+    # which encodes the physical dock port.
+    # Identity: POSITIONAL via windows_busid (dock port 9-4). The dock port
+    # must not change; if it does, update windows_busid here.
+    # Discovery resolves this via vhci_hcd.0/status -> sysfs -> /dev/videoN.
+    spec_model: Waveshare OV9281
+    observed_usb_product: openaicam
+    identity:
+      vendor_id: "32e6"
+      product_id: "9251"
+      # NOTE: usb_serial is left as observed; it is NOT used for identification
+      # (both cameras report the same serial 5423534724).
+      usb_serial: null
+      identify_by: usbip_busid
+      # windows_busid is the identity key: physical dock port 9-4.
+      # POSITIONAL: dock port must not change.
+      windows_busid: "9-4"
+      linux_by_id: null
+      linux_by_path: null
+      windows_busid_observed: "9-4"
+  right_arm:
+    spec_model: Waveshare OV9281
+    observed_usb_product: openaicam
+    identity:
+      vendor_id: "32e6"
+      product_id: "9251"
+      # NOTE: usb_serial is NOT used for identification; both cameras share
+      # serial 5423534724 and cannot be told apart by serial, VID:PID, or
+      # Linux path. Identity: POSITIONAL via windows_busid (dock port 10-2).
+      usb_serial: null
+      identify_by: usbip_busid
+      # windows_busid is the identity key: physical dock port 10-2.
+      # POSITIONAL: dock port must not change.
+      windows_busid: "10-2"
+      linux_by_id: null
+      linux_by_path: null
+      windows_busid_observed: "10-2"
+  scanner:
+    spec_model: Arducam OV9281
+    observed_usb_product: Arducam OV9281 USB Camera
+    identity:
+      vendor_id: "0c45"
+      product_id: "6366"
+      usb_serial: "UC762"
+      identify_by: usb_serial
+      linux_by_id: usb-Arducam_Technology_Co.__Ltd._Arducam_OV9281_USB_Camera_UC762-video-index0
+      windows_busid_observed: "11-4"
+
+relay:
+  # USB serial relay switching laser power. Candidate identity (AA-37):
+  # CH340 with no USB serial, identified by VID:PID 1a86:7523 alone.
+  # SAFETY: controls laser power. If more than one CH340 1a86:7523 is present,
+  # discovery and resolution MUST fail with an explicit error naming 'relay'.
+  # linux_by_path is informational only (WSL usbip port at time of AA-37); the
+  # udev rule (99-inchworm.rules) matches by VID:PID without any port-path pin.
+  adapter_chip: CH340
+  identity:
+    vendor_id: "1a86"
+    product_id: "7523"
+    usb_serial: null
+    identify_by: vid_pid
+    linux_by_id: usb-1a86_USB_Serial-if00-port0
+    linux_by_path: platform-vhci_hcd.0-usb-0:4:1.0-port0
+    windows_busid_observed: "9-2"
+
+laser:
+  # Owner design values (doc-1 s5), not calibrated values.
+  switched_by: relay
+  design:
+    laser_to_camera_angle_deg: 40.0
+    baseline_offset_mm: 67.0
+    standoff_mm: 80.0
+    height_sensitivity_mm_per_px: 0.1

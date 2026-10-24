@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-20 21:37'
+updated_date: '2026-10-24 15:46'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-20, at commit `98840c7`.
+**Last verified:** 2026-10-24 by the orchestrator, at the commit that first adds `robot/`. 252 tests pass. All 7 devices are attached and resolve via discovery.
 
 ## 1. Resume in 60 seconds
 
@@ -41,33 +41,22 @@ git log --oneline -5
 
 ## 2. Where the project stands
 
-Planning is complete and committed. **No implementation has started.** Nothing in `robot/` exists yet.
+- **Done and reviewed (Sonnet, plus an orchestrator live check where hardware is involved):** AA-4 scaffold and config. AA-5 discovery: cameras are resolved by **usbipd BusId through `vhci_hcd.0/status`** because both openaicams share serial 5423534724. Verified with a reversed attach order. AA-6 single global camera lock. AA-7 logging (only P2 test nits remain). AA-37 human bind.
+- Open follow-up: `scripts/attach_usb.py` does not verify that a device appears after `usbipd attach`. A silent failure was observed twice. See the AA-5 comment.
+- Package: `robot/src/inchworm/`, tests in `robot/tests/`, config in `robot/config/hardware.yaml`.
 
-- 33 tasks across 7 milestones (`m-0` .. `m-6`), dependency-ordered.
-- Commit `98840c7` holds the plan, both specs, the Definition of Done, and `AGENTS.md`. Pushed to `origin/main`.
-- Tasks AA-1 .. AA-3 are Done but unrelated: they are earlier portfolio-site work, not robot work.
+## 3. Blocked right now / pending owner decisions
 
-## 3. Blocked right now
-
-**AA-37 (human task) is proposed and awaiting the owner's explicit acceptance.** Nothing else is blocked on it except hardware work.
-
-- What it is: physically connect the robot USB dock, then `usbipd bind` each device from an elevated Windows console.
-- Why it is human-only: the devices are not plugged in (verified: both arm adapters show as persisted with no BusId; DexArm, cameras and relay do not appear at all), and `usbipd bind` requires Windows administrator. Verified directly, not assumed: `usbipd attach --wsl --busid 2-2` returned `Device is not shared; run 'usbipd bind --busid 2-2' as administrator first`.
-- Owner accepts with `accept AA-37` or reviews with `/human`. Do not re-propose it, and do not nag; if it was declined or deferred, respect that.
-- It also resolves one thing software cannot: **which CH343 serial is the left arm versus the right arm**. Guessing that could drive a trajectory into the chassis.
-
-Known stable identities already captured, so nobody needs to re-derive them:
-
-- SO-101 arm buses are CH343 `VID_1A86:PID_55D3`, serials **5B91030298** (COM3) and **5B91045044** (COM5). Left/right mapping still unknown.
-- usbipd-win 5.3.0 is installed on the Windows host.
+1. **Leader arms (pending, AA-23 / doc-1 s3).** The owner says each SO-101 can act as the leader for the other. LeRobot facts (source checked at 0.6.2): `so101_leader` is a plain read of `Present_Position` with torque off, using the same 6 STS3215 motor IDs. Real leaders use gear ratios 1/191, 1/345, 1/191, 1/147, 1/147, 1/147. Followers use 1/345 on all joints, so backdriving a follower is stiffer. The proposed rewrite of doc-1 s3 and AA-23 awaits owner approval. Do not edit those ACs before then.
+2. **Demonstration burden (pending).** The owner will record many demos. Estimates and AC changes for AA-23 and AA-25 await approval.
+3. **Camera concurrency (pending).** The owner switched to a USB 3.2 dock, and the arm-camera cables are 480 Mbps. All cameras are USB 2.0 devices that output MJPEG only (the Arducam also offers YUY2), so the dock does not add camera bandwidth by itself. The single-camera invariant **stays** until a measured concurrency test and an explicit owner decision say otherwise (doc-2 s4).
+4. Left/right arm mapping is still owner-reported. It needs a supervised low-speed motion test before any trajectory runs.
 
 ## 4. Next action
 
-**AA-4 — scaffold the `robot/` package and hardware config schema.** It needs no hardware, and it is the root dependency of everything else.
-
-Then, in order, the other hardware-free foundation work: **AA-6** (single-camera USB arbiter) and **AA-7** (structured logging). AA-5 is partly hardware-dependent but its role-resolution logic and error paths can be built and tested against fixtures now.
-
-Everything in `m-1` onward needs AA-37 accepted and the devices attached.
+- Fix AA-5 (Sonnet worker, then Sonnet review).
+- After the owner decides: a decision record, plus rewrites of doc-1 s3/s4/s6, AA-23 and AA-22/25 (Python 3.12 env for LeRobot 0.6.2).
+- Then hardware-free mock work: **AA-8** (SO-101 servo bus), **AA-12** (DexArm G-code), **AA-29** (relay laser fail-safe; needs the AA-5 relay identity fix first). Their hardware ACs need the owner present.
 
 ## 5. Decisions already made (do not silently revisit)
 
@@ -75,7 +64,7 @@ Each of these came from an explicit owner answer or a verified observation. Chan
 
 - **The chassis is fixed; the tube moves.** This inverts the usual mobile-robot convention. Every frame computation must respect it.
 - **The gripper latch and jaw share one servo ID** (owner's custom gripper). Lock and unlock are *position bands* of a single servo, not separate actuators. Locking is commanded by code and never by the learned policy, per the owner's explicit instruction.
-- **No leader arms exist**, so standard LeRobot teleop recording is unavailable. AA-23 must justify its leaderless capture method in writing.
+- ~~No leader arms exist~~ **Under revision (2026-10-24):** the owner proposes follower-as-leader cross-teleop. See s3.1. Until it is approved, AA-23's existing text stands.
 - **Control host is WSL2** with usbipd attach, chosen for LeRobot support.
 - **Slicing is done by the owner in Cura**, and a correct DexArm profile must be installed there first. AA-34 owns that boundary; do not assume a profile exists.
 - **The real crawl cycle depends on learned insertion** (AA-27 depends on AA-26), per the owner's observation that crawl cannot really happen until insertion works. A tube-free dry rehearsal (AA-21) comes first.
@@ -90,7 +79,7 @@ Stated plainly so a fresh session does not mistake an estimate for a commitment.
 - **M3 (learned insertion) is the least predictable phase**, estimated at 10 to 25 sessions. No leader arms makes demo capture awkward, and 4 GB of VRAM constrains architecture. If the first policy does not generalize across the coarse-approach offset range, the recollect, retrain, re-evaluate loop costs days per iteration. This is the number least worth trusting.
 - **AA-13 could force a redesign of M5.** If DexArm repeatability cannot hold roughly 0.1 mm at the scan standoff with the print head and scanner payload attached, leveling precision is capped. Deliberately sequenced early so this surfaces in week 2 rather than week 8.
 - **AA-16 calibration quality propagates into M3.** Loose transforms widen the capture range the policy must absorb.
-- **AA-31 line extraction on a glossy, curved, ridged printed surface is harder than on a flat coupon.** A method that passes on a test coupon and fails on the real tube would look fine in review and then produce quietly wrong corrections.
+- **AA-31 line extraction on a glossy, curved, ridged printed surface is harder than on a flat coupon.** A method that passes on a test coupon and fails on the real tube would look fine in review and then produce quietly wrong conclusions.
 - **Estimates for m-0 through m-2 are defensible. From m-3 onward they are a forecast.**
 
 ## 7. Stability model, and its limit

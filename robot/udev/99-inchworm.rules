@@ -1,0 +1,89 @@
+# 99-inchworm.rules — stable by-role symlinks for the inchworm print-crawl robot.
+#
+# Install (one-time, operator):
+#   sudo cp robot/udev/99-inchworm.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# After installation, plug in (or re-attach via usbipd) the devices.
+# Device facts from hardware.yaml (AA-37, 2026-10-24).  See doc-1 §3/§4/§6/§7.
+#
+# Serial devices (SUBSYSTEM=="tty") receive symlinks under /dev/:
+#   /dev/inchworm_arm_left    → left SO-101 arm (CH343, serial 5B91045044)
+#   /dev/inchworm_arm_right   → right SO-101 arm (CH343, serial 5B91030298)
+#   /dev/inchworm_dexarm      → Rotrics DexArm (STM32, serial 306133643438)
+#   /dev/inchworm_relay       → USB relay / laser switch (CH340 1a86:7523, no serial)
+#
+# Camera devices (SUBSYSTEM=="video4linux") receive symlinks under /dev/:
+#   /dev/inchworm_cam_scanner → scanner OV9281 camera (Arducam, serial UC762)
+#
+# NOTE: cam_left and cam_right DO NOT HAVE udev rules in this file.
+# REASON: Both Waveshare OV9281 cameras (32e6:9251) report the SAME USB serial
+#   5423534724 to Linux (/sys/bus/usb/devices/1-5 and 1-6 both have
+#   serial=5423534724). udev cannot distinguish them; a rule using
+#   ATTRS{serial}=="5423534724" matches BOTH cameras and a rule using
+#   ATTRS{serial}!="5423534724" matches neither (both have this serial).
+# MECHANISM: cam_left and cam_right are resolved at runtime by inchworm.discovery
+#   using identify_by: usbip_busid. The windows_busid field in hardware.yaml
+#   encodes the physical dock port (cam_left=9-4, cam_right=10-2). Discovery
+#   reads /sys/devices/platform/vhci_hcd.0/status to map the BusId to a local
+#   sysfs device, then finds the /dev/videoN capture node (index 0).
+#   This satisfies AC#3: "equivalent documented mechanism".
+# If the dock port changes, update windows_busid in hardware.yaml (do not add
+#   port-path (KERNELS==) pins here, as WSL usbip assigns ports in attach order).
+#
+# Identity strategy:
+#   All rules key on VID:PID and (where available) USB serial number.
+#   Under WSL usbip every device sits on the virtual host controller and
+#   port numbers are assigned in attach order; they are NOT stable identities.
+#   Port-path (KERNELS==) pins are therefore intentionally absent from all rules.
+#
+#   relay: matched solely by VID:PID 1a86:7523.
+#     IMPORTANT: this rule relies on at most ONE CH340 1a86:7523 device being
+#     attached at a time.  If a second CH340 is present, both nodes receive the
+#     same symlink, which is unsafe (relay controls laser power).  The
+#     inchworm.discovery module enforces this at runtime and raises
+#     RelayAmbiguousError if more than one CH340 entry is found in by-id.
+#
+# The /dev/serial/by-id symlinks created by udev's 60-serial.rules are also
+#       stable and used by inchworm.discovery; these rules add shorter aliases.
+
+# ── Left arm: CH343 serial 5B91045044 ──────────────────────────────────────
+SUBSYSTEM=="tty", \
+  ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", \
+  ATTRS{serial}=="5B91045044", \
+  SYMLINK+="inchworm_arm_left", \
+  MODE="0666"
+
+# ── Right arm: CH343 serial 5B91030298 ─────────────────────────────────────
+SUBSYSTEM=="tty", \
+  ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", \
+  ATTRS{serial}=="5B91030298", \
+  SYMLINK+="inchworm_arm_right", \
+  MODE="0666"
+
+# ── DexArm: STM32 CDC serial 306133643438 ──────────────────────────────────
+SUBSYSTEM=="tty", \
+  ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", \
+  ATTRS{serial}=="306133643438", \
+  SYMLINK+="inchworm_dexarm", \
+  MODE="0666"
+
+# ── Relay / laser switch: CH340 1a86:7523, no USB serial ───────────────────
+# Matched by VID:PID alone.  RELIES ON AT MOST ONE CH340 1a86:7523 being
+# attached; see identity strategy note above.
+SUBSYSTEM=="tty", \
+  ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", \
+  SYMLINK+="inchworm_relay", \
+  MODE="0666"
+
+# ── Scanner camera: Arducam OV9281 serial UC762 ────────────────────────────
+SUBSYSTEM=="video4linux", \
+  ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="6366", \
+  ATTRS{serial}=="UC762", \
+  ATTR{index}=="0", \
+  SYMLINK+="inchworm_cam_scanner", \
+  MODE="0666"
+
+# ── cam_left / cam_right: NO udev rule (see NOTE above) ────────────────────
+# Both 32e6:9251 cameras share serial 5423534724; udev cannot distinguish them.
+# Use inchworm.discovery with identify_by: usbip_busid for role resolution.

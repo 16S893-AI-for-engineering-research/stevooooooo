@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-20 21:14'
+updated_date: '2026-10-24 15:35'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -39,6 +39,8 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - SO-101 arms (x2): Waveshare **OV9281** 1 MP mono USB camera (A), global shutter, up to 120 FPS, UVC.
 - DexArm scanner: Arducam **OV9281** mono global-shutter USB camera, 720p, 100 FPS, UVC, low-distortion M12 lens, no microphone.
 - All are mono (Y8/greyscale) global-shutter UVC devices. Global shutter matters: laser-line and insertion imagery must not be rolling-shutter skewed during motion.
+- **Measured 2026-10-24 (`lsusb -v` in WSL), correcting the line above:** none of the three cameras advertises a Y8/GREY format. The two arm cameras enumerate as `32e6:9251` "openaicam" and offer **MJPEG only** (640x480, 800x600, 1280x720). The Arducam `0c45:6366` offers MJPEG and uncompressed YUY2 (up to 1280x800). All three are **USB 2.0 High-Speed devices** (`bcdUSB 2.00`, link at 480M). Mono output must therefore come from decoding and converting to greyscale in software. The sensors may still be mono, but the USB format is not.
+- **Measured 2026-10-24, camera identity:** both arm cameras report the **same USB serial `5423534724`** (sysfs `serial` and udev `ID_SERIAL` are identical). Linux serial, by-id and udev rules therefore **cannot tell them apart**. Windows assigns the second camera a port-derived instance ID (`7&69F6256&0&2`) because the serials collide. The only stable distinguisher is the physical dock port, visible as the usbipd BusId: owner mapping cam_left = 9-4, cam_right = 10-2. **Do not move the arm-camera cables between dock ports.** Discovery maps BusId to the WSL node through `/sys/devices/platform/vhci_hcd.0/status` (AA-5).
 
 ## 5. Laser line scanner
 
@@ -53,7 +55,11 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 
 ## 6. USB topology constraint (critical)
 
-Every arm and camera connects through **one centralized USB hub/dock** uplinked to the host over **USB 2.0**. Total bandwidth is shared, so:
+Every arm and camera connects through **one centralized USB hub/dock**. Owner update 2026-10-24: the dock was replaced with a **USB 3.2** dock (observed hub chips: VIA `2109:0822/2822` and Realtek `0bda:0409/5409` SuperSpeed/High-Speed pairs). The owner reports the two arm-camera cables are rated 480 Mbps (USB 2.0).
+
+Because every camera is a USB 2.0 High-Speed device, camera traffic travels on the dock's **USB 2.0 (480 Mbps) side**, not its SuperSpeed side. A USB 3.2 dock therefore does **not** by itself add camera bandwidth, and USB 2.0 cables cost nothing. Whether two cameras can stream at once is an **unmeasured** question. Until a measured test and an explicit owner decision say otherwise, the invariant below stands unchanged.
+
+Total bandwidth is shared, so:
 
 - **Only one camera may stream at a time.** This is a hard system invariant, not a preference.
 - Software must enforce exclusive camera access with a single arbiter/lock: acquire -> open device -> stream -> close device -> release. A camera that is not in use must be closed, not merely paused.
@@ -61,7 +67,7 @@ Every arm and camera connects through **one centralized USB hub/dock** uplinked 
 
 ## 7. Host environment
 
-- Control host: **WSL2** (Linux 6.18 microsoft-standard-WSL2, Ubuntu-class userland), Python 3.10, `uv` available.
+- Control host: **WSL2** (Linux 6.18 microsoft-standard-WSL2, Ubuntu-class userland), Python 3.10, `uv` available. Note: LeRobot 0.6.2 (main as of 2026-10-23) requires Python >= 3.12, so its environment needs a uv-managed 3.12 interpreter (see AA-22).
 - USB devices reach WSL via **usbipd-win**: `usbipd bind` (one-time, requires Windows administrator) then `usbipd attach --wsl`. Binding is a human/admin action; attaching per boot can be scripted.
 - Observed at planning time (2026-10-20, verified by running `usbipd state` and an attach attempt):
   - Both SO-101 CH343 adapters are **persisted but have no BusId**, i.e. previously bound and *not currently physically connected*: `USB\\VID_1A86&PID_55D3\\5B91030298` (COM3) and `USB\\VID_1A86&PID_55D3\\5B91045044` (COM5). These serial numbers are the stable identities to key the arm role map on.

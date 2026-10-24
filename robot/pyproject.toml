@@ -1,0 +1,34 @@
+[project]
+name = "inchworm-robot"
+version = "0.1.0"
+description = "Control software for the inchworm print-crawl robot (two SO-101 arms + Rotrics DexArm)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+]
+
+# A dependency group (not an optional extra) so a bare `uv run pytest` installs
+# pytest without needing `--extra dev`.
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inchworm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[project.scripts]
+inchworm-discover = "inchworm.discover:main"
+
+[tool.uv]
+package = true
