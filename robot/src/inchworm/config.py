@@ -326,6 +326,251 @@ class SO101KinematicsConfig(_Strict):
     right_arm_base_to_chassis: SO101FrameOffset
     trajectory: SO101TrajectoryLimits
 # --- AA-11 end ---
+# --- AA-15 ---
+
+
+class AA15ArmApproachOffsets(_Strict):
+    """Coarse-approach and insertion offsets for one arm's attachment interaction.
+
+    Both offsets are expressed in the **attachment-point frame** (z-axis points
+    into the tube along the attachment axis).  They describe where the TCP must
+    be positioned *before* descending into the attachment hole.
+
+    ``unverified: true`` means these are placeholder values; a hardware session
+    (AA-16 calibration) must measure the real offsets and set ``unverified: false``.
+    When ``unverified`` is ``True`` the frame model will refuse live motion (fail
+    closed); dry-run mode still works.
+    """
+
+    # Offset from attachment-point origin to coarse-approach TCP target (metres).
+    # UNVERIFIED placeholder — measure in AA-16.
+    coarse_approach_offset_m: List[float]
+    # Offset from attachment-point origin to insertion TCP target (metres).
+    # UNVERIFIED placeholder — measure in AA-16.
+    insertion_offset_m: List[float]
+    unverified: bool = True
+
+
+class AA15FramesConfig(_Strict):
+    """AA-15 frame model configuration: per-arm approach offsets.
+
+    See inchworm.frames for the full chassis/tube/lattice model.
+    """
+
+    left: AA15ArmApproachOffsets
+    right: AA15ArmApproachOffsets
+
+
+# --- AA-15 end ---
+
+
+# --- AA-17 ---
+class GripperBandConfig(_Strict):
+    """Position bands (degrees) for one arm's custom gripper servo.
+
+    All band boundaries are ``None`` until empirically measured in a live
+    hardware session using ``scripts/gripper_bands.py --live``.  The AA-17
+    state machine **refuses** every live lock or unlock when any band boundary
+    is ``None`` (fail-closed).  Dry-run mode skips the null check.
+
+    Measurement method: record present_position_deg while commanding the
+    servo through its full range; observe three regions:
+    - **unlocked**: jaw open, latch fully retracted.
+    - **engaged_but_unlocked**: jaw contacting attachment but latch not seated.
+    - **locked**: latch positively seated and holding.
+
+    Mark ``unverified: true`` until confirmed on hardware; set to ``false``
+    after the owner-supervised measurement session.
+    """
+
+    # unlocked band: [low_deg, high_deg]
+    unlocked_low_deg: Optional[Degrees] = None   # unverified: true
+    unlocked_high_deg: Optional[Degrees] = None  # unverified: true
+    # engaged-but-unlocked band
+    engaged_low_deg: Optional[Degrees] = None    # unverified: true
+    engaged_high_deg: Optional[Degrees] = None   # unverified: true
+    # locked band
+    locked_low_deg: Optional[Degrees] = None     # unverified: true
+    locked_high_deg: Optional[Degrees] = None    # unverified: true
+    # True when any value above is a placeholder (not yet measured).
+    unverified: bool = True
+
+
+class GripperVerificationThresholds(_Strict):
+    """Thresholds used by the AA-17 lock-verification logic.
+
+    All values are ``None`` until measured; null -> state machine cannot
+    distinguish latch/jam/miss in live mode (treated as FAULT).
+    Mark ``unverified: true`` until confirmed on hardware.
+    """
+
+    # Minimum |load_raw| indicating the servo is under significant load.
+    # Below this value while in the locked band -> probable miss (latch not engaged).
+    jam_load_threshold_raw: Optional[int] = None   # unverified: true
+    # Maximum |load_raw| expected for a true latch (not a jam).
+    # Above this value while in the locked band -> probable jam.
+    latch_load_max_raw: Optional[int] = None       # unverified: true
+    # Maximum current_raw for a true latch.  Spike above -> probable jam.
+    latch_current_max_raw: Optional[int] = None    # unverified: true
+    # True when any value above is a placeholder (not yet measured).
+    unverified: bool = True
+
+
+class GripperLockConfig(_Strict):
+    """Per-arm gripper lock configuration for the AA-17 state machine.
+
+    ``bands`` is ``None`` until the owner runs the measurement script;
+    the state machine treats ``None`` bands as fail-closed.
+    ``drift_threshold_deg`` is the maximum allowed position drift before
+    the hold-monitor re-asserts (UNVERIFIED placeholder).
+    """
+
+    # Per-arm band config: keyed by arm role ('arm_left', 'arm_right').
+    # Each value is a GripperBandConfig, or None if not yet measured.
+    arm_left: Optional[GripperBandConfig] = None
+    arm_right: Optional[GripperBandConfig] = None
+    # Drift threshold for active hold-monitor (degrees). UNVERIFIED placeholder.
+    drift_threshold_deg: Optional[Degrees] = None   # unverified: true
+    # Thresholds for latch/jam/miss classification. UNVERIFIED placeholders.
+    verification: Optional[GripperVerificationThresholds] = None
+# --- AA-17 end ---
+
+
+# --- AA-9 ---
+class SoftJointLimits(_Strict):
+    """Soft per-joint travel limits for one arm (radians).
+
+    ``null`` values mean the limits have not been measured; the guard
+    falls back to the URDF limits from ``so101_kinematics`` but marks them
+    as unverified and refuses LIVE motion until real limits with
+    ``method`` and ``measured_date`` are recorded.
+
+    ``unverified`` must be ``False`` before LIVE motion is allowed.  It is
+    set by the owner after running ``scripts/measure_limits.py --live``.
+    """
+
+    shoulder_pan_lower_rad: Optional[float] = None
+    shoulder_pan_upper_rad: Optional[float] = None
+    shoulder_lift_lower_rad: Optional[float] = None
+    shoulder_lift_upper_rad: Optional[float] = None
+    elbow_flex_lower_rad: Optional[float] = None
+    elbow_flex_upper_rad: Optional[float] = None
+    wrist_flex_lower_rad: Optional[float] = None
+    wrist_flex_upper_rad: Optional[float] = None
+    wrist_roll_lower_rad: Optional[float] = None
+    wrist_roll_upper_rad: Optional[float] = None
+    # True until a hardware session with measure_limits.py --live populates
+    # all fields and sets this to False.
+    unverified: bool = True
+    # How limits were measured and when. null = not yet measured.
+    method: Optional[str] = None
+    measured_date: Optional[str] = None
+
+
+class KeepOutBox(_Strict):
+    """Axis-aligned keep-out box in the chassis fixed frame (metres).
+
+    Poses whose FK link points fall inside this box are rejected.
+    ``unverified: true`` means the bounds are a conservative placeholder;
+    the owner must measure and set ``unverified: false``.
+    """
+
+    label: str
+    x_min_m: float
+    x_max_m: float
+    y_min_m: float
+    y_max_m: float
+    z_min_m: float
+    z_max_m: float
+    unverified: bool = True
+
+    @model_validator(mode="after")
+    def _ranges_positive(self) -> "KeepOutBox":
+        for axis in ("x", "y", "z"):
+            lo = getattr(self, f"{axis}_min_m")
+            hi = getattr(self, f"{axis}_max_m")
+            if lo >= hi:
+                raise ValueError(f"{axis}_min_m ({lo}) must be < {axis}_max_m ({hi})")
+        return self
+
+
+class KeepOutCapsule(_Strict):
+    """Capsule keep-out primitive in the chassis fixed frame (metres).
+
+    Defined as the swept sphere of radius ``radius_m`` along the segment
+    from ``p0_xyz`` to ``p1_xyz``.  Any FK link point within ``radius_m`` of
+    the segment is rejected.
+    ``unverified: true`` means the values are a conservative placeholder.
+    """
+
+    label: str
+    p0_xyz: List[float]  # [x, y, z] metres
+    p1_xyz: List[float]  # [x, y, z] metres
+    radius_m: float
+    unverified: bool = True
+
+
+class NamedPose(_Strict):
+    """A named joint configuration (radians, 5-DoF, proximal→distal).
+
+    ``unverified: true`` means the angles are a placeholder; the guard
+    refuses to use this pose for real motion until
+    ``unverified`` is ``False`` and the pose passes validation.
+    """
+
+    name: str
+    q_rad: List[float]  # [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll]
+    description: str = ""
+    unverified: bool = True
+
+    @model_validator(mode="after")
+    def _five_dof(self) -> "NamedPose":
+        if len(self.q_rad) != 5:
+            raise ValueError(
+                f"Named pose '{self.name}' must have exactly 5 joint angles, "
+                f"got {len(self.q_rad)}"
+            )
+        return self
+
+
+class CollisionConfig(_Strict):
+    """Collision model configuration for the AA-9 motion guard.
+
+    All keep-out primitives are UNVERIFIED placeholders.  A hardware session
+    with measured arm dimensions is required to replace them with real values.
+
+    Sampling resolution for trajectory checks: the straight-line joint-space
+    interpolation is sampled at ``interpolation_samples`` evenly-spaced points
+    (including endpoints).  50 samples is the documented default; decrease for
+    speed, increase for tighter safety.
+    """
+
+    # Dense sampling of straight-line joint interpolations for collision check.
+    # 50 samples -> step ≤ max_joint_range/50 ≈ 0.11 rad for the widest joint.
+    # DOCUMENTED: this is the guaranteed check resolution.
+    interpolation_samples: int = Field(default=50, ge=2)
+    # Keep-out boxes in the chassis fixed frame.
+    keep_out_boxes: List[KeepOutBox] = Field(default_factory=list)
+    # Keep-out capsules in the chassis fixed frame.
+    keep_out_capsules: List[KeepOutCapsule] = Field(default_factory=list)
+
+
+class MotionGuardConfig(_Strict):
+    """AA-9 motion guard configuration.
+
+    Contains per-arm soft joint limits, named poses, and the collision model.
+    If this block is absent from hardware.yaml, the guard uses URDF limits
+    (from ``so101_kinematics``) and marks everything as unverified.
+    """
+
+    # Per-arm soft limits. null arms → fall back to URDF (unverified).
+    left_arm_limits: Optional[SoftJointLimits] = None
+    right_arm_limits: Optional[SoftJointLimits] = None
+    # Collision model (primitives + sampling config).
+    collision: CollisionConfig = Field(default_factory=CollisionConfig)
+    # Named poses used by the motion planner (neutral, folded_transit, etc.).
+    named_poses: List[NamedPose] = Field(default_factory=list)
+# --- AA-9 end ---
 
 
 class HardwareConfig(_Strict):
@@ -345,6 +590,15 @@ class HardwareConfig(_Strict):
     # --- AA-11 ---
     so101_kinematics: SO101KinematicsConfig
     # --- AA-11 end ---
+    # --- AA-17 ---
+    gripper_lock: Optional[GripperLockConfig] = None
+    # --- AA-17 end ---
+    # --- AA-15 ---
+    frames_model: Optional["AA15FramesConfig"] = None
+    # --- AA-15 end ---
+    # --- AA-9 ---
+    motion_guard: Optional["MotionGuardConfig"] = None
+    # --- AA-9 end ---
 
     @model_validator(mode="before")
     @classmethod

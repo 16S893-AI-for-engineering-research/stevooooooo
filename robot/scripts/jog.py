@@ -97,6 +97,23 @@ def collision_check_hook(arm: str, q: np.ndarray) -> Optional[str]:
     # --- AA-9 hook end ---
 
 
+# --- AA-9 ---
+def _aa9_collision_check(arm: str, q: np.ndarray, cfg) -> Optional[str]:  # noqa: ANN001
+    """Real AA-9 collision check via :mod:`inchworm.motion_guard`.
+
+    Called in place of the placeholder ``collision_check_hook`` when the
+    ``motion_guard`` config block is present.  Returns a violation string
+    if any link point falls in a keep-out zone, else None.
+
+    Joint limits are also checked (dry-run mode only here; live mode enforced
+    inside :class:`~inchworm.motion_guard.GuardedArm`).
+    """
+    from inchworm.motion_guard import build_motion_guard  # local import
+    guard = build_motion_guard(cfg, arm)
+    return guard.check_pose(q, live=False)
+# --- AA-9 end ---
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -272,7 +289,13 @@ def main(argv: list[str] | None = None) -> int:
     q_target = ik_result.q
 
     # --- Collision check (AA-9 hook) ---
-    collision_msg = collision_check_hook(arm_name, q_target)
+    # --- AA-9 ---
+    # Use the real AA-9 guard when the motion_guard config block is present.
+    if cfg.motion_guard is not None:
+        collision_msg = _aa9_collision_check(arm_name, q_target, cfg)
+    else:
+        collision_msg = collision_check_hook(arm_name, q_target)
+    # --- AA-9 end ---
     if collision_msg is not None:
         logger.error("Collision check FAILED: %s", collision_msg)
         return 3
@@ -299,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  IK pos_err   : {ik_result.pos_err_m*1000:.4f} mm")
     print(f"  q_current    : {np.round(q_current, 4)}")
     print(f"  q_target     : {np.round(q_target, 4)}")
-    print(f"  collision     : {collision_msg or 'none (AA-9 hook pending)'}")
+    print(f"  collision     : {collision_msg or 'none (AA-9 guard active)'}")
     print()
     print(traj.summary())
     print()

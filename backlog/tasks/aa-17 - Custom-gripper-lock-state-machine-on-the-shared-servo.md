@@ -1,9 +1,11 @@
 ---
 id: AA-17
 title: Custom gripper lock state machine on the shared servo
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@agent'
 created_date: '2026-10-20 21:11'
+updated_date: '2026-10-24 18:03'
 labels: []
 milestone: m-2
 dependencies:
@@ -38,3 +40,11 @@ See doc-1 sections 3 and 9.
 - [ ] #6 Unlocking under load is handled safely (documented behaviour when the arm is still bearing the tube) and never commanded while the opposite arm is not holding
 - [ ] #7 Tests cover band logic, illegal transitions, lock verification success and failure, drift re-assertion and the policy-blocked path
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan executed. New modules: gripper_lock.py (state machine), policy_actions.py (policy adapter), gripper_bands.py (script). Shared-file additions: config.py + hardware.yaml under AA-17 markers. 81 new tests in test_gripper_lock.py. 664 total tests passing. AC#1 unchecked (hardware session required). ACs #2-7 covered by software tests.
+
+Orchestrator review 2026-10-24: hold_tick previously swallowed read failures forever while still reporting LOCKED. It now escalates to FAULT and raises GripperLockError after 3 consecutive failures (gripper_hold_lost event). Tests: test_hold_tick_escalates_to_fault_after_repeated_read_failures, test_hold_tick_read_failure_counter_resets_on_success. Checked: unlock refuses without a passing opposite-arm predicate. 767 passed.
+<!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-24 17:50'
+updated_date: '2026-10-24 17:56'
 labels: []
 milestone: m-1
 dependencies:
@@ -99,4 +99,6 @@ Unchecked pending AA-9.
 - units.py: _rad_per_s, _rad_per_s2 suffixes (AA-11 markers)
 
 Orchestrator review 2026-10-24: the IK default tolerance was exactly 1 mm (_DEFAULT_TOL_M=1e-3), so 'sub-mm round trip' only measured the solver's stop threshold (observed max 0.98 mm). Tightened to 1e-5 m / 1e-3 rad and max_iter 500; the round-trip test now requires < 0.05 mm. Re-measured with test_fk_ik_round_trip_accuracy over 8 poses: max 0.0098 mm, mean 0.0067 mm. An extra 50-pose random sweep (orchestrator, seed 1) gave max 0.0096 mm, with 5/50 unreached from the zero seed (genuinely hard configurations, reported as unreachable rather than silently wrong). Full suite: 583 passed. AC#3 stays unchecked: physical-pose verification needs hardware.
+
+AA-9 implemented (motion_guard.py): the jog.py collision_check_hook has been wired to the real AA-9 MotionGuard (_aa9_collision_check in jog.py). AA-11 AC#4 (collision hook wired) can now be checked by the orchestrator by reviewing jog.py and running uv run pytest tests/test_motion_guard.py::TestJogAA9Integration -v.
 <!-- SECTION:NOTES:END -->

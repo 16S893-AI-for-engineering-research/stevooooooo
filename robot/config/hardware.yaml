@@ -322,3 +322,184 @@ so101_kinematics:
     max_velocity_rad_per_s: 1.0
     max_acceleration_rad_per_s2: 2.0
 # --- AA-11 end ---
+# --- AA-17 ---
+# Gripper lock state-machine configuration (AA-17).
+# All band boundaries are null until empirically measured with
+# scripts/gripper_bands.py --live (owner-supervised hardware session required).
+# null bands = state machine fails closed on any live lock/unlock attempt.
+gripper_lock:
+  # Per-arm servo position bands (degrees). Null = unverified / not yet measured.
+  arm_left:
+    unlocked_low_deg: null      # unverified: true
+    unlocked_high_deg: null     # unverified: true
+    engaged_low_deg: null       # unverified: true
+    engaged_high_deg: null      # unverified: true
+    locked_low_deg: null        # unverified: true
+    locked_high_deg: null       # unverified: true
+    unverified: true
+  arm_right:
+    unlocked_low_deg: null      # unverified: true
+    unlocked_high_deg: null     # unverified: true
+    engaged_low_deg: null       # unverified: true
+    engaged_high_deg: null      # unverified: true
+    locked_low_deg: null        # unverified: true
+    locked_high_deg: null       # unverified: true
+    unverified: true
+  # Drift threshold (degrees) for active hold-monitor. UNVERIFIED placeholder.
+  drift_threshold_deg: null     # unverified: true
+  # Lock-verification thresholds. UNVERIFIED placeholders.
+  verification:
+    jam_load_threshold_raw: null   # unverified: true
+    latch_load_max_raw: null       # unverified: true
+    latch_current_max_raw: null    # unverified: true
+    unverified: true
+# --- AA-17 end ---
+# --- AA-15 ---
+# Chassis–tube frame model: per-arm coarse-approach and insertion offsets.
+# The chassis is fixed to the ground; the tube translates along its axis.
+# These offsets are expressed in the attachment-point frame (z-axis into tube).
+# UNVERIFIED: placeholders — measure in AA-16 calibration session.
+frames_model:
+  left:
+    # Coarse-approach TCP offset from attachment-point origin (metres).
+    # UNVERIFIED: placeholder — measure in AA-16.
+    coarse_approach_offset_m: [0.0, 0.0, 0.05]
+    # Insertion TCP offset from attachment-point origin (metres).
+    # UNVERIFIED: placeholder — measure in AA-16.
+    insertion_offset_m: [0.0, 0.0, 0.0]
+    unverified: true
+  right:
+    coarse_approach_offset_m: [0.0, 0.0, 0.05]
+    insertion_offset_m: [0.0, 0.0, 0.0]
+    unverified: true
+# --- AA-15 end ---
+
+# --- AA-9 ---
+# AA-9: Motion guard configuration — joint limits, collision model, named poses.
+# All numeric values are UNVERIFIED placeholders until hardware sessions measure them.
+# See robot/src/inchworm/motion_guard.py for enforcement logic.
+# See scripts/measure_limits.py for the measurement procedure.
+motion_guard:
+  # Per-arm soft joint limits (radians).
+  # null fields → guard falls back to URDF limits (also unverified).
+  # unverified: true → guard refuses LIVE motion (fail-closed).
+  # Set method + measured_date after running: scripts/measure_limits.py --live
+  left_arm_limits:
+    shoulder_pan_lower_rad: null
+    shoulder_pan_upper_rad: null
+    shoulder_lift_lower_rad: null
+    shoulder_lift_upper_rad: null
+    elbow_flex_lower_rad: null
+    elbow_flex_upper_rad: null
+    wrist_flex_lower_rad: null
+    wrist_flex_upper_rad: null
+    wrist_roll_lower_rad: null
+    wrist_roll_upper_rad: null
+    unverified: true  # set to false only after measure_limits.py --live
+    method: null      # e.g. "torque-off manual sweep, measure_limits.py --live"
+    measured_date: null  # e.g. "2026-10-28"
+  right_arm_limits:
+    shoulder_pan_lower_rad: null
+    shoulder_pan_upper_rad: null
+    shoulder_lift_lower_rad: null
+    shoulder_lift_upper_rad: null
+    elbow_flex_lower_rad: null
+    elbow_flex_upper_rad: null
+    wrist_flex_lower_rad: null
+    wrist_flex_upper_rad: null
+    wrist_roll_lower_rad: null
+    wrist_roll_upper_rad: null
+    unverified: true
+    method: null
+    measured_date: null
+
+  # Collision model.
+  # Dense sampling of straight-line joint interpolations: 50 samples.
+  # (see motion_guard.py CollisionModel for documented resolution)
+  collision:
+    interpolation_samples: 50
+    # Keep-out boxes in the chassis fixed frame (metres).
+    # ALL VALUES ARE UNVERIFIED CONSERVATIVE PLACEHOLDERS.
+    # Owner: measure actual chassis geometry and replace with real values.
+    keep_out_boxes:
+      # Chassis base plate: conservative box below arm bases.
+      # The arm mounts are elevated above the chassis plate; this box
+      # covers the plate area below them.
+      # UNVERIFIED: placeholder dimensions.
+      - label: chassis_base
+        x_min_m: -0.30
+        x_max_m:  0.30
+        y_min_m: -0.30
+        y_max_m:  0.30
+        z_min_m: -0.15
+        z_max_m: -0.02
+        unverified: true
+      # DexArm body: conservative box to the front of the chassis.
+      # The DexArm is mounted in a separate region from the SO-101 arms.
+      # UNVERIFIED: placeholder; actual position must be measured in AA-16.
+      # Placed at high positive-Y to avoid overlapping arm rest pose.
+      - label: dexarm_body
+        x_min_m: -0.20
+        x_max_m:  0.20
+        y_min_m:  0.30
+        y_max_m:  0.70
+        z_min_m: -0.05
+        z_max_m:  0.40
+        unverified: true
+      # Tube volume: the printed tube held between the grippers.
+      # The tube is held at approximately y=0.15..0.35 m in front of the arms,
+      # above the chassis plate.  The z range starts above the arm shoulder link.
+      # UNVERIFIED: placeholder values; see doc-1 s2 for attachment pitch.
+      - label: tube_volume
+        x_min_m: -0.05
+        x_max_m:  0.05
+        y_min_m:  0.15
+        y_max_m:  0.35
+        z_min_m:  0.10
+        z_max_m:  0.20
+        unverified: true
+    # Keep-out capsules in the chassis fixed frame (metres).
+    # ALL VALUES ARE UNVERIFIED CONSERVATIVE PLACEHOLDERS.
+    keep_out_capsules:
+      # Opposite (right) arm base swept volume: conservative capsule around
+      # the right arm base to prevent the left arm from reaching into it.
+      # The two arms are separated laterally. In the arm base frame, the
+      # other arm is approximately at positive Y (forward from the chassis
+      # midpoint). Exact position requires AA-16 calibration.
+      # UNVERIFIED: placeholder; measure right arm base position in AA-16.
+      - label: right_arm_base
+        p0_xyz: [0.00,  0.35, 0.00]
+        p1_xyz: [0.00,  0.35, 0.35]
+        radius_m: 0.10
+        unverified: true
+      # Left arm base (to prevent right arm from reaching into it).
+      # UNVERIFIED: placeholder; measure left arm base position in AA-16.
+      - label: left_arm_base
+        p0_xyz: [0.00, -0.35, 0.00]
+        p1_xyz: [0.00, -0.35, 0.35]
+        radius_m: 0.10
+        unverified: true
+
+  # Named poses (radians, 5-DoF: shoulder_pan, shoulder_lift, elbow_flex,
+  # wrist_flex, wrist_roll).
+  # ALL VALUES ARE UNVERIFIED PLACEHOLDERS.
+  # Owner: verify poses on hardware before setting unverified: false.
+  # AC#4 of AA-9 requires measured poses; these placeholders are intentionally
+  # not passing AC#4 until the owner confirms them on hardware.
+  named_poses:
+    - name: neutral
+      description: >-
+        Safe neutral pose: arm roughly upright, all joints near 0 rad (URDF
+        rest pose). UNVERIFIED placeholder; measure safe neutral on hardware
+        and set unverified: false to satisfy AA-9 AC#4.
+      q_rad: [0.0, 0.0, 0.0, 0.0, 0.0]
+      unverified: true
+    - name: folded_transit
+      description: >-
+        Folded transit pose: arm tucked compactly for crawl transit. UNVERIFIED
+        placeholder; measure safe folded pose on hardware and set unverified:
+        false to satisfy AA-9 AC#4. Doc-1 s3 notes the configuration is tight;
+        DO NOT run on hardware without owner supervision.
+      q_rad: [0.0, 1.57, -1.57, 0.0, 0.0]
+      unverified: true
+# --- AA-9 end ---

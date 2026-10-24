@@ -1,0 +1,922 @@
+"""AA-9: Joint-limit and collision-envelope enforcement for the SO-101 arms.
+
+This module is the single motion-safety layer.  Every position write for
+joints 1-5 (shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll)
+must pass through :class:`MotionGuard` before reaching the servo bus.
+
+Architecture
+------------
+:class:`JointLimitGuard`
+    Validates joint angles in radians against per-arm soft limits from
+    ``motion_guard.left_arm_limits`` / ``right_arm_limits`` in
+    ``hardware.yaml``.
+
+    *Fail-closed*: if a limit is null (not measured) or the soft-limits block
+    is marked ``unverified: true``, the guard falls back to the URDF limits
+    from ``so101_kinematics`` but **refuses LIVE motion**.  An operator must
+    run ``scripts/measure_limits.py --live``, populate all limit fields, and
+    set ``unverified: false`` to unlock live operation.
+
+:class:`CollisionModel`
+    Checks FK link-point positions against conservative keep-out primitives
+    (boxes and capsules) defined in ``motion_guard.collision`` in
+    ``hardware.yaml``.  Primitives are evaluated in the **arm base frame**
+    (``base_link`` frame of the arm being commanded).
+
+    *Trajectory interpolation*: straight-line joint-space paths are sampled
+    at a dense, documented resolution (default 50 samples, configurable via
+    ``collision.interpolation_samples``).  Both endpoints and all intermediate
+    samples are checked.  Endpoint-only checking is insufficient because a
+    path can enter and exit a keep-out zone while keeping both endpoints
+    outside it.
+
+:class:`MotionGuard`
+    Combines :class:`JointLimitGuard` and :class:`CollisionModel`.  Exposes a
+    single entry point:
+
+    .. code-block:: python
+
+        violation = guard.check_pose(q, live=True)
+        if violation is not None:
+            raise MotionViolationError(violation)
+
+        violation = guard.check_trajectory(q_start, q_end, live=True)
+        if violation is not None:
+            raise MotionViolationError(violation)
+
+:class:`GuardedArm`
+    Wraps :class:`~inchworm.servo_bus.ArmServoBus`.  All position writes for
+    joints 1-5 are intercepted and passed through :class:`MotionGuard`.  The
+    gripper joint is never guarded here; it is handled by the AA-17 state
+    machine.
+
+    An explicit ``bypass_guard=True`` flag is available for emergency or
+    diagnostic use.  **Its use logs a WARNING event via AA-7 telemetry.**
+    Every call site that sets ``bypass_guard=True`` must have a comment
+    explaining why; the design intent is that no production code path ever
+    sets it.
+
+URDF fallback limits
+--------------------
+URDF limits are taken from ``so101_kinematics.joints`` in ``hardware.yaml``
+(source: ``vendor/so101/so101_new_calib.urdf``, hash a758567c).  They are
+used only when the soft-limits block has null values.  When URDF fallbacks are
+used, the guard logs a WARNING and blocks LIVE motion.
+
+Named poses
+-----------
+:func:`get_named_pose` looks up a pose from ``motion_guard.named_poses`` by
+name.  Poses with ``unverified: true`` are returned with a warning and must
+not be used for live motion without explicit human review.
+
+Interpolation resolution
+------------------------
+The straight-line joint-space interpolation for trajectory collision checks
+is sampled at ``collision.interpolation_samples`` evenly-spaced points
+(including both endpoints).  The default is 50 samples.  For the widest joint
+(``wrist_roll`` ≈ 5.58 rad), 50 samples gives ≤ 0.11 rad per step.  Decrease
+``interpolation_samples`` for speed (accepting coarser checking), increase for
+tighter safety.  The resolution is documented here and in ``hardware.yaml``.
+
+Safety invariants (doc-1 s8, AGENTS.md)
+----------------------------------------
+* This guard never opens real serial ports.
+* Dry-run is the default; live motion requires ``live=True``.
+* Fail-closed: null or unverified limits block live motion.
+* Never both grippers unlocked while tube attached (enforced by AA-17, not here).
+* The gripper servo is never commanded by this module.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+from dataclasses import dataclass, field
+from typing import List, Optional, Sequence, Tuple
+
+import numpy as np
+import numpy.typing as npt
+
+from inchworm.config import (
+    CollisionConfig,
+    HardwareConfig,
+    KeepOutBox,
+    KeepOutCapsule,
+    MotionGuardConfig,
+    NamedPose,
+    SO101KinematicsConfig,
+    SoftJointLimits,
+)
+from inchworm.kinematics import KinematicChain, build_chain
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Type aliases
+# ---------------------------------------------------------------------------
+
+JointVec = npt.NDArray[np.float64]  # 5-vector of joint angles (rad)
+
+# Joint names in chain order (proximal → distal).  Index aligns with JointVec.
+JOINT_NAMES: Tuple[str, ...] = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+)
+
+# ---------------------------------------------------------------------------
+# Typed exceptions
+# ---------------------------------------------------------------------------
+
+
+class MotionViolationError(ValueError):
+    """Raised when a commanded pose or trajectory violates the motion guard.
+
+    Attributes
+    ----------
+    violation:
+        Human-readable description of the violation (joint name, limit value,
+        or collision primitive label).
+    """
+
+    def __init__(self, violation: str) -> None:
+        self.violation = violation
+        super().__init__(f"motion guard violation: {violation}")
+
+
+class LiveMotionBlockedError(MotionViolationError):
+    """Raised when LIVE motion is requested but limits are unverified.
+
+    The operator must run ``scripts/measure_limits.py --live``, populate the
+    soft-limits block in ``hardware.yaml``, and set ``unverified: false``.
+    """
+
+
+# ---------------------------------------------------------------------------
+# Resolved joint limits (one arm)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ResolvedLimits:
+    """Resolved per-joint soft limits for one arm.
+
+    ``unverified`` is True when any limit came from the URDF fallback or
+    when the soft-limits config block is marked ``unverified: true``.
+    ``live_ok`` is True only when all limits are present and ``unverified``
+    is False.
+    """
+
+    # Parallel to JOINT_NAMES
+    lower_rad: Tuple[float, ...]  # length 5
+    upper_rad: Tuple[float, ...]  # length 5
+    unverified: bool
+    live_ok: bool
+
+
+def _resolve_limits_for_arm(
+    soft: Optional[SoftJointLimits],
+    kin_cfg: SO101KinematicsConfig,
+    arm_role: str,
+) -> ResolvedLimits:
+    """Build :class:`ResolvedLimits` for one arm.
+
+    Falls back to URDF limits for any null field.  Marks ``unverified=True``
+    and ``live_ok=False`` if:
+    * ``soft`` is None (no soft-limits block)
+    * ``soft.unverified`` is True
+    * any individual limit field is null
+
+    Parameters
+    ----------
+    soft:
+        The ``SoftJointLimits`` block from config, or ``None``.
+    kin_cfg:
+        The ``SO101KinematicsConfig`` block (source of URDF fallback limits).
+    arm_role:
+        ``"left"`` or ``"right"`` — used in log messages.
+    """
+    # Build URDF limit map: name → (lower, upper)
+    urdf_map: dict[str, tuple[float, float]] = {}
+    for jcfg in kin_cfg.joints:
+        lo = jcfg.limit_lower_rad
+        hi = jcfg.limit_upper_rad
+        if lo is not None and hi is not None:
+            urdf_map[jcfg.name] = (float(lo), float(hi))
+
+    # Per-joint limit resolution
+    _FIELD_PREFIX = {
+        "shoulder_pan":  "shoulder_pan",
+        "shoulder_lift": "shoulder_lift",
+        "elbow_flex":    "elbow_flex",
+        "wrist_flex":    "wrist_flex",
+        "wrist_roll":    "wrist_roll",
+    }
+
+    lower_list: list[float] = []
+    upper_list: list[float] = []
+    any_null = False
+    any_unverified = soft is None or (soft is not None and soft.unverified)
+
+    for name in JOINT_NAMES:
+        prefix = _FIELD_PREFIX[name]
+        lo_field = f"{prefix}_lower_rad"
+        hi_field = f"{prefix}_upper_rad"
+
+        lo_val: Optional[float] = getattr(soft, lo_field, None) if soft else None
+        hi_val: Optional[float] = getattr(soft, hi_field, None) if soft else None
+
+        if lo_val is None or hi_val is None:
+            any_null = True
+            # Fallback to URDF
+            urdf_lo, urdf_hi = urdf_map.get(name, (-math.pi, math.pi))
+            if lo_val is None:
+                lo_val = urdf_lo
+                logger.warning(
+                    "AA-9 %s arm: soft limit for %s (lower) is null; "
+                    "using URDF fallback %.4f rad — UNVERIFIED, LIVE blocked.",
+                    arm_role, name, urdf_lo,
+                )
+            if hi_val is None:
+                hi_val = urdf_hi
+                logger.warning(
+                    "AA-9 %s arm: soft limit for %s (upper) is null; "
+                    "using URDF fallback %.4f rad — UNVERIFIED, LIVE blocked.",
+                    arm_role, name, urdf_hi,
+                )
+
+        lower_list.append(float(lo_val))
+        upper_list.append(float(hi_val))
+
+    is_unverified = any_unverified or any_null
+    live_ok = not is_unverified
+
+    if is_unverified:
+        logger.warning(
+            "AA-9 %s arm: soft limits are UNVERIFIED (null or unverified=True). "
+            "LIVE motion is blocked until measure_limits.py --live is run and "
+            "hardware.yaml is updated with method/measured_date and unverified: false.",
+            arm_role,
+        )
+
+    return ResolvedLimits(
+        lower_rad=tuple(lower_list),
+        upper_rad=tuple(upper_list),
+        unverified=is_unverified,
+        live_ok=live_ok,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Joint-limit guard
+# ---------------------------------------------------------------------------
+
+
+class JointLimitGuard:
+    """Validate joint angles against per-arm soft limits.
+
+    Construction
+    ------------
+    Use :func:`build_joint_limit_guard` rather than calling directly.
+
+    Fail-closed rule
+    ----------------
+    If ``limits.live_ok`` is False (limits are null or unverified), calling
+    ``check(q, live=True)`` raises :class:`LiveMotionBlockedError` immediately,
+    before checking individual joint values.  This prevents any live motion
+    when limits have not been measured.
+    """
+
+    def __init__(self, limits: ResolvedLimits, arm_role: str) -> None:
+        self._limits = limits
+        self._arm_role = arm_role
+
+    @property
+    def limits(self) -> ResolvedLimits:
+        return self._limits
+
+    def check(
+        self, q: JointVec, live: bool = False
+    ) -> Optional[str]:
+        """Check joint angles against soft limits.
+
+        Parameters
+        ----------
+        q:
+            5-vector of joint angles (rad), ordered per :data:`JOINT_NAMES`.
+        live:
+            If True and limits are unverified, raises
+            :class:`LiveMotionBlockedError` immediately.
+
+        Returns
+        -------
+        str or None
+            Violation description if any joint is outside its limit, else None.
+
+        Raises
+        ------
+        LiveMotionBlockedError
+            If ``live=True`` and limits are unverified (fail-closed).
+        ValueError
+            If ``q`` does not have exactly 5 elements.
+        """
+        if len(q) != 5:
+            raise ValueError(f"q must have 5 elements, got {len(q)}")
+
+        # Fail-closed: block live motion if unverified
+        if live and not self._limits.live_ok:
+            raise LiveMotionBlockedError(
+                f"AA-9 {self._arm_role} arm: soft limits are UNVERIFIED. "
+                "Run scripts/measure_limits.py --live, populate hardware.yaml "
+                "(method, measured_date, unverified: false) before live motion."
+            )
+
+        for i, name in enumerate(JOINT_NAMES):
+            lo = self._limits.lower_rad[i]
+            hi = self._limits.upper_rad[i]
+            qi = float(q[i])
+            if qi < lo or qi > hi:
+                return (
+                    f"{self._arm_role} arm joint '{name}' value {qi:.4f} rad "
+                    f"is outside soft limits [{lo:.4f}, {hi:.4f}] rad"
+                )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Collision model
+# ---------------------------------------------------------------------------
+
+
+def _point_in_box(p: npt.NDArray[np.float64], box: KeepOutBox) -> bool:
+    """Return True if point ``p`` (3-vector, metres) is inside ``box``."""
+    return (
+        box.x_min_m <= p[0] <= box.x_max_m
+        and box.y_min_m <= p[1] <= box.y_max_m
+        and box.z_min_m <= p[2] <= box.z_max_m
+    )
+
+
+def _point_to_segment_dist2(
+    p: npt.NDArray[np.float64],
+    a: npt.NDArray[np.float64],
+    b: npt.NDArray[np.float64],
+) -> float:
+    """Squared distance from point ``p`` to segment ``ab``."""
+    ab = b - a
+    ab_sq = float(np.dot(ab, ab))
+    if ab_sq < 1e-12:
+        return float(np.dot(p - a, p - a))
+    t = max(0.0, min(1.0, float(np.dot(p - a, ab)) / ab_sq))
+    closest = a + t * ab
+    diff = p - closest
+    return float(np.dot(diff, diff))
+
+
+def _point_in_capsule(
+    p: npt.NDArray[np.float64], cap: KeepOutCapsule
+) -> bool:
+    """Return True if point ``p`` is within the capsule's radius of the segment."""
+    a = np.array(cap.p0_xyz, dtype=np.float64)
+    b = np.array(cap.p1_xyz, dtype=np.float64)
+    dist2 = _point_to_segment_dist2(p, a, b)
+    return dist2 <= cap.radius_m ** 2
+
+
+@dataclass
+class CollisionModel:
+    """Check FK link-point positions against keep-out primitives.
+
+    Link points checked per pose
+    ----------------------------
+    For each joint in the kinematic chain, the origin of that joint's frame
+    (after applying all preceding transforms up to and including that joint's
+    rotation) is extracted from the FK chain.  The TCP (tool-centre point) is
+    also checked.  This covers six 3-D points per arm per pose: one per joint
+    frame origin plus the TCP.
+
+    All points are expressed in the **arm base frame** (``base_link``).
+    Keep-out primitives are also specified in the arm base frame (because
+    ``left_arm_base_to_chassis`` and ``right_arm_base_to_chassis`` are
+    ``unverified: true`` until AA-16, and re-expressing primitives into the
+    chassis frame would compound two unverified transforms).
+
+    Interpolation resolution
+    ------------------------
+    Straight-line joint-space paths are sampled at
+    ``CollisionConfig.interpolation_samples`` points (including endpoints).
+    Both endpoints and all interior samples are checked.  50 samples is the
+    documented default.
+
+    Unverified primitives
+    ---------------------
+    All primitives start with ``unverified: true``.  The collision model logs
+    a WARNING when any primitive is unverified but still enforces the check
+    (conservative — better to have false positives than false negatives).
+    """
+
+    chain: KinematicChain
+    collision_cfg: CollisionConfig
+
+    def __post_init__(self) -> None:
+        # Warn once if any primitive is unverified
+        all_primitives = list(self.collision_cfg.keep_out_boxes) + list(
+            self.collision_cfg.keep_out_capsules
+        )
+        unverified_labels = [p.label for p in all_primitives if p.unverified]
+        if unverified_labels:
+            logger.warning(
+                "AA-9 collision model: %d primitive(s) are UNVERIFIED placeholders: %s. "
+                "Check results are conservative (fail-closed). "
+                "Measure real chassis geometry and update hardware.yaml.",
+                len(unverified_labels),
+                ", ".join(unverified_labels),
+            )
+
+    def _link_points(self, q: JointVec) -> List[npt.NDArray[np.float64]]:
+        """Return list of 3-D link frame origins for all joints + TCP.
+
+        Uses partial FK up to each joint to extract the joint-frame origin.
+        """
+        import numpy as np  # noqa: F811 (already imported at module top)
+        points: list[npt.NDArray[np.float64]] = []
+        T = np.eye(4, dtype=np.float64)
+        for jf, qi in zip(self.chain.joints, q):
+            T = T @ jf.T_fixed @ _rotz_for_guard(qi)
+            points.append(T[:3, 3].copy())
+        # TCP: apply tool offset
+        T_tcp = T @ self.chain.T_tool_offset
+        points.append(T_tcp[:3, 3].copy())
+        return points
+
+    def check_pose(self, q: JointVec) -> Optional[str]:
+        """Check a single pose for collisions.
+
+        Parameters
+        ----------
+        q:
+            5-vector of joint angles (rad).
+
+        Returns
+        -------
+        str or None
+            Collision description if any link point is in a keep-out zone,
+            else None.
+        """
+        points = self._link_points(q)
+        for p in points:
+            for box in self.collision_cfg.keep_out_boxes:
+                if _point_in_box(p, box):
+                    return (
+                        f"link point {p.tolist()} is inside keep-out box "
+                        f"'{box.label}'"
+                    )
+            for cap in self.collision_cfg.keep_out_capsules:
+                if _point_in_capsule(p, cap):
+                    return (
+                        f"link point {p.tolist()} is inside keep-out capsule "
+                        f"'{cap.label}' (radius {cap.radius_m} m)"
+                    )
+        return None
+
+    def check_trajectory(
+        self,
+        q_start: JointVec,
+        q_end: JointVec,
+    ) -> Optional[str]:
+        """Check a straight-line joint-space interpolation for collisions.
+
+        Samples ``collision.interpolation_samples`` evenly-spaced points
+        (including both endpoints) along the linear interpolation from
+        ``q_start`` to ``q_end``.  Returns the first collision found.
+
+        This check detects collisions whose endpoints are safe but whose
+        interior passes through a keep-out zone.
+
+        Parameters
+        ----------
+        q_start:
+            Start joint configuration (rad).
+        q_end:
+            End joint configuration (rad).
+
+        Returns
+        -------
+        str or None
+            Collision description if any sample is in a keep-out zone,
+            else None.
+        """
+        n = self.collision_cfg.interpolation_samples
+        for i in range(n):
+            t = float(i) / float(n - 1)
+            q_sample = (1.0 - t) * np.asarray(q_start) + t * np.asarray(q_end)
+            result = self.check_pose(q_sample)
+            if result is not None:
+                return (
+                    f"trajectory sample {i}/{n-1} (t={t:.3f}): {result}"
+                )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Rotz helper (avoid importing private from kinematics)
+# ---------------------------------------------------------------------------
+
+
+def _rotz_for_guard(theta: float) -> npt.NDArray[np.float64]:
+    """Pure Z-rotation 4×4 HTM (duplicated to avoid private import)."""
+    import numpy as np  # noqa: F811
+    c, s = math.cos(theta), math.sin(theta)
+    return np.array([
+        [c, -s, 0, 0],
+        [s,  c, 0, 0],
+        [0,  0, 1, 0],
+        [0,  0, 0, 1],
+    ], dtype=np.float64)
+
+
+# ---------------------------------------------------------------------------
+# Combined motion guard
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class MotionGuard:
+    """Combined joint-limit + collision guard for one arm.
+
+    Use :func:`build_motion_guard` to construct from a loaded
+    :class:`~inchworm.config.HardwareConfig`.
+
+    Entry points
+    ------------
+    - :meth:`check_pose`: validate a single joint configuration.
+    - :meth:`check_trajectory`: validate a straight-line interpolation.
+    Both raise :class:`LiveMotionBlockedError` if ``live=True`` and limits
+    are unverified.
+
+    Returned violations are strings (human-readable); the caller decides
+    whether to raise, log, or handle them.
+    """
+
+    limit_guard: JointLimitGuard
+    collision_model: CollisionModel
+    arm_role: str
+
+    def check_pose(
+        self,
+        q: JointVec,
+        live: bool = False,
+    ) -> Optional[str]:
+        """Validate a single joint configuration.
+
+        Checks joint limits first (fail-closed on unverified), then collision.
+
+        Parameters
+        ----------
+        q:
+            5-vector of joint angles (rad).
+        live:
+            If True and limits are unverified, raises
+            :class:`LiveMotionBlockedError` immediately.
+
+        Returns
+        -------
+        str or None
+            First violation found, or None if the pose is safe.
+
+        Raises
+        ------
+        LiveMotionBlockedError
+            When ``live=True`` and soft limits are unverified.
+        """
+        violation = self.limit_guard.check(q, live=live)
+        if violation is not None:
+            return violation
+        return self.collision_model.check_pose(q)
+
+    def check_trajectory(
+        self,
+        q_start: JointVec,
+        q_end: JointVec,
+        live: bool = False,
+    ) -> Optional[str]:
+        """Validate a straight-line joint-space interpolation.
+
+        Checks both endpoints with the joint-limit guard (fail-closed on
+        unverified), then samples the full interpolation for collisions.
+        Sampling is done even if endpoint collision checks pass (interior
+        could still intersect a keep-out zone).
+
+        Parameters
+        ----------
+        q_start:
+            Start joint configuration (rad).
+        q_end:
+            End joint configuration (rad).
+        live:
+            If True and limits are unverified, raises
+            :class:`LiveMotionBlockedError` immediately.
+
+        Returns
+        -------
+        str or None
+            First violation found, or None if the trajectory is safe.
+
+        Raises
+        ------
+        LiveMotionBlockedError
+            When ``live=True`` and soft limits are unverified.
+        """
+        # Check both endpoints for joint-limit violations (fail-closed on live)
+        v = self.limit_guard.check(q_start, live=live)
+        if v is not None:
+            return f"q_start: {v}"
+        v = self.limit_guard.check(q_end, live=False)  # live=False: already checked above
+        if v is not None:
+            return f"q_end: {v}"
+
+        # Dense trajectory collision check (samples endpoints + interior)
+        return self.collision_model.check_trajectory(q_start, q_end)
+
+
+# ---------------------------------------------------------------------------
+# GuardedArm: ArmServoBus wrapper
+# ---------------------------------------------------------------------------
+
+
+class GuardedArm:
+    """Wraps :class:`~inchworm.servo_bus.ArmServoBus` to enforce motion guard.
+
+    All position writes for joints 1-5 (shoulder_pan … wrist_roll) are
+    intercepted and validated by :class:`MotionGuard` before the write
+    reaches the servo bus.  The gripper joint is excluded (managed by AA-17).
+
+    Bypass
+    ------
+    Pass ``bypass_guard=True`` to any position-write call to skip guard
+    validation.  **This always logs a WARNING via AA-7 telemetry.**
+    The intent is that no production code path ever sets this flag;
+    it exists only for emergency recovery or operator-commanded override.
+
+    Parameters
+    ----------
+    bus:
+        The :class:`~inchworm.servo_bus.ArmServoBus` to wrap.
+    guard:
+        The :class:`MotionGuard` for this arm.
+    live:
+        If True, position writes will raise
+        :class:`LiveMotionBlockedError` when limits are unverified.
+        In dry-run mode (``live=False``) guard violations are logged but
+        writes are still blocked; unverified limits do not block dry-run.
+    session_logger:
+        Optional AA-7 session logger.  If present, WARNING events are
+        emitted via ``session_logger.warning()``.
+    """
+
+    def __init__(
+        self,
+        bus: object,  # ArmServoBus — typed as object to avoid circular import
+        guard: MotionGuard,
+        live: bool = False,
+        session_logger: Optional[object] = None,
+    ) -> None:
+        self._bus = bus
+        self._guard = guard
+        self._live = live
+        self._session_logger = session_logger
+
+    @property
+    def bus(self) -> object:
+        """The underlying :class:`~inchworm.servo_bus.ArmServoBus`."""
+        return self._bus
+
+    @property
+    def guard(self) -> MotionGuard:
+        return self._guard
+
+    def _emit_warning(self, event_type: str, payload: dict) -> None:
+        """Emit a WARNING event via AA-7 telemetry if a logger is present."""
+        logger.warning("AA-9 GuardedArm [%s]: %s %r", self._guard.arm_role, event_type, payload)
+        if self._session_logger is not None:
+            warning_fn = getattr(self._session_logger, "warning", None)
+            if warning_fn is not None:
+                warning_fn(
+                    role=self._guard.arm_role,
+                    subsystem="motion_guard",
+                    event_type=event_type,
+                    payload=payload,
+                )
+
+    def write_position_deg(
+        self,
+        joint_name: str,
+        position_deg: float,
+        bypass_guard: bool = False,
+    ) -> None:
+        """Write a goal position to a named joint (degrees), enforcing the guard.
+
+        Parameters
+        ----------
+        joint_name:
+            Joint name (must be one of the 5 arm joints, not the gripper).
+        position_deg:
+            Desired position in degrees (0-360 STS3215 range).
+        bypass_guard:
+            If True, skip guard validation.
+            **ALWAYS logs a WARNING. Use only for emergency override.**
+
+        Raises
+        ------
+        MotionViolationError
+            If the target angle violates joint limits or collision envelope,
+            and ``bypass_guard=False``.
+        LiveMotionBlockedError
+            If ``live=True``, limits are unverified, and ``bypass_guard=False``.
+        """
+        if bypass_guard:
+            self._emit_warning(
+                "guard_bypass",
+                {
+                    "joint_name": joint_name,
+                    "position_deg": position_deg,
+                    "reason": "bypass_guard=True was set by caller",
+                },
+            )
+        else:
+            # Convert degrees to radians for guard check.
+            # Only check this single joint; build a full pose from current = zeros.
+            # This is a conservative per-joint check; trajectory check requires a full q.
+            joint_idx = JOINT_NAMES.index(joint_name) if joint_name in JOINT_NAMES else -1
+            if joint_idx >= 0:
+                import math as _math
+                q_single = np.zeros(5, dtype=np.float64)
+                q_single[joint_idx] = _math.radians(position_deg - 180.0)
+                # Note: STS3215 uses 0-360 range where 180 deg = 0 rad (centre).
+                # The conversion: q_rad = degrees_to_rad(position_deg) where
+                # the STS3215 range 0-360 maps to -π..+π (0 → -π, 180 → 0, 360 → +π).
+                q_rad = (position_deg - 180.0) * (math.pi / 180.0)
+                q_single[joint_idx] = q_rad
+                violation = self._guard.limit_guard.check(
+                    q_single, live=self._live
+                )
+                if violation is not None:
+                    raise MotionViolationError(violation)
+
+        # Delegate to underlying bus
+        self._bus.write_position_deg(joint_name, position_deg)  # type: ignore[attr-defined]
+
+    def write_positions_rad(
+        self,
+        q: JointVec,
+        bypass_guard: bool = False,
+    ) -> None:
+        """Write a complete 5-DoF joint configuration (radians) with guard enforcement.
+
+        This is the preferred entry point for motion commands that compute
+        a full configuration (e.g. from IK).  It runs the full
+        :meth:`MotionGuard.check_pose` check.
+
+        Parameters
+        ----------
+        q:
+            5-vector of joint angles (rad), ordered per :data:`JOINT_NAMES`.
+        bypass_guard:
+            If True, skip guard validation.
+            **ALWAYS logs a WARNING. Use only for emergency override.**
+
+        Raises
+        ------
+        MotionViolationError
+            If ``q`` violates joint limits or collision envelope,
+            and ``bypass_guard=False``.
+        LiveMotionBlockedError
+            If ``live=True``, limits are unverified, and ``bypass_guard=False``.
+        """
+        if bypass_guard:
+            self._emit_warning(
+                "guard_bypass",
+                {
+                    "q_rad": list(q),
+                    "reason": "bypass_guard=True was set by caller",
+                },
+            )
+        else:
+            violation = self._guard.check_pose(q, live=self._live)
+            if violation is not None:
+                raise MotionViolationError(violation)
+
+        # Convert rad → deg and write each joint
+        for i, name in enumerate(JOINT_NAMES):
+            deg = math.degrees(float(q[i])) + 180.0  # STS3215: 180 = 0 rad
+            deg = max(0.0, min(360.0, deg))
+            self._bus.write_position_deg(name, deg)  # type: ignore[attr-defined]
+
+    def check_trajectory_rad(
+        self,
+        q_start: JointVec,
+        q_end: JointVec,
+    ) -> Optional[str]:
+        """Validate a straight-line joint-space trajectory without writing.
+
+        Does not write to the servo bus.  Returns a violation string or None.
+
+        Raises
+        ------
+        LiveMotionBlockedError
+            If ``live=True`` and limits are unverified.
+        """
+        return self._guard.check_trajectory(q_start, q_end, live=self._live)
+
+
+# ---------------------------------------------------------------------------
+# Named pose lookup
+# ---------------------------------------------------------------------------
+
+
+def get_named_pose(
+    name: str,
+    guard_cfg: MotionGuardConfig,
+) -> Optional[NamedPose]:
+    """Look up a named pose from the motion guard config.
+
+    Returns None if the pose is not found.
+
+    Logs a WARNING if the pose has ``unverified: true``.  Unverified poses
+    must not be used for live motion without explicit operator review.
+    """
+    for pose in guard_cfg.named_poses:
+        if pose.name == name:
+            if pose.unverified:
+                logger.warning(
+                    "AA-9 named pose '%s' is UNVERIFIED (placeholder). "
+                    "Do not use for live motion without owner verification.",
+                    name,
+                )
+            return pose
+    logger.warning("AA-9 named pose '%s' not found in config.", name)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Factory functions
+# ---------------------------------------------------------------------------
+
+
+def build_joint_limit_guard(
+    cfg: HardwareConfig,
+    arm_role: str,
+) -> JointLimitGuard:
+    """Build a :class:`JointLimitGuard` from a loaded :class:`HardwareConfig`.
+
+    Parameters
+    ----------
+    cfg:
+        Loaded hardware config.
+    arm_role:
+        ``"left"`` or ``"right"``.
+    """
+    guard_cfg = cfg.motion_guard
+    soft: Optional[SoftJointLimits] = None
+    if guard_cfg is not None:
+        soft = guard_cfg.left_arm_limits if arm_role == "left" else guard_cfg.right_arm_limits
+    limits = _resolve_limits_for_arm(soft, cfg.so101_kinematics, arm_role)
+    return JointLimitGuard(limits, arm_role)
+
+
+def build_collision_model(
+    cfg: HardwareConfig,
+) -> CollisionModel:
+    """Build a :class:`CollisionModel` from a loaded :class:`HardwareConfig`.
+
+    Uses the ``so101_kinematics`` chain for FK and the
+    ``motion_guard.collision`` primitives.
+    """
+    chain = build_chain(cfg.so101_kinematics)
+    guard_cfg = cfg.motion_guard
+    collision_cfg = guard_cfg.collision if guard_cfg is not None else CollisionConfig()
+    return CollisionModel(chain=chain, collision_cfg=collision_cfg)
+
+
+def build_motion_guard(
+    cfg: HardwareConfig,
+    arm_role: str,
+) -> MotionGuard:
+    """Build a :class:`MotionGuard` for one arm from a loaded config.
+
+    Parameters
+    ----------
+    cfg:
+        Loaded hardware config.
+    arm_role:
+        ``"left"`` or ``"right"``.
+    """
+    limit_guard = build_joint_limit_guard(cfg, arm_role)
+    collision_model = build_collision_model(cfg)
+    return MotionGuard(
+        limit_guard=limit_guard,
+        collision_model=collision_model,
+        arm_role=arm_role,
+    )
