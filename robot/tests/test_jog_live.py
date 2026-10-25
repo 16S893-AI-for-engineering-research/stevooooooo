@@ -326,7 +326,7 @@ class TestDryRunUnchanged:
         assert ret == 0
 
     def test_dry_run_abs_exits_zero(self) -> None:
-        ret = jog.main(["--arm", "left", "--abs", "0.10,0.00,0.20"])
+        ret = jog.main(["--arm", "left", "--abs", "0.20,0.00,0.15"])  # reachable within the measured soft limits (2026-10-25)
         assert ret == 0
 
     def test_dry_run_never_opens_backend(self) -> None:

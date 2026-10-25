@@ -321,7 +321,7 @@ class TestJogDryRun:
         result = subprocess.run(
             [sys.executable, str(self.JOG_SCRIPT),
              "--arm", "right",
-             "--abs", "0.1,0.0,0.2",
+             "--abs", "0.2,0.0,0.15",  # reachable within the measured soft limits
              "--dry-run"],
             capture_output=True, text=True, timeout=30,
         )

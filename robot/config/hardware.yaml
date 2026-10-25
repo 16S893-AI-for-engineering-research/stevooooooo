@@ -567,7 +567,9 @@ motion_guard:
         placeholder; measure safe folded pose on hardware and set unverified:
         false to satisfy AA-9 AC#4. Doc-1 s3 notes the configuration is tight;
         DO NOT run on hardware without owner supervision.
-      q_rad: [0.0, 1.57, -1.57, 0.0, 0.0]
+      # 2026-10-25: placeholder moved inside the measured soft limits (shoulder_lift
+      # max 1.2364 rad on the right arm); was 1.57. Still a placeholder.
+      q_rad: [0.0, 1.2, -1.57, 0.0, 0.0]
       unverified: true
 
   # Per-joint servo calibration: servo-degree ↔ joint-radian conversion.
@@ -711,7 +713,8 @@ fold_sequence:
     # Step 3: Full elbow tuck (approach folded_transit pose).
     # Matches folded_transit q_rad from AA-9 named_poses.
     # (FoldSequencer appends the folded_transit pose as the terminal waypoint.)
-    - q_rad: [0.0, 1.57, -1.57, 0.0, 0.0]
+    # 2026-10-25: was 1.57 (outside measured shoulder_lift limits); still a placeholder.
+    - q_rad: [0.0, 1.2, -1.57, 0.0, 0.0]
       description: >-
         Full fold: shoulder raised, elbow tucked. Matches folded_transit.
         UNVERIFIED placeholder; this is the terminal waypoint.

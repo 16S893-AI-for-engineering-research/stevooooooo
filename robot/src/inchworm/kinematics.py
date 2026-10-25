@@ -447,6 +447,30 @@ class IKResult:
 # ---------------------------------------------------------------------------
 
 
+def with_soft_limits(chain: "KinematicChain", arm_limits) -> "KinematicChain":
+    """Return a copy of *chain* whose joint limits are the INTERSECTION of the
+    URDF/config limits and the per-arm motion_guard soft limits (rad).
+
+    Tightening only, so it never widens a limit. Null soft-limit fields keep the
+    chain limit. Lets IK search only inside the guard's allowed range, so it
+    never proposes a target the guard must reject (orchestrator 2026-10-25).
+    The guard still enforces its own limits independently.
+    """
+    import dataclasses as _dc
+    if arm_limits is None:
+        return chain
+    joints = []
+    for jf in chain.joints:
+        lo = getattr(arm_limits, f"{jf.name}_lower_rad", None)
+        hi = getattr(arm_limits, f"{jf.name}_upper_rad", None)
+        joints.append(_dc.replace(
+            jf,
+            limit_lower=jf.limit_lower if lo is None else max(jf.limit_lower, float(lo)),
+            limit_upper=jf.limit_upper if hi is None else min(jf.limit_upper, float(hi)),
+        ))
+    return _dc.replace(chain, joints=joints)
+
+
 def build_chain(cfg: SO101KinematicsConfig) -> KinematicChain:
     """Build a :class:`KinematicChain` from a loaded ``SO101KinematicsConfig``.
 

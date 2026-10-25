@@ -68,7 +68,7 @@ if str(_src_path) not in sys.path:
     sys.path.insert(0, str(_src_path))
 
 from inchworm.config import load_config
-from inchworm.kinematics import build_chain, IKResult
+from inchworm.kinematics import build_chain, with_soft_limits, IKResult
 from inchworm.trajectory import plan_joint_trajectory, sample_trajectory
 
 logging.basicConfig(
@@ -341,6 +341,8 @@ def main(argv: list[str] | None = None) -> int:
     chain = build_chain(cfg.so101_kinematics)
     arm_name = args.arm
     role = f"arm_{arm_name}"  # "arm_left" or "arm_right"
+    if cfg.motion_guard is not None:
+        chain = with_soft_limits(chain, getattr(cfg.motion_guard, f"{arm_name}_arm_limits", None))
 
     # --- Determine current joint configuration ---
     # In dry-run mode we use q=zeros as the "current" configuration.
