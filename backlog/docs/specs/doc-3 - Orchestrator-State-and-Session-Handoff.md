@@ -3,13 +3,15 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-24 21:18'
+updated_date: '2026-10-25 00:53'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-24 by the orchestrator at commit `92ac565`. 1496 tests pass (`cd robot && uv run pytest`). All hardware-free work is done; the remaining ACs need the owner, the robot or a trained model.
+**Last verified:** 2026-10-24 (end of the first owner-supervised hardware session) at commit `8f997a6`. 1505 tests pass.
+
+**SAFE STATE at pause (verified by live read):** both arms torque OFF on all 12 servos (limp; the owner left them supported), EEPROM locks closed, laser relay commanded OFF, no scripts running, DexArm powered off. Nothing is commanded. A computer shutdown changes nothing: on reboot, devices need `scripts/attach_usb.py` again (binds persist).
 
 ## 1. Resume in 60 seconds
 
@@ -63,6 +65,32 @@ Modules in `robot/src/inchworm/`:
 - AC checks lost in worktree patches, plus an agent adding pseudo-ACs
 
 The orchestrator must independently verify every safety-relevant change, and must re-check AC state after applying any worktree patch.
+
+## 2b. Hardware session 1 results (2026-10-24, owner supervised)
+
+Done:
+- Servo scan: both arms have 6x STS3215 (model 777) at IDs 1-6, firmware 3.9/3.10; full joint read about 200 Hz (AA-8 Done).
+- Relay and laser: LCUS-1 at 9600 verified on hardware (AA-29 #1).
+- **Servo EEPROM written (owner-approved):**
+  - half-turn homing offsets and per-joint Min/Max_Position_Limit on both arms, all read back;
+  - backups in `robot/calibration_data/eeprom_backup_*`;
+  - right shoulder_pan capped to the left arm's span (owner decision).
+- Joint zeros = mid-range (URDF so101_new_calib convention).
+- Direction test: higher reading = clockwise (cable-away view).
+
+Bugs found ON HARDWARE and fixed:
+- model register (3, not 0);
+- serial read blocking for the full timeout (811 ms to 5 ms per read);
+- SYNC_READ reply collisions;
+- live scripts silently using the mock backend;
+- **torque enable would have slammed every joint to the stale goal 0 deg** (now goal := present, verified, before enable);
+- range recorder not wrap-aware.
+
+Open from session 1:
+1. Joint signs vs the URDF +axis: an assumed +1, servo_calibration kept `unverified: true`, so live motion is blocked. Next step (no hardware): derive the per-joint mapping from URDF/CAD, then one owner check ("move the tip toward the DexArm").
+2. Combined-joint safe envelope (owner: limits depend on all joints together). The collision keep-out geometry is still placeholders; it must come from CAD and measurements before motion near the limits.
+3. The servo temperature reads 0 C and the current reads about 930 raw at rest: confirm plausibility before AA-10 fault thresholds rely on them.
+4. Remaining checklist steps: gripper bands (AA-17), the first powered jog, named poses and fold, DexArm, cameras, calibration.
 
 ## 3. Owner hardware session checklist (about 2-3 h, dry-run first, owner supervising every first live motion)
 
