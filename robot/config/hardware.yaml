@@ -575,33 +575,47 @@ motion_guard:
   # values for BOTH arms.
   servo_calibration:
     left_arm:
-      shoulder_pan_zero_offset_deg: null    # unverified: true
-      shoulder_pan_sign: null               # unverified: true
-      shoulder_lift_zero_offset_deg: null   # unverified: true
-      shoulder_lift_sign: null              # unverified: true
-      elbow_flex_zero_offset_deg: null      # unverified: true
-      elbow_flex_sign: null                 # unverified: true
-      wrist_flex_zero_offset_deg: null      # unverified: true
-      wrist_flex_sign: null                 # unverified: true
-      wrist_roll_zero_offset_deg: null      # unverified: true
-      wrist_roll_sign: null                 # unverified: true
+      shoulder_pan_zero_offset_deg: 140.669
+      shoulder_pan_sign: 1
+      shoulder_lift_zero_offset_deg: 186.987
+      shoulder_lift_sign: 1
+      elbow_flex_zero_offset_deg: 177.1
+      elbow_flex_sign: 1
+      wrist_flex_zero_offset_deg: 180.879
+      wrist_flex_sign: 1
+      wrist_roll_zero_offset_deg: 166.553
+      wrist_roll_sign: 1
+      # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
+      #   = so101_new_calib URDF zero, joint mid-range).
+      # sign: ASSUMED +1 (LeRobot SO-101 convention: DEGREES norm, drive_mode 0).
+      #   Owner test 2026-10-24: higher reading = clockwise viewed with the servo cable
+      #   exiting away, consistent on shoulder_pan/lift/elbow (left). Mapping
+      #   'clockwise' to the URDF +axis per joint is NOT yet verified (needs the CAD or
+      #   URDF axis comparison), so this stays unverified and live motion stays blocked.
       unverified: true
-      method: null        # e.g. "manual zero-pose sweep, 2026-XX-XX"
-      measured_date: null # e.g. "2026-XX-XX"
+      method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
+      measured_date: "2026-10-24"
     right_arm:
-      shoulder_pan_zero_offset_deg: null    # unverified: true
-      shoulder_pan_sign: null               # unverified: true
-      shoulder_lift_zero_offset_deg: null   # unverified: true
-      shoulder_lift_sign: null              # unverified: true
-      elbow_flex_zero_offset_deg: null      # unverified: true
-      elbow_flex_sign: null                 # unverified: true
-      wrist_flex_zero_offset_deg: null      # unverified: true
-      wrist_flex_sign: null                 # unverified: true
-      wrist_roll_zero_offset_deg: null      # unverified: true
-      wrist_roll_sign: null                 # unverified: true
+      shoulder_pan_zero_offset_deg: 186.108
+      shoulder_pan_sign: 1
+      shoulder_lift_zero_offset_deg: 187.119
+      shoulder_lift_sign: 1
+      elbow_flex_zero_offset_deg: 173.672
+      elbow_flex_sign: 1
+      wrist_flex_zero_offset_deg: 178.682
+      wrist_flex_sign: 1
+      wrist_roll_zero_offset_deg: 175.254
+      wrist_roll_sign: 1
+      # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
+      #   = so101_new_calib URDF zero, joint mid-range).
+      # sign: ASSUMED +1 (LeRobot SO-101 convention: DEGREES norm, drive_mode 0).
+      #   Owner test 2026-10-24: higher reading = clockwise viewed with the servo cable
+      #   exiting away, consistent on shoulder_pan/lift/elbow (left). Mapping
+      #   'clockwise' to the URDF +axis per joint is NOT yet verified (needs the CAD or
+      #   URDF axis comparison), so this stays unverified and live motion stays blocked.
       unverified: true
-      method: null
-      measured_date: null
+      method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
+      measured_date: "2026-10-24"
 # --- AA-9 end ---
 # --- AA-20 ---
 # Policy supervisor configuration.

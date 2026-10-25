@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 23:19'
+updated_date: '2026-10-25 00:52'
 labels: []
 milestone: m-1
 dependencies:
@@ -78,6 +78,8 @@ OWNER NOTE: these are per-joint independent maxima; the real safe envelope depen
 AC#1 NOT checked yet: the right arm is pending, and the radian-valued soft limits need AA-9 servo_calibration (joint zero and sign), which is unmeasured.
 
 LIVE 2026-10-24, right arm servo EEPROM calibration (owner-approved, torque OFF, all writes read back). Homing offsets id1 -312, id2 397, id3 -99, id4 269, id5 -1063, id6 611. Two read-only sweeps (the first missed shoulder_pan); merged ranges (ticks): pan 758-3477 (239 deg), lift 1293-2965, elbow 876-3076, wrist_flex 869-3197, wrist_roll 524-3464, gripper 1543-2509; no seam crossing. Left shoulder_pan re-swept: 654-2565 (168 deg), repeatable, limit kept. OWNER DECISION (b): right shoulder_pan capped to the left span (1853 ticks) centred on its midpoint, giving 1191-3044. EEPROM limits written: pan 1191-3044, lift 1323-2935, elbow 906-3046, wrist_flex 899-3167, wrist_roll 554-3434, gripper 1573-2479. Both arms now have per-joint servo-side limits. AC#1 still unchecked: radian soft limits need the joint zero and sign calibration, and the combined-joint envelope needs the collision geometry.
+
+LIVE 2026-10-24 joint zero and direction (read-only). Zero offsets set to the midpoint of each EEPROM limit range: left pan 140.669, lift 186.987, elbow 177.1, wrist_flex 180.879, roll 166.553; right 186.108, 187.119, 173.672, 178.682, 175.254 servo deg. Resulting joint ranges are symmetric (e.g. left pan +/-81.4, lift +/-76.7, elbow +/-94.6, wrist_flex +/-99.2, roll +/-122.6 deg). Owner direction test: higher reading = clockwise viewed with the servo cable exiting away (pan +255, lift +343, elbow -329 for CCW). Signs ASSUMED +1 (LeRobot convention); the servo_calibration block stays unverified (live blocked) until the per-joint URDF +axis vs 'clockwise' mapping is verified from the URDF/CAD.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

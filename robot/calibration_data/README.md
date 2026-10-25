@@ -58,3 +58,18 @@ confirm (654-2565, 168 deg, repeatable), so its limit 674..2527 was kept.
 | wrist_flex | 899..3167 | 79.0..278.3 |
 | wrist_roll | 554..3434 | 48.7..301.8 |
 | gripper | 1573..2479 | 138.3..217.9 |
+
+## Joint direction test, left arm, 2026-10-24 (read-only)
+
+Owner convention: view each joint along its rotation axis from the side where the
+servo's cable exits AWAY from the viewer (from above for the base; from the robot's
+left side for the pitch joints; the robot front faces the DexArm, which sits on the
+structure's left). Results (`direction_test_left_2026-10-24.jsonl`): shoulder_pan CW
++255 ticks, shoulder_lift CW +343, elbow_flex CCW -329, wrist_flex no movement
+recorded. Conclusion: **higher servo reading = clockwise** in that view, consistent
+with all 12 servos having the same phase register (0x0C). Mapping to the URDF +axis
+per joint is still pending (needs the URDF/CAD mounting orientation).
+
+Joint zero offsets (servo deg) written to hardware.yaml servo_calibration = midpoint
+of each EEPROM limit range (URDF so101_new_calib zero = joint mid-range). Signs are
+ASSUMED +1 and the block remains `unverified: true`.
