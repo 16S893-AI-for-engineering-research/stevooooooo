@@ -593,8 +593,8 @@ motion_guard:
       #   - shoulder_pan +1: cable down, viewed from above. CW about -z = URDF positive.
       #     Independent of where the arm points.
       #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
-      #     from the robot's right. CW = URDF positive about +y, ASSUMING the arm at
-      #     mid-range pan points toward the robot's front (DexArm). Owner to confirm.
+      #     from the robot's right. CW = URDF positive about +y. CONFIRMED: owner says
+      #     the arm at mid-range pan points at the DexArm (robot front).
       #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
       #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
       #     from behind the wrist looking toward the gripper tip.
@@ -623,8 +623,8 @@ motion_guard:
       #   - shoulder_pan +1: cable down, viewed from above. CW about -z = URDF positive.
       #     Independent of where the arm points.
       #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
-      #     from the robot's right. CW = URDF positive about +y, ASSUMING the arm at
-      #     mid-range pan points toward the robot's front (DexArm). Owner to confirm.
+      #     from the robot's right. CW = URDF positive about +y. CONFIRMED: owner says
+      #     the arm at mid-range pan points at the DexArm (robot front).
       #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
       #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
       #     from behind the wrist looking toward the gripper tip.

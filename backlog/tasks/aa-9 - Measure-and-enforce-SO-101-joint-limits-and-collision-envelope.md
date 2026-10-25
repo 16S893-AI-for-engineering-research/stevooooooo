@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-25 00:58'
+updated_date: '2026-10-25 06:54'
 labels: []
 milestone: m-1
 dependencies:
@@ -82,6 +82,8 @@ LIVE 2026-10-24, right arm servo EEPROM calibration (owner-approved, torque OFF,
 LIVE 2026-10-24 joint zero and direction (read-only). Zero offsets set to the midpoint of each EEPROM limit range: left pan 140.669, lift 186.987, elbow 177.1, wrist_flex 180.879, roll 166.553; right 186.108, 187.119, 173.672, 178.682, 175.254 servo deg. Resulting joint ranges are symmetric (e.g. left pan +/-81.4, lift +/-76.7, elbow +/-94.6, wrist_flex +/-99.2, roll +/-122.6 deg). Owner direction test: higher reading = clockwise viewed with the servo cable exiting away (pan +255, lift +343, elbow -329 for CCW). Signs ASSUMED +1 (LeRobot convention); the servo_calibration block stays unverified (live blocked) until the per-joint URDF +axis vs 'clockwise' mapping is verified from the URDF/CAD.
 
 Owner info 2026-10-24 (no hardware touched): cable exits per servo: id1 down; id2-4 to the robot's left (the robot faces the DexArm, on the structure's left); id5-6 down. In the robot.png side view the cables point toward the viewer, so test-clockwise appears CCW in that picture (to confirm). This is the input for the per-joint URDF sign derivation. Recorded in robot/calibration_data/README.md.
+
+Owner 2026-10-24: at mid-range shoulder_pan the arm points at the DexArm, which confirms sign +1 for shoulder_lift, elbow_flex and wrist_flex (URDF +y). Wrist_roll: owner says 'clockwise increases'; the viewing direction (from behind the wrist toward the tip, or from the tip back) is needed to fix the sign. URDF +wrist_roll is CCW viewed from behind the wrist looking toward the tip.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
