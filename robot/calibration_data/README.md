@@ -73,3 +73,20 @@ per joint is still pending (needs the URDF/CAD mounting orientation).
 Joint zero offsets (servo deg) written to hardware.yaml servo_calibration = midpoint
 of each EEPROM limit range (URDF so101_new_calib zero = joint mid-range). Signs are
 ASSUMED +1 and the block remains `unverified: true`.
+
+## Servo cable orientation (owner, 2026-10-24, verbatim summary)
+
+"Clockwise" is defined relative to each servo's cable exit, consistently:
+- Servo 1 (shoulder_pan): cable points DOWN; viewed from above, the cable exits away from the viewer.
+- Servos 2, 3, 4 (shoulder_lift, elbow_flex, wrist_flex): cables point to the robot's LEFT.
+  The robot faces the DexArm, which is on the left of the structure. Viewed from the
+  robot's right, the cables exit away from the viewer.
+- Servos 5, 6 (wrist_roll, gripper): cables point DOWN.
+- In the side view of `pictures/robot.png`, the cables come OUT of the picture toward the
+  viewer. So the test's clockwise appears COUNTER-clockwise in that picture (pending
+  owner confirmation).
+- Observed: higher servo reading = clockwise in the cable-away view (direction test above).
+
+Pending owner confirmation: both arms have cables on the same side (robot's left), so the
+arms may be mounted in the SAME orientation rather than mirrored. That affects
+decision-1 teleop sign mapping.
