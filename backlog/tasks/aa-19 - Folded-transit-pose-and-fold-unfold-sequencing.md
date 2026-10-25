@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-24 18:39'
+updated_date: '2026-10-25 19:43'
 labels: []
 milestone: m-2
 dependencies:
@@ -94,6 +94,11 @@ Test evidence:
 AC#1 and AC#4: UNCHECKED (hardware ACs)
 
 Orchestrator 2026-10-24: removed a hard-coded worktree path in test_build_fold_sequencer_missing_fold_sequence_raises (it now uses DEFAULT_CONFIG_PATH).
+
+Folded pose read by hand 2026-10-25 (owner placed both arms per pictures/robot.png; read-only scripts/read_pose.py; calibration_data/poses_2026-10-25.jsonl):
+LEFT  q_rad [0.6266, -1.1037, 1.6935, -1.6306, 1.2824] (deg 35.9, -63.2, 97.0, -93.4, 73.5)
+RIGHT q_rad [-0.0836, -0.9802, 1.6874, -1.5509, 1.4435] (deg -4.8, -56.2, 96.7, -88.9, 82.7)
+Findings: (1) both elbows are at their mechanical end-stop, outside the EEPROM/soft limits (L 3119 > max 3091; R 3076 > max 3046), so the fold uses the full elbow travel; the limit update must include it (owner approval, EEPROM). (2) left shoulder_pan reads +35.9 deg while right reads -4.8 deg; asked the owner whether this asymmetry is intended. Not yet written to config; AC#1 also needs real collision validation.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

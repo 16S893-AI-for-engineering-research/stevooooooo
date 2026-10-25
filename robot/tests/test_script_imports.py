@@ -45,6 +45,7 @@ def test_script_inchworm_imports_resolve(script):
 #: Scripts that require a sub-command to run in dry-run (default args won't work).
 #: Map script-name -> argv to pass instead of [].
 _DRY_RUN_ARGV: dict[str, list[str]] = {
+    "read_pose.py": [],
     "gripper_sample.py": ["--arm", "left", "--label", "open"],
     "record_joint_ranges.py": ["--arm", "left"],
     # attach_usb queries the LIVE usbipd device list even in --dry-run, so its
