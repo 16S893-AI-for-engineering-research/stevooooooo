@@ -71,8 +71,10 @@ def main() -> int:
     # --- 1. Import lerobot (must be in lerobot_env) ----------------------
     try:
         import torch
-        from lerobot.common.policies.act.modeling_act import ACTPolicy
-        from lerobot.common.policies.act.configuration_act import ACTConfig
+        # lerobot 0.6.x module layout (lerobot.common.* was removed upstream).
+        from lerobot.configs.types import FeatureType, PolicyFeature
+        from lerobot.policies.act.modeling_act import ACTPolicy
+        from lerobot.policies.act.configuration_act import ACTConfig
     except ImportError as exc:
         print(f"ERROR: lerobot or torch not available: {exc}", file=sys.stderr)
         print(
@@ -83,7 +85,9 @@ def main() -> int:
         return 1
 
     device = torch.device(args.device)
-    H, W, C = args.frame_h, args.frame_w, 1
+    # 3 channels: the policy input is the grayscale frame replicated to 3 channels
+    # for the ImageNet ResNet backbone (same as the AA-22 VRAM measurement).
+    H, W, C = args.frame_h, args.frame_w, 3
     N = args.n_joints
 
     print(f"Device: {device}")
@@ -97,11 +101,12 @@ def main() -> int:
     # These hyperparameters determine latency (architecture-bound).
     try:
         config = ACTConfig(
-            input_shapes={
-                "observation.state": [N],
-                "observation.images.wrist_cam": [C, H, W],
+            input_features={
+                "observation.state": PolicyFeature(type=FeatureType.STATE, shape=(N,)),
+                "observation.images.wrist_cam": PolicyFeature(type=FeatureType.VISUAL, shape=(C, H, W)),
             },
-            output_shapes={"action": [N]},
+            output_features={"action": PolicyFeature(type=FeatureType.ACTION, shape=(N,))},
+            device=str(device),
         )
         policy = ACTPolicy(config).to(device)
         policy.eval()
@@ -112,7 +117,7 @@ def main() -> int:
 
     def _make_obs() -> dict:
         state = torch.zeros(1, N, dtype=torch.float32, device=device)
-        frame = torch.zeros(1, C, H, W, dtype=torch.float32, device=device)
+        frame = torch.rand(1, C, H, W, dtype=torch.float32, device=device)
         return {
             "observation.state": state,
             "observation.images.wrist_cam": frame,
@@ -144,6 +149,26 @@ def main() -> int:
             torch.cuda.synchronize()
         t1 = time.perf_counter()
         latencies_ms.append((t1 - t0) * 1000.0)
+
+    # --- 4b. Full network forward (predict_action_chunk) --------------
+    # select_action() runs the network only once per chunk (chunk_size steps)
+    # and otherwise pops a queued action, so its per-call mean understates the
+    # worst-case step. Measure the full forward separately (orchestrator 2026-10-25).
+    fwd_ms: List[float] = []
+    for _ in range(max(20, args.n_measure // 5)):
+        obs = _make_obs()
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        with torch.no_grad():
+            _ = policy.predict_action_chunk(obs)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        fwd_ms.append((time.perf_counter() - t0) * 1000.0)
+    fs = sorted(fwd_ms)
+    print("\n=== ACTPolicy full forward (predict_action_chunk) ===")
+    print(f"  chunk_size: {config.chunk_size}  n_action_steps: {config.n_action_steps}")
+    print(f"  Mean: {statistics.mean(fwd_ms):.2f} ms  p95: {fs[int(0.95*len(fs))]:.2f} ms  max: {fs[-1]:.2f} ms")
 
     # --- 5. Report ---------------------------------------------------
     mean_ms = statistics.mean(latencies_ms)

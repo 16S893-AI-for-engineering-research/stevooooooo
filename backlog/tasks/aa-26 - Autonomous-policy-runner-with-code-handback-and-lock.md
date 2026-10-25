@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-24 19:14'
+updated_date: '2026-10-25 19:38'
 labels: []
 milestone: m-3
 dependencies:
@@ -112,6 +112,11 @@ See doc-1 sections 3 and 9.
 
 AC#4 UNCHECKED: needs owner-supervised hardware session: cd robot/lerobot_env && uv run python latency_measure.py (script written and documented)
 AC#7 UNCHECKED: needs owner-supervised hardware session: python scripts/rollout.py --live --checkpoint PATH (script written; live mode has stub guard that forces the owner to wire real hardware callables)
+
+AC#4 measurement 2026-10-25 (this host: RTX 3050 Ti 4 GB, CUDA, lerobot 0.6.1, RANDOM-weight ACTPolicy at the deployment shapes: 3x480x640 wrist image, 5-joint state, default chunk_size=100, n_action_steps=100; latency_measure.py fixed for the lerobot 0.6 API):
+- select_action(): mean 0.94 ms, median 0.61, p95 1.91, p99 19.02, max 22.78 ms (300 calls). Most calls pop a queued action.
+- Full network forward (predict_action_chunk, runs once per 100 steps): mean 16.93 ms, p95 21.11, max 25.52 ms.
+Compatibility with supervisor_loop_rate_hz 50 (20 ms budget): the mean fits easily. But the per-step budget also includes the camera (measured mean ~17-18 ms per frame at ~55-60 fps, AA-14) and the servo bus read (~5 ms). On chunk-boundary steps that is about 17 + 21 + 5 = ~43 ms, which OVERRUNS 20 ms (about once every 2 s). Also, the supervisor _attempt loop has no rate pacing or overrun detection: it runs as fast as camera + policy + bus allow, so 50 Hz is a config value, not an enforced rate. NOT CHECKED: (1) random weights, not the trained checkpoint (an earlier note required the trained checkpoint); (2) compatibility is not shown for worst-case steps. Owner decision needed: accept random-weight evidence, and decide whether to (a) run the loop at 20-25 Hz, (b) add pacing with overrun logging, or (c) shrink chunk_size or use temporal ensembling.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
