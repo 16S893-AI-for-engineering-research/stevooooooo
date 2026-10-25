@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:08'
-updated_date: '2026-10-24 21:18'
+updated_date: '2026-10-25 07:04'
 labels: []
 milestone: m-0
 dependencies:
@@ -161,6 +161,8 @@ TEST RUN: uv run pytest: 252 passed, 0 failed (222 pre-existing + 24 test_vhci +
 Orchestrator live check 2026-10-24 ~11:45 EDT. I detached all three cameras and re-attached them in REVERSED order (10-2, then 11-4, then 9-4). The vhci local ports changed: 10-2 went to 1-5, 11-4 to 1-6, 9-4 to 1-7. Discovery followed the BusId correctly: cam_left=/dev/video4 (ID_PATH vhci usb-0:7, which is BusId 9-4), cam_right=/dev/video0, cam_scanner=/dev/video2. Before the fix, the same input labelled one node as both cameras. 252 tests pass. Follow-up observed: the first 'usbipd attach' for 10-2 twice returned without the device appearing in vhci status. A retry succeeded. attach_usb.py does not verify presence after attaching (no vhci check), so it can report OK falsely. Logged here and not fixed in AA-5.
 
 Orchestrator 2026-10-24 (owner asked whether a power cycle changes USB connections): discovery for the BusId-identified cameras now also checks that the device at the configured BusId has the expected VID:PID (expected_vid_pid in vhci.resolve_busid_to_video_node), and refuses with 'dock port changed' if a different device sits on that port after a reboot or re-cabling. Test test_busid_holding_wrong_device_is_refused. Made test_attach_usb and the attach_usb smoke test hermetic (they read the live /sys and usbipd, and failed when the owner powered off the DexArm). 1496 passed.
+
+Orchestrator 2026-10-24 after the owner power-cycled everything: attach_usb.py resolved cam_left to BusId 10-2 (the RIGHT camera's port), because BusId-identified cameras were matched by 'first 32e6:9251 without a real serial'. cam_left's InstanceId carries its colliding serial 5423534724, so it was skipped. Fixed: usbip_busid devices match their configured windows_busid plus a VID:PID check (test test_busid_identified_cameras_resolve_to_configured_ports). Re-run: 7/7 OK, discovery cam_left=/dev/video4 (9-4), cam_right=/dev/video0 (10-2). Post-power-cycle: EEPROM limits persisted on all 12 servos, torque off, laser off.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

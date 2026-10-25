@@ -548,3 +548,17 @@ class TestVhciVerification:
             results = [result]
             any_failure = any(not r.success for r in results)
             assert any_failure, "Exit nonzero logic must trigger on FAIL result"
+
+
+# --- Orchestrator 2026-10-24: BusId-identified cameras resolve to THEIR port ---
+def test_busid_identified_cameras_resolve_to_configured_ports(config):
+    devices = [
+        {"BusId": "9-4", "InstanceId": "USB\\\\VID_32E6&PID_9251\\\\5423534724"},
+        {"BusId": "10-2", "InstanceId": "USB\\\\VID_32E6&PID_9251\\\\7&69F6256&0&2"},
+    ]
+    specs = {s.role: s for s in attach_usb._device_specs_from_config(config)}
+    assert attach_usb._resolve_busid(specs["cam_left"], devices) == "9-4"
+    assert attach_usb._resolve_busid(specs["cam_right"], devices) == "10-2"
+    # A different device on the configured port is refused.
+    wrong = [{"BusId": "9-4", "InstanceId": "USB\\\\VID_1A86&PID_7523\\\\X"}]
+    assert attach_usb._resolve_busid(specs["cam_left"], wrong) is None

@@ -89,6 +89,12 @@ class _DeviceSpec:
     usb_serial: Optional[str]
     """USB serial number from hardware.yaml, or ``None`` for port-path devices."""
 
+    windows_busid: Optional[str] = None
+    """For ``identify_by: usbip_busid`` devices (the two arm cameras share a
+    serial): the configured dock-port BusId. Matched by BusId + VID:PID, never by
+    'first device without a serial'. Orchestrator fix 2026-10-24: after a power
+    cycle the old rule picked the right camera's port for cam_left."""
+
 
 @dataclass
 class _AttachResult:
@@ -201,6 +207,14 @@ def _resolve_busid(
     target_pid = spec.pid.lower()
     target_serial = spec.usb_serial.upper() if spec.usb_serial else None
 
+    if spec.windows_busid is not None:
+        # Positional identity: the configured BusId, verified against VID:PID.
+        for dev in devices:
+            if dev.get("BusId") == spec.windows_busid:
+                vid, pid, _ = _parse_instance_id(dev.get("InstanceId", ""))
+                return dev["BusId"] if (vid, pid) == (target_vid, target_pid) else None
+        return None
+
     for dev in devices:
         instance_id = dev.get("InstanceId", "")
         vid, pid, serial = _parse_instance_id(instance_id)
@@ -250,6 +264,9 @@ def _device_specs_from_config(config: HardwareConfig) -> list[_DeviceSpec]:
             vid=identity.vendor_id.lower(),
             pid=identity.product_id.lower(),
             usb_serial=identity.usb_serial,
+            windows_busid=(getattr(identity, "windows_busid", None)
+                           if getattr(getattr(identity, "identify_by", None), "value", None) == "usbip_busid"
+                           else None),
         )
         for role, identity in raw
     ]
