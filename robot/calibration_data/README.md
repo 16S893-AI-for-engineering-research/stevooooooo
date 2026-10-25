@@ -90,3 +90,16 @@ ASSUMED +1 and the block remains `unverified: true`.
 Pending owner confirmation: both arms have cables on the same side (robot's left), so the
 arms may be mounted in the SAME orientation rather than mirrored. That affects
 decision-1 teleop sign mapping.
+
+## Shoulder pan zero re-taken from a landmark, 2026-10-25 (owner-supervised, read-only)
+
+The owner reported that both arms' pans pointed at the same angle in real life, yet the
+mid-range zeros gave left +32.7 deg and right -4.8 deg. Cause: the LEFT pan travel is
+mechanically limited on one side (owner confirmed), so its mid-range is not "forward".
+Fix: with both arms pointing at the DexArm (owner), the read pan positions became the
+zeros: left 1972 ticks (173.320 servo deg, was 140.669), right 2063 ticks (181.318, was
+186.108). `poses_2026-10-25.jsonl` label `pan_zero_pointing_at_dexarm`. Pan soft limits
+were recomputed from the EEPROM limits around the new zeros: left [-1.9198 (URDF clip), 0.8514] rad,
+right [-1.3376, 1.5048] rad. The other joints keep mid-range zeros (their travel is not
+obstructed). servo_calibration stays `unverified: true` until a landmark check of the
+pitch joints.

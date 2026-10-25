@@ -460,8 +460,10 @@ motion_guard:
   # unverified: true → guard refuses LIVE motion (fail-closed).
   # Set method + measured_date after running: scripts/measure_limits.py --live
   left_arm_limits:
-    shoulder_pan_lower_rad: -1.4212
-    shoulder_pan_upper_rad: 1.4212
+    # EEPROM min 674 ticks around the landmark zero gives -1.9911 rad, beyond the URDF
+    # limit -1.91986; clipped to the URDF value (tighter of the two).
+    shoulder_pan_lower_rad: -1.9198
+    shoulder_pan_upper_rad: 0.8514
     shoulder_lift_lower_rad: -1.3384
     shoulder_lift_upper_rad: 1.3384
     elbow_flex_lower_rad: -1.6506
@@ -489,8 +491,8 @@ motion_guard:
       wrist_roll: [500, 3290]
       gripper: [1558, 2487]
   right_arm_limits:
-    shoulder_pan_lower_rad: -1.4212
-    shoulder_pan_upper_rad: 1.4212
+    shoulder_pan_lower_rad: -1.3376
+    shoulder_pan_upper_rad: 1.5048
     shoulder_lift_lower_rad: -1.2364
     shoulder_lift_upper_rad: 1.2364
     elbow_flex_lower_rad: -1.6414
@@ -619,7 +621,7 @@ motion_guard:
   # values for BOTH arms.
   servo_calibration:
     left_arm:
-      shoulder_pan_zero_offset_deg: 140.669
+      shoulder_pan_zero_offset_deg: 173.320  # 2026-10-25 LANDMARK: owner-confirmed arm pointing at the DexArm (was mid-range 140.669)
       shoulder_pan_sign: 1
       shoulder_lift_zero_offset_deg: 186.987
       shoulder_lift_sign: 1
@@ -643,14 +645,15 @@ motion_guard:
       #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
       #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      # VERIFIED for the zero/sign CONVERSION only. This does NOT authorise motion:
-      # live motion additionally needs the collision geometry (placeholders now) and
-      # owner supervision for the first move.
-      unverified: false
+      # RE-OPENED 2026-10-25: the owner reports that both arms' pans point at the same
+      # angle, yet left reads +32.7 deg and right -4.8 deg. The zero = mid-range rule is
+      # wrong for pan (the left sweep was likely shorter on one side). Pan zeros must be
+      # re-taken from a landmark (arm pointing at the DexArm). Signs are unaffected.
+      unverified: true
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
     right_arm:
-      shoulder_pan_zero_offset_deg: 186.108
+      shoulder_pan_zero_offset_deg: 181.318  # 2026-10-25 LANDMARK: owner-confirmed arm pointing at the DexArm (was mid-range 186.108)
       shoulder_pan_sign: 1
       shoulder_lift_zero_offset_deg: 187.119
       shoulder_lift_sign: 1
@@ -674,10 +677,11 @@ motion_guard:
       #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
       #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      # VERIFIED for the zero/sign CONVERSION only. This does NOT authorise motion:
-      # live motion additionally needs the collision geometry (placeholders now) and
-      # owner supervision for the first move.
-      unverified: false
+      # RE-OPENED 2026-10-25: the owner reports that both arms' pans point at the same
+      # angle, yet left reads +32.7 deg and right -4.8 deg. The zero = mid-range rule is
+      # wrong for pan (the left sweep was likely shorter on one side). Pan zeros must be
+      # re-taken from a landmark (arm pointing at the DexArm). Signs are unaffected.
+      unverified: true
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
 # --- AA-9 end ---
