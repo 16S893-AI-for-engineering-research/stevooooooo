@@ -587,11 +587,20 @@ motion_guard:
       wrist_roll_sign: 1
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
-      # sign: ASSUMED +1 (LeRobot SO-101 convention: DEGREES norm, drive_mode 0).
-      #   Owner test 2026-10-24: higher reading = clockwise viewed with the servo cable
-      #   exiting away, consistent on shoulder_pan/lift/elbow (left). Mapping
-      #   'clockwise' to the URDF +axis per joint is NOT yet verified (needs the CAD or
-      #   URDF axis comparison), so this stays unverified and live motion stays blocked.
+      # sign: DERIVED 2026-10-24 (no hardware motion). Higher reading = clockwise in
+      #   the cable-away view (owner test). URDF +axes in the base frame: pan -z,
+      #   lift/elbow/wrist_flex +y, wrist_roll -x.
+      #   - shoulder_pan +1: cable down, viewed from above. CW about -z = URDF positive.
+      #     Independent of where the arm points.
+      #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
+      #     from the robot's right. CW = URDF positive about +y, ASSUMING the arm at
+      #     mid-range pan points toward the robot's front (DexArm). Owner to confirm.
+      #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
+      #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
+      #     from behind the wrist looking toward the gripper tip.
+      #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
+      #   Stays unverified (live blocked) until the wrist_roll test and the pan-direction
+      #   confirmation.
       unverified: true
       method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
       measured_date: "2026-10-24"
@@ -608,11 +617,20 @@ motion_guard:
       wrist_roll_sign: 1
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
-      # sign: ASSUMED +1 (LeRobot SO-101 convention: DEGREES norm, drive_mode 0).
-      #   Owner test 2026-10-24: higher reading = clockwise viewed with the servo cable
-      #   exiting away, consistent on shoulder_pan/lift/elbow (left). Mapping
-      #   'clockwise' to the URDF +axis per joint is NOT yet verified (needs the CAD or
-      #   URDF axis comparison), so this stays unverified and live motion stays blocked.
+      # sign: DERIVED 2026-10-24 (no hardware motion). Higher reading = clockwise in
+      #   the cable-away view (owner test). URDF +axes in the base frame: pan -z,
+      #   lift/elbow/wrist_flex +y, wrist_roll -x.
+      #   - shoulder_pan +1: cable down, viewed from above. CW about -z = URDF positive.
+      #     Independent of where the arm points.
+      #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
+      #     from the robot's right. CW = URDF positive about +y, ASSUMING the arm at
+      #     mid-range pan points toward the robot's front (DexArm). Owner to confirm.
+      #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
+      #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
+      #     from behind the wrist looking toward the gripper tip.
+      #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
+      #   Stays unverified (live blocked) until the wrist_roll test and the pan-direction
+      #   confirmation.
       unverified: true
       method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
       measured_date: "2026-10-24"

@@ -24,7 +24,7 @@ Demonstrations are captured by **cross-arm teleoperation**: one SO-101, torque o
 Rules:
 1. The leader arm never carries the tube while its torque is off. Recording refuses to start unless the tube is supported by the fixture or by a locked, torqued arm.
 2. The gripper (joint 6) is excluded from the teleop mapping and from the action space. Lock and unlock remain AA-17 state-machine commands only.
-3. Joint mapping between the arms handles mirrored mounting (per-joint sign and offset), and it is verified at low speed under owner supervision before any recording.
+3. Joint mapping between the arms handles per-joint sign and offset, and it is verified at low speed under owner supervision before any recording. **Update 2026-10-24 (owner): the arms are mounted in the same orientation, not mirrored, so the expected cross-arm sign is +1 on every joint; offsets come from each arm's own calibration.**
 4. The fixture must reproduce the real attachment-point geometry and pose relative to the inserting arm and its wrist camera closely enough that rollout observations match training. This is checked by comparing camera frames from the fixture and from the real crawl pose.
 
 ## Consequences
@@ -32,5 +32,5 @@ Rules:
 - AA-23 is rewritten for cross-arm capture with a fixture. A fixture design and validation step is added, and the fixture is a physical owner deliverable.
 - Distribution shift between the fixture and the real crawl is the main risk. If AA-25 online success in the real crawl lags fixture success, fall back to option (b) or (c) for HIL correction rounds in the real pose.
 - Follower backdrive stiffness may degrade demo smoothness. AA-23 measures it.
-- Both arms need demonstrations eventually (mirrored sides). Start with one arm (owner-approved item H), then add the other.
+- Both arms need demonstrations eventually (they insert at different lattice positions; the mounts are the same orientation). Start with one arm (owner-approved item H), then add the other.
 
