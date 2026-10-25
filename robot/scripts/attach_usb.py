@@ -588,6 +588,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     n_total = len(results)
     print(f"{n_ok}/{n_total} devices OK")
 
+    # Orchestrator 2026-10-24: after attach, udev creates /dev/serial/by-id
+    # links a moment later; a script started immediately could fail with
+    # DeviceNotFoundError (observed). Wait (bounded) for udev to settle.
+    if not args.dry_run and not any_failure:
+        try:
+            subprocess.run(["udevadm", "settle", "--timeout=10"], check=False,
+                           capture_output=True)
+        except FileNotFoundError:
+            pass
+
     return 1 if any_failure else 0
 
 
