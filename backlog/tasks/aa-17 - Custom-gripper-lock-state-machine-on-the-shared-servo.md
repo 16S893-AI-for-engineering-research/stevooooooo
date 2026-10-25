@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-24 19:18'
+updated_date: '2026-10-25 19:01'
 labels: []
 milestone: m-2
 dependencies:
@@ -49,4 +49,12 @@ Plan executed. New modules: gripper_lock.py (state machine), policy_actions.py (
 Orchestrator review 2026-10-24: hold_tick previously swallowed read failures forever while still reporting LOCKED. It now escalates to FAULT and raises GripperLockError after 3 consecutive failures (gripper_hold_lost event). Tests: test_hold_tick_escalates_to_fault_after_repeated_read_failures, test_hold_tick_read_failure_counter_resets_on_success. Checked: unlock refuses without a passing opposite-arm predicate. 767 passed.
 
 Orchestrator re-verification 2026-10-24 (the worker's AC checks were lost in the worktree patch merge, so they were re-run here): `uv run pytest tests/test_gripper_lock.py` -> 83 passed. TestStateMachineTransitions 16 (AC#2 transitions and illegal ones), TestLockVerification 13 (AC#3 latch/jam/miss), TestActiveHold 7 + the orchestrator hold-loss tests (AC#4), TestPolicyActions 15 + test_no_token_import_outside_aa17 in test_servo_bus.py (AC#5 policy path blocked), TestUnlockSafety 6 (AC#6 opposite-arm gate and under-load warning). AC#7 is the union. AC#1 (empirical bands) is hardware-only and stays unchecked.
+
+Owner 2026-10-25: the gripper is a lock-and-key. The key inserts at the fully-open position, so 'engaged but unlocked' is the SAME servo position as 'unlocked/open'. Left samples (calibration_data/gripper_samples_2026-10-25.jsonl): open 1531, engaged_unlocked 1550, closed_empty 2521 ticks. CONSEQUENCE / OWNER QUESTION: position alone cannot tell unlocked from engaged-but-unlocked. The AC#1 three-band model may need another signal (load/current, or a camera) to detect key insertion. Raised with the owner; AC not changed.
+
+Owner-supervised band measurement 2026-10-25 (read-only, torque off; calibration_data/gripper_samples_2026-10-25.jsonl, 40 samples each, all steady):
+LEFT: open 1531, engaged_unlocked (key in) 1550, locked 1802/1802/1801 (3 full cycles), closed_empty 2521.
+RIGHT: open 1576, locked 1792/1800/1801, closed_empty 2494.
+Owner: lock-and-key; the key is inserted at the open position; locked with key stops short of closed_empty; key detection method = (a) position.
+DESIGN ISSUE FOUND (needs owner decision, AC not changed): GripperLockSM._goal_pos_locked() commands the MIDPOINT of the locked band. Without a key, the servo would also reach that goal, so position could not detect a missing key. For (a) to work, the lock goal must lie BEYOND the key stop (e.g. about 1950-2000 ticks), so: key in = stalls at about 1800 (in band); no key = passes it (MISS). That needs a torque/current limit for the stall. Also: the measured open and closed positions lie outside the EEPROM limits (L 1558-2487, R 1573-2479); a limit update (EEPROM write) is needed before powered gripper use.
 <!-- SECTION:NOTES:END -->
