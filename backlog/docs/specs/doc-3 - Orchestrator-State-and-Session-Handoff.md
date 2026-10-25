@@ -3,15 +3,15 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-25 00:53'
+updated_date: '2026-10-25 18:07'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-24 (end of the first owner-supervised hardware session) at commit `8f997a6`. 1505 tests pass.
+**Last verified:** 2026-10-25 at commit `8790fd6`. **3 tests FAIL at this commit (known, to fix first):** test_jog_live::test_dry_run_abs_exits_zero, test_kinematics::TestJogDryRun::test_jog_dry_run_abs, test_script_imports dry-run fold_cycle.py. Cause: the new real soft limits (rad, from EEPROM limits) now reject dry-run targets and placeholder fold poses that only fit the old URDF limits. The guard is behaving correctly; the tests and placeholder poses need updating, not the limits.
 
-**SAFE STATE at pause (verified by live read):** both arms torque OFF on all 12 servos (limp; the owner left them supported), EEPROM locks closed, laser relay commanded OFF, no scripts running, DexArm powered off. Nothing is commanded. A computer shutdown changes nothing: on reboot, devices need `scripts/attach_usb.py` again (binds persist).
+**Session 2 (2026-10-25) state:** robot powered, 7/7 USB attached, torque OFF on all 12 servos, EEPROM limits intact, laser OFF. Joint servo_calibration VERIFIED (zeros = mid-range, all signs +1, both arms the same orientation). Soft limits in rad filled in but kept `unverified: true` (live blocked until the collision geometry is real). Next with the owner: gripper bands (AA-17) using read-only `scripts/gripper_sample.py --arm left --label <open|engaged|locked> --live --out calibration_data/gripper_samples_2026-10-25.jsonl`; left gripper baseline 1531 ticks (134.6 deg). The owner chose option (c): gripper bands now, then soft limits and CAD collision geometry, then the first supervised powered move.
 
 ## 1. Resume in 60 seconds
 
