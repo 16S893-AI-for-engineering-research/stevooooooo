@@ -706,8 +706,8 @@ class TestJointCalibration:
         # 2026-10-24: zeros measured (mid-range after half-turn homing) and signs
         # verified (owner direction test + URDF axes, all +1) on both arms.
         for arm in (sc.left_arm, sc.right_arm):
-            # Re-opened 2026-10-25 (pan zero discrepancy); signs still verified +1.
-            assert arm.unverified is True
+            # 2026-10-25: pan zero from landmark; other zeros owner-accepted.
+            assert arm.unverified is False
             assert arm.shoulder_pan_zero_offset_deg is not None
             assert [arm.shoulder_pan_sign, arm.shoulder_lift_sign, arm.elbow_flex_sign,
                     arm.wrist_flex_sign, arm.wrist_roll_sign] == [1, 1, 1, 1, 1]

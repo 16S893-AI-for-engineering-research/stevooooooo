@@ -645,11 +645,13 @@ motion_guard:
       #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
       #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      # RE-OPENED 2026-10-25: the owner reports that both arms' pans point at the same
-      # angle, yet left reads +32.7 deg and right -4.8 deg. The zero = mid-range rule is
-      # wrong for pan (the left sweep was likely shorter on one side). Pan zeros must be
-      # re-taken from a landmark (arm pointing at the DexArm). Signs are unaffected.
-      unverified: true
+      # VERIFIED 2026-10-25 (zero/sign conversion only; does NOT authorise motion):
+      # - shoulder_pan zero = LANDMARK (owner: arm pointing at the DexArm), read-only.
+      # - other joints: mid-range zeros, accepted by the OWNER (only the left pan had an
+      #   obstructed range). Supporting evidence: in the hand-placed fold, both arms read
+      #   within 0.5-6 deg of each other on lift/elbow/wrist_flex. That shows the arms
+      #   agree with each other, not absolute accuracy; AA-11 #3 pose checks will test it.
+      unverified: false
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
     right_arm:
@@ -677,11 +679,13 @@ motion_guard:
       #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
       #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      # RE-OPENED 2026-10-25: the owner reports that both arms' pans point at the same
-      # angle, yet left reads +32.7 deg and right -4.8 deg. The zero = mid-range rule is
-      # wrong for pan (the left sweep was likely shorter on one side). Pan zeros must be
-      # re-taken from a landmark (arm pointing at the DexArm). Signs are unaffected.
-      unverified: true
+      # VERIFIED 2026-10-25 (zero/sign conversion only; does NOT authorise motion):
+      # - shoulder_pan zero = LANDMARK (owner: arm pointing at the DexArm), read-only.
+      # - other joints: mid-range zeros, accepted by the OWNER (only the left pan had an
+      #   obstructed range). Supporting evidence: in the hand-placed fold, both arms read
+      #   within 0.5-6 deg of each other on lift/elbow/wrist_flex. That shows the arms
+      #   agree with each other, not absolute accuracy; AA-11 #3 pose checks will test it.
+      unverified: false
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
 # --- AA-9 end ---
