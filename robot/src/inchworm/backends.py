@@ -669,6 +669,10 @@ class V4L2CameraTransport(CameraTransport):
         dev_node = require_device(discovery_role)
 
         cap = _cv2.VideoCapture(dev_node, _cv2.CAP_V4L2)
+        # NOTE 2026-10-25: raw MJPEG passthrough (CAP_PROP_CONVERT_RGB=0) was tried
+        # for truncated-frame detection; on the openaicam arm cameras OpenCV returns
+        # misaligned buffers in that mode (no SOI/EOI), so it is NOT used. Truncated
+        # frames therefore remain undetected here (AA-14 AC#3 open).
         if not cap.isOpened():
             raise BackendError(
                 f"Failed to open camera {device!r} at {dev_node!r} (V4L2 backend). "
@@ -693,6 +697,7 @@ class V4L2CameraTransport(CameraTransport):
         if not ret or frame is None or frame.size == 0:
             # Return empty bytes; CameraCapture will flag as corrupt.
             return b"", self._transport_counter
+
 
         # Encode the decoded frame back to JPEG for uniform handling in
         # _decode_to_gray (which will decode it back to gray).  This is a

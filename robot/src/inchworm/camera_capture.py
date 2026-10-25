@@ -457,6 +457,13 @@ def _decode_to_gray(raw_bytes: bytes) -> "tuple[np.ndarray, bool]":
     if not raw_bytes:
         return _np.empty((0, 0), dtype=_np.uint8), True
 
+    # Truncated-JPEG check (orchestrator 2026-10-25): on hardware, truncated MJPEG
+    # frames ("premature end of data segment") still decode, with a grey tail, so
+    # imdecode success alone is not proof of integrity. A JPEG must start with SOI
+    # (FFD8) and end with EOI (FFD9), ignoring trailing zero padding from the driver.
+    if raw_bytes[:2] == b"\xff\xd8" and not raw_bytes.rstrip(b"\x00").endswith(b"\xff\xd9"):
+        return _np.empty((0, 0), dtype=_np.uint8), True
+
     buf = _np.frombuffer(raw_bytes, dtype=_np.uint8)
     # Try MJPEG (JPEG decode).
     frame = _cv2.imdecode(buf, _cv2.IMREAD_GRAYSCALE)

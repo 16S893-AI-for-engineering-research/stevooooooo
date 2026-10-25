@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-25 19:30'
+updated_date: '2026-10-25 19:36'
 labels: []
 milestone: m-1
 dependencies:
@@ -86,6 +86,8 @@ FIX found during measurement: without an explicit MJPG FOURCC the scanner fell b
 DATA-QUALITY FINDING (follow-up, not hidden): libjpeg printed 'Corrupt JPEG data: premature end of data segment' (truncated frames) for left-arm 36/300 and scanner-1280x800 203/300; right-arm and scanner-640 had 0. The probe's 'corrupt' counter reported 0, so it does NOT detect truncated-but-decodable frames. Likely USB/IP bandwidth on 1280x800 MJPEG. It needs truncated-frame detection before scanner use (AA-30/31).
 
 AC#3 UNCHECKED 2026-10-25 by the orchestrator. Live evidence contradicts it: truncated MJPEG frames ('premature end of data segment') decode without error and are NOT counted as corrupt (left arm 36/300, scanner 1280x800 203/300). AC#3 was previously checked on mock evidence only. Fix needed: detect truncated JPEG (missing EOI marker 0xFFD9 / libjpeg warning) and report it as corrupt; then re-measure.
+
+Truncated-frame detection attempt 2026-10-25: added an SOI/EOI check in _decode_to_gray (kept, with a unit test; it catches truncated JPEG bytes when the transport supplies raw JPEG). The raw passthrough via CAP_PROP_CONVERT_RGB=0 was REVERTED: on the openaicam arm cameras OpenCV then returns misaligned buffers (no SOI/EOI, every frame unreadable). So hardware truncated frames are still undetected and AC#3 stays unchecked. Next options: read V4L2 directly (v4l2 mmap buffer bytesused), or detect them via the libjpeg warning or the grey-tail pattern. Live probe after the revert: L 59.4 fps, R 53.3, scanner 99.7, reported corrupt 0 (as before).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -645,3 +645,21 @@ def test_v4l2_transport_refuses_open_without_global_lock():
     from inchworm.backends import BackendError, V4L2CameraTransport
     with pytest.raises(BackendError, match="global camera lock"):
         V4L2CameraTransport.open("camera_left_arm", identity=None)
+
+
+# --- Orchestrator 2026-10-25: truncated MJPEG detection (hardware finding) ---
+def test_truncated_jpeg_is_reported_corrupt():
+    import cv2
+    import numpy as np
+    from inchworm.camera_capture import _decode_to_gray
+    img = (np.arange(64 * 48, dtype=np.uint8).reshape(48, 64))
+    ok, buf = cv2.imencode(".jpg", img)
+    full = buf.tobytes()
+    data, corrupt = _decode_to_gray(full)
+    assert not corrupt and data.shape == (48, 64)
+    # Driver zero padding after EOI is still a complete frame.
+    _, corrupt = _decode_to_gray(full + b"\x00" * 32)
+    assert not corrupt
+    # Truncated bitstream (no EOI) decodes in libjpeg but must be flagged.
+    _, corrupt = _decode_to_gray(full[: len(full) * 2 // 3])
+    assert corrupt
