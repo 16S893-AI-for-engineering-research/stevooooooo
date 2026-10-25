@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-24 17:48'
+updated_date: '2026-10-25 19:30'
 labels: []
 milestone: m-1
 dependencies:
@@ -32,8 +32,8 @@ See doc-1 sections 4 and 6.
 <!-- AC:BEGIN -->
 - [x] #1 Capture opens any configured camera by logical role through the USB arbiter, and streaming without holding the arbiter lock is impossible by construction
 - [x] #2 Resolution, frame rate, exposure and gain are explicitly settable, auto-exposure and auto-gain can be disabled, and the applied settings are read back and logged
-- [x] #3 Frames are delivered as single-channel arrays with a monotonic capture timestamp and a frame counter, and dropped or corrupt frames are detected and reported rather than silently skipped
-- [ ] #4 Achieved frame rate and latency are measured for each camera role at the settings used downstream and recorded in task notes
+- [ ] #3 Frames are delivered as single-channel arrays with a monotonic capture timestamp and a frame counter, and dropped or corrupt frames are detected and reported rather than silently skipped
+- [x] #4 Achieved frame rate and latency are measured for each camera role at the settings used downstream and recorded in task notes
 - [x] #5 A snapshot and a short-recording CLI exist for any camera role, writing to the gitignored session artifact directory
 - [x] #6 Switching between two camera roles in sequence fully closes the first device before opening the second, verified by a test
 - [x] #7 Tests cover arbiter enforcement, settings read-back, frame metadata and the sequential-switch path against the mock backend
@@ -76,6 +76,16 @@ Implementation complete (software half):
 - AC#4 unchecked: needs owner-supervised hardware session: uv run python scripts/camera_probe.py --live --role camera_left_arm --frames 120
 
 Orchestrator hardening 2026-10-24: V4L2CameraTransport.open() refuses to open unless CameraArbiter.acquire() holds the global lock for that device (camera_arbiter.global_lock_held_for). That closes a bypass where scripts could stream without the lock. Test: test_v4l2_transport_refuses_open_without_global_lock. 583 passed.
+
+AC#4 measurement 2026-10-25 (live, one camera at a time via the arbiter, scripts/camera_probe.py --live --frames 300, 640x480 requested = downstream teleop/policy setting, robot/config hardware.yaml teleop.camera_frame_*):
+- camera_left_arm: applied 640x480@60, achieved 59.85 fps, latency mean 16.74 / p95 31.42 / max 41.59 ms, dropped 0.
+- camera_right_arm: applied 640x480@60, achieved 54.62 fps, latency mean 18.35 / p95 32.81 / max 63.94 ms, dropped 0.
+- camera_scanner 640x480: applied @100, achieved 101.49 fps, latency mean 9.88 / p95 19.64 / max 28.40 ms.
+- camera_scanner 1280x800 (full sensor; scanner downstream resolution not yet fixed by AA-30/31): achieved 59.30 fps, latency mean 16.84 / p95 29.84 / max 48.54 ms.
+FIX found during measurement: without an explicit MJPG FOURCC the scanner fell back to YUYV, ignored the size and ran at 1280x720@~10.7 fps. backends.py now requests MJPG before the size.
+DATA-QUALITY FINDING (follow-up, not hidden): libjpeg printed 'Corrupt JPEG data: premature end of data segment' (truncated frames) for left-arm 36/300 and scanner-1280x800 203/300; right-arm and scanner-640 had 0. The probe's 'corrupt' counter reported 0, so it does NOT detect truncated-but-decodable frames. Likely USB/IP bandwidth on 1280x800 MJPEG. It needs truncated-frame detection before scanner use (AA-30/31).
+
+AC#3 UNCHECKED 2026-10-25 by the orchestrator. Live evidence contradicts it: truncated MJPEG frames ('premature end of data segment') decode without error and are NOT counted as corrupt (left arm 36/300, scanner 1280x800 203/300). AC#3 was previously checked on mock evidence only. Fix needed: detect truncated JPEG (missing EOI marker 0xFFD9 / libjpeg warning) and report it as corrupt; then re-measure.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

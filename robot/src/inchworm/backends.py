@@ -716,6 +716,10 @@ class V4L2CameraTransport(CameraTransport):
         s: CameraSettings = settings  # type: ignore[assignment]
         cap = self._cap
 
+        # Request MJPEG before the size: without it the Arducam scanner falls back to
+        # uncompressed YUYV, ignores the size and is capped at ~10 fps (measured
+        # 2026-10-25). The arm cameras already default to MJPEG.
+        cap.set(_cv2.CAP_PROP_FOURCC, float(_cv2.VideoWriter_fourcc(*"MJPG")))
         if s.width is not None:
             cap.set(_cv2.CAP_PROP_FRAME_WIDTH, float(s.width))
         if s.height is not None:
