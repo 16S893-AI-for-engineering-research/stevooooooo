@@ -595,14 +595,15 @@ motion_guard:
       #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
       #     from the robot's right. CW = URDF positive about +y. CONFIRMED: owner says
       #     the arm at mid-range pan points at the DexArm (robot front).
-      #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
-      #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
-      #     from behind the wrist looking toward the gripper tip.
+      #   - wrist_roll +1: owner, viewed from the gripper tip looking back toward the
+      #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
+      #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      #   Stays unverified (live blocked) until the wrist_roll test and the pan-direction
-      #   confirmation.
-      unverified: true
-      method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
+      # VERIFIED for the zero/sign CONVERSION only. This does NOT authorise motion:
+      # live motion additionally needs the collision geometry (placeholders now) and
+      # owner supervision for the first move.
+      unverified: false
+      method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
     right_arm:
       shoulder_pan_zero_offset_deg: 186.108
@@ -625,14 +626,15 @@ motion_guard:
       #   - shoulder_lift, elbow_flex, wrist_flex +1: cable to the robot's left, viewed
       #     from the robot's right. CW = URDF positive about +y. CONFIRMED: owner says
       #     the arm at mid-range pan points at the DexArm (robot front).
-      #   - wrist_roll: cable is perpendicular to its axis, so the cable rule does not
-      #     apply; sign UNKNOWN until a wrist-roll test. URDF +wrist_roll = CCW viewed
-      #     from behind the wrist looking toward the gripper tip.
+      #   - wrist_roll +1: owner, viewed from the gripper tip looking back toward the
+      #     wrist, clockwise = reading increases. URDF +wrist_roll is CCW viewed from
+      #     behind the wrist, which is CW viewed from the tip, so it matches.
       #   Both arms are mounted in the SAME orientation (owner), so the same signs apply.
-      #   Stays unverified (live blocked) until the wrist_roll test and the pan-direction
-      #   confirmation.
-      unverified: true
-      method: "zero = measured mid-range after half-turn homing; sign = assumed +1 pending URDF axis check"
+      # VERIFIED for the zero/sign CONVERSION only. This does NOT authorise motion:
+      # live motion additionally needs the collision geometry (placeholders now) and
+      # owner supervision for the first move.
+      unverified: false
+      method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
 # --- AA-9 end ---
 # --- AA-20 ---

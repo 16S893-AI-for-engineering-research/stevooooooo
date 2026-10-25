@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-25 06:54'
+updated_date: '2026-10-25 07:00'
 labels: []
 milestone: m-1
 dependencies:
@@ -84,6 +84,8 @@ LIVE 2026-10-24 joint zero and direction (read-only). Zero offsets set to the mi
 Owner info 2026-10-24 (no hardware touched): cable exits per servo: id1 down; id2-4 to the robot's left (the robot faces the DexArm, on the structure's left); id5-6 down. In the robot.png side view the cables point toward the viewer, so test-clockwise appears CCW in that picture (to confirm). This is the input for the per-joint URDF sign derivation. Recorded in robot/calibration_data/README.md.
 
 Owner 2026-10-24: at mid-range shoulder_pan the arm points at the DexArm, which confirms sign +1 for shoulder_lift, elbow_flex and wrist_flex (URDF +y). Wrist_roll: owner says 'clockwise increases'; the viewing direction (from behind the wrist toward the tip, or from the tip back) is needed to fix the sign. URDF +wrist_roll is CCW viewed from behind the wrist looking toward the tip.
+
+Owner 2026-10-24: wrist_roll, viewed from the gripper tip looking back toward the wrist, clockwise = increasing reading. URDF +wrist_roll is CW from the tip, so sign +1. All 5 joint signs are +1 on both arms (same mounting orientation). servo_calibration set to unverified: false (zero and sign conversion verified). Live motion remains BLOCKED (checked): soft limits are still null or unverified, and the collision primitives are UNVERIFIED placeholders; scripts/jog.py --live refuses (rc 4).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

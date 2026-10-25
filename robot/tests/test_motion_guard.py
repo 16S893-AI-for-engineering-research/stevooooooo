@@ -703,10 +703,13 @@ class TestJointCalibration:
         assert sc is not None
         assert sc.left_arm is not None
         assert sc.right_arm is not None
-        # 2026-10-24: zeros measured (mid-range after half-turn homing); signs still
-        # pending the URDF axis check, so the block stays unverified (live blocked).
-        assert sc.left_arm.unverified is True
-        assert sc.left_arm.shoulder_pan_zero_offset_deg is not None
+        # 2026-10-24: zeros measured (mid-range after half-turn homing) and signs
+        # verified (owner direction test + URDF axes, all +1) on both arms.
+        for arm in (sc.left_arm, sc.right_arm):
+            assert arm.unverified is False
+            assert arm.shoulder_pan_zero_offset_deg is not None
+            assert [arm.shoulder_pan_sign, arm.shoulder_lift_sign, arm.elbow_flex_sign,
+                    arm.wrist_flex_sign, arm.wrist_roll_sign] == [1, 1, 1, 1, 1]
 
 
 class TestGuardedArmFullPoseCheck:
