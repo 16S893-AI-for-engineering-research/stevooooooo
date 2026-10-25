@@ -1,0 +1,38 @@
+{
+  "shoulder_pan": {
+    "servo_id": 1,
+    "min": 674,
+    "max": 2527,
+    "present": 1972
+  },
+  "shoulder_lift": {
+    "servo_id": 2,
+    "min": 1255,
+    "max": 3000,
+    "present": 1225
+  },
+  "elbow_flex": {
+    "servo_id": 3,
+    "min": 939,
+    "max": 3091,
+    "present": 3114
+  },
+  "wrist_flex": {
+    "servo_id": 4,
+    "min": 929,
+    "max": 3187,
+    "present": 2033
+  },
+  "wrist_roll": {
+    "servo_id": 5,
+    "min": 500,
+    "max": 3290,
+    "present": 1248
+  },
+  "gripper": {
+    "servo_id": 6,
+    "min": 1558,
+    "max": 2487,
+    "present": 1541
+  }
+}

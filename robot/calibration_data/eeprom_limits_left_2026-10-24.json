@@ -7,15 +7,17 @@
   },
   "shoulder_lift": {
     "servo_id": 2,
-    "min_position_limit": 1255,
+    "min_position_limit": 1216,
     "max_position_limit": 3000,
-    "verified": true
+    "verified": true,
+    "widened_2026-10-25": "from 1255..3000; observed positions (fold end stops / gripper open+closed_empty / rest) + 10 ticks"
   },
   "elbow_flex": {
     "servo_id": 3,
     "min_position_limit": 939,
-    "max_position_limit": 3091,
-    "verified": true
+    "max_position_limit": 3129,
+    "verified": true,
+    "widened_2026-10-25": "from 939..3091; observed positions (fold end stops / gripper open+closed_empty / rest) + 10 ticks"
   },
   "wrist_flex": {
     "servo_id": 4,
@@ -31,8 +33,9 @@
   },
   "gripper": {
     "servo_id": 6,
-    "min_position_limit": 1558,
-    "max_position_limit": 2487,
-    "verified": true
+    "min_position_limit": 1521,
+    "max_position_limit": 2531,
+    "verified": true,
+    "widened_2026-10-25": "from 1558..2487; observed positions (fold end stops / gripper open+closed_empty / rest) + 10 ticks"
   }
 }

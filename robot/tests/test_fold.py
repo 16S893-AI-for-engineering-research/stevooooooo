@@ -519,8 +519,10 @@ class TestUnfoldPath:
         waypoints = cfg.fold_sequence.unfold_waypoints
         assert len(waypoints) >= 2
         # shoulder_lift is index 1
-        first_lift = waypoints[0].q_rad[1]
-        last_lift = waypoints[-1].q_rad[1]
+        # 2026-10-25: the measured fold has shoulder_lift NEGATIVE (URDF sign), so
+        # 'raised' = larger |lift|. Same ordering property, sign-independent.
+        first_lift = abs(waypoints[0].q_rad[1])
+        last_lift = abs(waypoints[-1].q_rad[1])
         assert first_lift > last_lift, (
             f"unfold should start with raised shoulder ({first_lift:.4f} rad) "
             f"and end with lowered shoulder ({last_lift:.4f} rad)"

@@ -103,3 +103,22 @@ were recomputed from the EEPROM limits around the new zeros: left [-1.9198 (URDF
 right [-1.3376, 1.5048] rad. The other joints keep mid-range zeros (their travel is not
 obstructed). servo_calibration stays `unverified: true` until a landmark check of the
 pitch joints.
+
+## EEPROM limits widened, 2026-10-25 (owner-approved, torque off, read back)
+
+Hand-placed positions (fold end stops, gripper open / closed-empty, rest) lay outside the
+24 Oct limits, which had stopped short of the hard stops. Widen-only, to observed + 10 ticks.
+Backups: `eeprom_backup_{left,right}_2026-10-25_pre_limit_widen.json`.
+
+| arm | joint | old | new |
+|---|---|---|---|
+| left | shoulder_lift | 1255..3000 | 1216..3000 |
+| left | elbow_flex | 939..3091 | 939..3129 |
+| left | gripper | 1558..2487 | 1521..2531 |
+| right | shoulder_lift | 1323..2935 | 1283..2935 |
+| right | elbow_flex | 906..3046 | 906..3086 |
+| right | wrist_flex | 899..3167 | 860..3167 |
+| right | gripper | 1573..2479 | 1563..2504 |
+
+Soft limits (rad) recomputed from these, clipped to the URDF limits (elbow upper 1.69,
+wrist_flex +/-1.6581).

@@ -462,14 +462,14 @@ motion_guard:
   left_arm_limits:
     # EEPROM min 674 ticks around the landmark zero gives -1.9911 rad, beyond the URDF
     # limit -1.91986; clipped to the URDF value (tighter of the two).
-    shoulder_pan_lower_rad: -1.9198
+    shoulder_pan_lower_rad: -1.9199
     shoulder_pan_upper_rad: 0.8514
-    shoulder_lift_lower_rad: -1.3384
+    shoulder_lift_lower_rad: -1.3982
     shoulder_lift_upper_rad: 1.3384
     elbow_flex_lower_rad: -1.6506
-    elbow_flex_upper_rad: 1.6506
-    wrist_flex_lower_rad: -1.7319
-    wrist_flex_upper_rad: 1.7319
+    elbow_flex_upper_rad: 1.69
+    wrist_flex_lower_rad: -1.6581
+    wrist_flex_upper_rad: 1.6581
     wrist_roll_lower_rad: -2.1399
     wrist_roll_upper_rad: 2.1399
     # Radians = EEPROM servo-tick limits converted with the verified servo_calibration
@@ -493,12 +493,12 @@ motion_guard:
   right_arm_limits:
     shoulder_pan_lower_rad: -1.3376
     shoulder_pan_upper_rad: 1.5048
-    shoulder_lift_lower_rad: -1.2364
+    shoulder_lift_lower_rad: -1.2977
     shoulder_lift_upper_rad: 1.2364
     elbow_flex_lower_rad: -1.6414
-    elbow_flex_upper_rad: 1.6414
-    wrist_flex_lower_rad: -1.7395
-    wrist_flex_upper_rad: 1.7395
+    elbow_flex_upper_rad: 1.69
+    wrist_flex_lower_rad: -1.6581
+    wrist_flex_upper_rad: 1.6581
     wrist_roll_lower_rad: -2.2089
     wrist_roll_upper_rad: 2.2089
     # Radians = EEPROM servo-tick limits converted with the verified servo_calibration
@@ -605,9 +605,16 @@ motion_guard:
         placeholder; measure safe folded pose on hardware and set unverified:
         false to satisfy AA-9 AC#4. Doc-1 s3 notes the configuration is tight;
         DO NOT run on hardware without owner supervision.
-      # 2026-10-25: placeholder moved inside the measured soft limits (shoulder_lift
-      # max 1.2364 rad on the right arm); was 1.57. Still a placeholder.
-      q_rad: [0.0, 1.2, -1.57, 0.0, 0.0]
+      # MEASURED 2026-10-25 (owner hand-placed per pictures/robot.png, read-only;
+      # calibration_data/poses_2026-10-25.jsonl label folded_transit, 2nd reading).
+      # Measured L [~0, -1.383, 1.687, -1.305, 1.282], R [~0, -1.282, 1.680, -1.319, 1.444].
+      # pan = 0: owner says both arms point at the DexArm when folded.
+      # lift -1.25 / elbow 1.64: ~2-3 deg short of the mechanical end stops (both arms
+      # fold onto them) so a powered fold does not drive into the stop.
+      # wrist_roll 1.36 = mean of the arms (owner to confirm if roll matters).
+      # NOTE: the old placeholder had the lift/elbow SIGNS REVERSED (+1.2 / -1.57).
+      # Still unverified: AC#1 needs real collision geometry.
+      q_rad: [0.0, -1.25, 1.64, -1.31, 1.36]
       unverified: true
 
   # Per-joint servo calibration: servo-degree ↔ joint-radian conversion.
@@ -741,7 +748,9 @@ fold_sequence:
     # Step 1: Raise shoulder_lift to clear the chassis before tucking elbow.
     # shoulder_pan=0, shoulder_lift=0.8rad (~46deg up), elbow/wrist neutral.
     # UNVERIFIED: placeholder; measure safe intermediate on hardware.
-    - q_rad: [0.0, 0.8, 0.0, 0.0, 0.0]
+    # 2026-10-25: waypoint signs corrected to match the measured fold (lift -, elbow +,
+    # wrist_flex -). The intermediate values are still interpolated placeholders.
+    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]
       description: >-
         Raise shoulder_lift to clear chassis before elbow tuck.
         Proximal-first ordering: shoulder clear, elbow still extended.
@@ -749,7 +758,7 @@ fold_sequence:
       unverified: true
     # Step 2: Begin elbow tuck while shoulder_lift still raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, 1.2, -0.8, 0.0, 0.0]
+    - q_rad: [0.0, -1.0, 1.2, -1.0, 0.7]
       description: >-
         Partial elbow tuck. Shoulder raised, elbow beginning to fold.
         UNVERIFIED placeholder; verify on hardware before live use.
@@ -757,8 +766,8 @@ fold_sequence:
     # Step 3: Full elbow tuck (approach folded_transit pose).
     # Matches folded_transit q_rad from AA-9 named_poses.
     # (FoldSequencer appends the folded_transit pose as the terminal waypoint.)
-    # 2026-10-25: was 1.57 (outside measured shoulder_lift limits); still a placeholder.
-    - q_rad: [0.0, 1.2, -1.57, 0.0, 0.0]
+    # 2026-10-25: = measured folded_transit.
+    - q_rad: [0.0, -1.25, 1.64, -1.31, 1.36]
       description: >-
         Full fold: shoulder raised, elbow tucked. Matches folded_transit.
         UNVERIFIED placeholder; this is the terminal waypoint.
@@ -769,7 +778,7 @@ fold_sequence:
   unfold_waypoints:
     # Step 1: Relax elbow from full tuck to partial, shoulder still raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, 1.2, -0.8, 0.0, 0.0]
+    - q_rad: [0.0, -1.0, 1.2, -1.0, 0.7]
       description: >-
         Partial unfold: relax elbow tuck, shoulder still raised.
         Distal-first unfold order: release wrist/elbow before lowering shoulder.
@@ -777,7 +786,7 @@ fold_sequence:
       unverified: true
     # Step 2: Extend elbow to near-neutral while shoulder_lift is raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, 0.8, 0.0, 0.0, 0.0]
+    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]
       description: >-
         Elbow extended, shoulder still raised. Prepare to lower shoulder.
         UNVERIFIED placeholder; verify on hardware before live use.
