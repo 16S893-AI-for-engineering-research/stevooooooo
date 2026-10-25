@@ -416,6 +416,22 @@ class GripperBandConfig(_Strict):
 
     Mark ``unverified: true`` until confirmed on hardware; set to ``false``
     after the owner-supervised measurement session.
+
+    Overtravel (AA-17 lock-and-key design)
+    ----------------------------------------
+    ``lock_overtravel_goal_deg`` is the goal position commanded when locking.
+    The servo drives past the locked band, stalls on the physical key stop, and
+    the key blocks it within the locked band.  Without a key the servo reaches
+    the overtravel goal instead, which lies OUTSIDE the locked band -> MISS.
+    Must satisfy: ``locked_high_deg < lock_overtravel_goal_deg < closed_empty_deg``.
+
+    ``closed_empty_deg`` is the measured position when the servo reaches its
+    fully-closed no-key end stop.  Required for the ordering validation.
+
+    ``lock_torque_limit_raw`` is the torque limit (0-1000 STS3215 raw units)
+    applied to the gripper servo BEFORE issuing the overtravel lock command.
+    This ensures the servo stalls safely on the key stop without damage.
+    null = not yet measured; live lock with overtravel refuses if null.
     """
 
     # unlocked band: [low_deg, high_deg]
@@ -427,8 +443,62 @@ class GripperBandConfig(_Strict):
     # locked band
     locked_low_deg: Optional[Degrees] = None     # unverified: true
     locked_high_deg: Optional[Degrees] = None    # unverified: true
+    # --- AA-17 overtravel ---
+    # Goal position commanded when locking (past the key stop).
+    # Must satisfy: locked_high_deg < lock_overtravel_goal_deg < closed_empty_deg.
+    # null = not yet set; live lock refuses (fail-closed) when null.
+    lock_overtravel_goal_deg: Optional[Degrees] = None   # unverified: true
+    # Measured position at fully-closed no-key end stop (degrees).
+    # Required for ordering validation and MISS detection.
+    closed_empty_deg: Optional[Degrees] = None           # unverified: true
+    # Torque limit applied before issuing the overtravel lock command (0-1000).
+    # null = not yet measured; live lock refuses when null.
+    lock_torque_limit_raw: Optional[int] = None          # unverified: true
+    # --- AA-17 overtravel end ---
     # True when any value above is a placeholder (not yet measured).
     unverified: bool = True
+
+    @model_validator(mode="after")
+    def _validate_overtravel_ordering(self) -> "GripperBandConfig":
+        """Fail at config load if overtravel ordering constraints are violated.
+
+        When all three overtravel fields are non-null AND the base locked band
+        is configured, enforce:
+            unlocked_high_deg < locked_low_deg
+            locked_low_deg < locked_high_deg
+            locked_high_deg < lock_overtravel_goal_deg
+            lock_overtravel_goal_deg < closed_empty_deg
+        """
+        ot = self.lock_overtravel_goal_deg
+        ce = self.closed_empty_deg
+        lh = self.locked_high_deg
+        ll = self.locked_low_deg
+        ul = self.unlocked_high_deg
+        if any(v is None for v in (ot, ce, lh, ll)):
+            # Incomplete config: skip ordering check (null = unverified).
+            return self
+        # locked_low < locked_high
+        if not (ll < lh):  # type: ignore[operator]
+            raise ValueError(
+                f"locked_low_deg ({ll}) must be < locked_high_deg ({lh})"
+            )
+        # unlocked_high < locked_low (when unlocked_high is set)
+        if ul is not None and not (ul < ll):  # type: ignore[operator]
+            raise ValueError(
+                f"unlocked_high_deg ({ul}) must be < locked_low_deg ({ll})"
+            )
+        # locked_high < overtravel_goal < closed_empty
+        if not (lh < ot):  # type: ignore[operator]
+            raise ValueError(
+                f"lock_overtravel_goal_deg ({ot}) must be strictly greater than "
+                f"locked_high_deg ({lh})"
+            )
+        if not (ot < ce):  # type: ignore[operator]
+            raise ValueError(
+                f"lock_overtravel_goal_deg ({ot}) must be strictly less than "
+                f"closed_empty_deg ({ce})"
+            )
+        return self
 
 
 class GripperVerificationThresholds(_Strict):

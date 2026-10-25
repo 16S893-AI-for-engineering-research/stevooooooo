@@ -363,26 +363,62 @@ so101_kinematics:
 # --- AA-11 end ---
 # --- AA-17 ---
 # Gripper lock state-machine configuration (AA-17).
-# All band boundaries are null until empirically measured with
-# scripts/gripper_bands.py --live (owner-supervised hardware session required).
-# null bands = state machine fails closed on any live lock/unlock attempt.
+# All band boundaries populated from owner-supervised read-only sweep 2026-10-25.
+# Method: owner-supervised powered sweep; servo positions read from
+#   robot/calibration_data/gripper_samples_2026-10-25.jsonl
+#   (ticks->deg: deg = ticks * 360 / 4096)
+# locked band = [min_locked_ticks-25, max_locked_ticks+25] per arm
+# unlocked band = [open_ticks-25, key_in_unlocked_ticks+60] for left,
+#                 [open_ticks-25, open_ticks+60] for right (no key_in sample)
+# engaged band = same as unlocked (lock-and-key: engaged == open position;
+#   the key is inserted at open; the arm only needs to be at the open position
+#   to engage the attachment)
+# lock_overtravel_goal_deg = midpoint between locked_high and closed_empty
+# lock_torque_limit_raw: null (to be measured in supervised powered test)
 gripper_lock:
-  # Per-arm servo position bands (degrees). Null = unverified / not yet measured.
+  # Per-arm servo position bands (degrees).
   arm_left:
-    unlocked_low_deg: null      # unverified: true
-    unlocked_high_deg: null     # unverified: true
-    engaged_low_deg: null       # unverified: true
-    engaged_high_deg: null      # unverified: true
-    locked_low_deg: null        # unverified: true
-    locked_high_deg: null       # unverified: true
+    # Derived from gripper_samples_2026-10-25.jsonl:
+    #   open=1531, key_in_unlocked=1550, locked=[1801,1802], closed_empty=2521
+    # unlocked band: [open-25, key_in+60] -> ticks [1506,1610] -> deg
+    unlocked_low_deg: 132.36     # ticks 1506 (open_ticks-25)
+    unlocked_high_deg: 141.50    # ticks 1610 (key_in_ticks+60)
+    # engaged band: same as unlocked (lock-and-key: engaged == open position)
+    engaged_low_deg: 132.36      # same as unlocked_low_deg
+    engaged_high_deg: 141.50     # same as unlocked_high_deg
+    # locked band: [min_locked-25, max_locked+25] -> ticks [1776,1827]
+    locked_low_deg: 156.09       # ticks 1776 (1801-25)
+    locked_high_deg: 160.58      # ticks 1827 (1802+25)
+    # overtravel goal: midpoint(locked_high_ticks=1827, closed_empty_ticks=2521)
+    #   = ticks 2174 = 191.07 deg
+    lock_overtravel_goal_deg: 191.07
+    # closed_empty: ticks 2521 = 221.57 deg
+    closed_empty_deg: 221.57
+    # torque limit for lock command: null until supervised powered test measures
+    # the stall torque safely. Set to the measured safe limit before live use.
+    lock_torque_limit_raw: null  # unverified: true; to be measured in powered test
     unverified: true
   arm_right:
-    unlocked_low_deg: null      # unverified: true
-    unlocked_high_deg: null     # unverified: true
-    engaged_low_deg: null       # unverified: true
-    engaged_high_deg: null      # unverified: true
-    locked_low_deg: null        # unverified: true
-    locked_high_deg: null       # unverified: true
+    # Derived from gripper_samples_2026-10-25.jsonl:
+    #   open=1576, locked=[1792,1801], closed_empty=2494
+    #   (no key_in_unlocked sample; using open+60 for unlocked_high)
+    # unlocked band: [open-25, open+60] -> ticks [1551,1636] -> deg
+    unlocked_low_deg: 136.32     # ticks 1551 (open_ticks-25)
+    unlocked_high_deg: 143.79    # ticks 1636 (open_ticks+60)
+    # engaged band: same as unlocked (lock-and-key: engaged == open position)
+    engaged_low_deg: 136.32      # same as unlocked_low_deg
+    engaged_high_deg: 143.79     # same as unlocked_high_deg
+    # locked band: [min_locked-25, max_locked+25] -> ticks [1767,1826]
+    locked_low_deg: 155.30       # ticks 1767 (1792-25)
+    locked_high_deg: 160.49      # ticks 1826 (1801+25)
+    # overtravel goal: midpoint(locked_high_ticks=1826, closed_empty_ticks=2494)
+    #   = ticks 2160 = 189.84 deg
+    lock_overtravel_goal_deg: 189.84
+    # closed_empty: ticks 2494 = 219.20 deg
+    closed_empty_deg: 219.20
+    # torque limit for lock command: null until supervised powered test measures
+    # the stall torque safely. Set to the measured safe limit before live use.
+    lock_torque_limit_raw: null  # unverified: true; to be measured in powered test
     unverified: true
   # Drift threshold (degrees) for active hold-monitor. UNVERIFIED placeholder.
   drift_threshold_deg: null     # unverified: true

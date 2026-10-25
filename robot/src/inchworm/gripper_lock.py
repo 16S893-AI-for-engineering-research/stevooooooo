@@ -232,6 +232,46 @@ class GripperState(enum.Enum):
 # ---------------------------------------------------------------------------
 
 
+class OvertravelNotConfigured(GripperLockError):
+    """Raised in live mode when lock_overtravel_goal_deg or lock_torque_limit_raw is null.
+
+    The overtravel goal and torque limit are required for the key-detection
+    lock command.  Configure them in hardware.yaml after a supervised
+    powered test measures the appropriate torque limit.
+    """
+
+    def __init__(self, role: str, missing_field: str) -> None:
+        self.role = role
+        self.missing_field = missing_field
+        super().__init__(
+            f"{role}: cannot lock in live mode: {missing_field!r} is null. "
+            "Set lock_overtravel_goal_deg and lock_torque_limit_raw in "
+            "hardware.yaml after a supervised powered test."
+        )
+
+
+class HoldSlipFault(GripperLockError):
+    """Raised when the gripper position slips toward closed_empty during hold.
+
+    This indicates the key has been lost or slipped out of the lock: the servo
+    has moved beyond the locked band toward the closed-empty end stop.  This
+    is a safety fault; the state machine transitions to FAULT and must be reset
+    by the operator.
+    """
+
+    def __init__(self, role: str, present_deg: float, locked_high_deg: float, closed_empty_deg: float) -> None:
+        self.role = role
+        self.present_deg = present_deg
+        self.locked_high_deg = locked_high_deg
+        self.closed_empty_deg = closed_empty_deg
+        super().__init__(
+            f"{role}: gripper hold slip fault – position {present_deg:.2f}° is beyond "
+            f"locked_high_deg ({locked_high_deg:.2f}°) toward closed_empty "
+            f"({closed_empty_deg:.2f}°). Key may have been lost or slipped. "
+            "Reset required."
+        )
+
+
 class LockVerdict(enum.Enum):
     """Result of a lock verification check.
 
@@ -245,6 +285,9 @@ class LockVerdict(enum.Enum):
     MISS:
         Position NOT in the locked band.  The attachment point was not reached
         or was knocked away.
+    MISS_NO_KEY_OVERTRAVEL:
+        Position is beyond locked_high_deg toward closed_empty.  No key was
+        present; the servo drove past the locked band to the overtravel goal.
     UNVERIFIED:
         Verification thresholds are null (not yet measured).  Cannot classify.
         The state machine treats this as FAULT in live mode.
@@ -253,6 +296,7 @@ class LockVerdict(enum.Enum):
     LATCHED = "LATCHED"
     JAM = "JAM"
     MISS = "MISS"
+    MISS_NO_KEY_OVERTRAVEL = "MISS_NO_KEY_OVERTRAVEL"
     UNVERIFIED = "UNVERIFIED"
 
 
@@ -317,7 +361,7 @@ def verify_lock_state(
     Returns
     -------
     :class:`LockVerdict`
-        LATCHED, JAM, MISS, or UNVERIFIED.
+        LATCHED, JAM, MISS, MISS_NO_KEY_OVERTRAVEL, or UNVERIFIED.
 
     Note: ``load_raw`` uses the sign-magnitude convention from the STS3215
     (bit 10 = sign, bits 0-9 = magnitude); we compare the *absolute value*.
@@ -334,6 +378,14 @@ def verify_lock_state(
     in_locked = _in_band(pos, bands.locked_low_deg, bands.locked_high_deg)
 
     if not in_locked:
+        # Check for no-key overtravel: position beyond locked_high toward closed_empty.
+        # This means the servo drove past the locked band without a key blocking it.
+        if (
+            bands.locked_high_deg is not None
+            and bands.closed_empty_deg is not None
+            and pos > bands.locked_high_deg
+        ):
+            return LockVerdict.MISS_NO_KEY_OVERTRAVEL
         return LockVerdict.MISS
 
     # Position is in locked band – check load/current
@@ -535,8 +587,15 @@ class GripperLockSM:
     # ------------------------------------------------------------------
 
     def _goal_pos_locked(self) -> float:
-        """Return the goal position for the locked state (midpoint of locked band)."""
+        """Return the lock command goal position (overtravel goal if configured, else midpoint).
+
+        In live mode the overtravel goal is required; this helper is also called
+        in dry-run mode where the midpoint fallback is acceptable.
+        """
         bands = self._bands_for_role()
+        if bands is not None and bands.lock_overtravel_goal_deg is not None:
+            return bands.lock_overtravel_goal_deg
+        # Fallback: midpoint of locked band (used in dry-run or when not configured).
         if bands is not None and _bands_configured(bands):
             return _mid(bands.locked_low_deg, bands.locked_high_deg)
         return _PLACEHOLDER_LOCKED_POS_DEG
@@ -576,6 +635,42 @@ class GripperLockSM:
             "info",
             "gripper_position_command",
             {"position_deg": pos_deg, "context": context, "dry_run": self._dry_run},
+        )
+
+    def _require_overtravel_or_dry_run(self) -> None:
+        """Raise OvertravelNotConfigured in live mode if overtravel fields are null.
+
+        In live mode the overtravel goal and torque limit are required for
+        the key-detection lock command.  Dry-run mode skips this check.
+        """
+        if self._dry_run:
+            return
+        bands = self._bands_for_role()
+        if bands is None or bands.lock_overtravel_goal_deg is None:
+            raise OvertravelNotConfigured(self._role, "lock_overtravel_goal_deg")
+        if bands.lock_torque_limit_raw is None:
+            raise OvertravelNotConfigured(self._role, "lock_torque_limit_raw")
+
+    def _apply_lock_torque_limit(self) -> None:
+        """Apply the configured torque limit to the gripper servo before locking.
+
+        Called only from the lock path, only in live mode, after
+        ``_require_overtravel_or_dry_run`` has verified the fields are set.
+        Uses the existing ``ArmServoBus.set_torque_limit`` API.
+        """
+        bands = self._bands_for_role()
+        # bands and lock_torque_limit_raw are guaranteed non-None by the caller.
+        assert bands is not None and bands.lock_torque_limit_raw is not None
+        gripper_servo_id = self._bus._servo_id_for_joint("gripper")
+        self._bus.set_torque_limit(gripper_servo_id, bands.lock_torque_limit_raw)
+        self._emit(
+            "info",
+            "gripper_lock_torque_limit_applied",
+            {
+                "servo_id": gripper_servo_id,
+                "torque_limit_raw": bands.lock_torque_limit_raw,
+                "context": "pre_lock_overtravel",
+            },
         )
 
     # ------------------------------------------------------------------
@@ -621,10 +716,23 @@ class GripperLockSM:
         )
 
     def lock(self) -> LockVerdict:
-        """Transition APPROACH_READY → LOCKING → LOCKED (or FAULT).
+        """Transition APPROACH_READY \u2192 LOCKING \u2192 LOCKED (or FAULT).
 
-        Commands the gripper to the locked-band position, reads back the
-        joint state, and verifies the lock via :func:`verify_lock_state`.
+        Commands the gripper to the lock goal position (overtravel goal in live
+        mode, midpoint fallback in dry-run), reads back the joint state, and
+        verifies the lock via :func:`verify_lock_state`.
+
+        In live mode, BEFORE issuing the lock command:
+          1. Requires ``lock_overtravel_goal_deg`` and ``lock_torque_limit_raw``
+             to be non-null in the band config (raises :class:`OvertravelNotConfigured`
+             if either is null).
+          2. Applies the torque limit via :meth:`~inchworm.servo_bus.ArmServoBus.set_torque_limit`
+             so the servo stalls safely on the physical key stop.
+          3. Commands the overtravel goal position (beyond the locked band).
+             With a key inserted, the servo stalls on the key stop and the
+             readback position falls inside the locked band -> LATCHED.
+             Without a key, the servo reaches the overtravel goal ->
+             MISS_NO_KEY_OVERTRAVEL.
 
         In dry-run mode:
             - The position command is logged but not sent.
@@ -633,6 +741,9 @@ class GripperLockSM:
 
         In live mode with null bands:
             - Raises :class:`BandsNotConfigured` (fail-closed).
+
+        In live mode with configured bands but null overtravel fields:
+            - Raises :class:`OvertravelNotConfigured` (fail-closed).
 
         In live mode with configured bands but unverified thresholds:
             - Transitions to FAULT.
@@ -649,13 +760,16 @@ class GripperLockSM:
             If not currently in APPROACH_READY.
         :class:`BandsNotConfigured`
             In live mode when bands are null.
+        :class:`OvertravelNotConfigured`
+            In live mode when overtravel goal or torque limit is null.
         :class:`LockVerificationFailed`
-            When the servo does not confirm a true latch (JAM, MISS, or
-            UNVERIFIED thresholds in live mode).
+            When the servo does not confirm a true latch (JAM, MISS,
+            MISS_NO_KEY_OVERTRAVEL, or UNVERIFIED thresholds in live mode).
         """
         if self._state != GripperState.APPROACH_READY:
             raise IllegalTransition(self._state, "lock")
         self._require_bands_or_dry_run("lock")
+        self._require_overtravel_or_dry_run()
 
         prev_state = self._state
         self._state = GripperState.LOCKING
@@ -665,7 +779,11 @@ class GripperLockSM:
             {"prev_state": prev_state.name},
         )
 
-        # Command the locked position
+        # In live mode: apply torque limit before commanding the overtravel goal.
+        if not self._dry_run:
+            self._apply_lock_torque_limit()
+
+        # Command the lock position (overtravel goal in live; midpoint/placeholder in dry-run)
         pos = self._goal_pos_locked()
         self._write_gripper(pos, "lock_command")
 
@@ -702,13 +820,16 @@ class GripperLockSM:
             )
             return LockVerdict.LATCHED
 
-        # Verification failed – go to FAULT
+        # Verification failed \u2013 go to FAULT
         self._state = GripperState.FAULT
         detail = (
             f"position={joint_state.position_deg:.2f}deg, "
             f"load_raw={joint_state.load_raw}, "
             f"current_raw={joint_state.current_raw}"
         )
+        # Include a distinct reason for no-key overtravel
+        if verdict == LockVerdict.MISS_NO_KEY_OVERTRAVEL:
+            detail = "no_key_overtravel: " + detail
         self._emit(
             "error",
             "gripper_lock_failed",
@@ -717,13 +838,28 @@ class GripperLockSM:
         raise LockVerificationFailed(verdict, detail)
 
     def hold_tick(self) -> bool:
-        """Re-assert locked position if drift exceeds threshold.
+        """Re-assert locked position if drift is detected; fault on key slip.
 
         Call this method periodically (e.g. every 20 ms from a supervisor
-        loop) while the gripper is in LOCKED state.  If the present position
-        has drifted more than ``drift_threshold_deg`` from the last commanded
-        position, the servo is re-commanded and a ``gripper_hold_correction``
-        event is logged.
+        loop) while the gripper is in LOCKED state.
+
+        Overtravel-aware hold logic
+        ---------------------------
+        When ``lock_overtravel_goal_deg`` is configured, the servo is stalled
+        on the physical key stop INSIDE the locked band.  The present position
+        will permanently differ from the commanded overtravel goal, so
+        re-asserting based on commanded position would spam corrections.
+        Instead:
+
+        - **Healthy**: present position is within the locked band -> no action.
+        - **Slip toward closed_empty**: present position > locked_high_deg ->
+          key lost or slipped.  Transitions to FAULT, logs error, raises
+          :class:`HoldSlipFault`.
+        - **Drift toward open**: present position < locked_low_deg ->
+          re-assert the overtravel goal and log ``gripper_hold_correction``.
+
+        When no overtravel goal is configured (legacy / dry-run), the original
+        drift-from-commanded-position logic is used.
 
         Returns
         -------
@@ -734,6 +870,9 @@ class GripperLockSM:
         ------
         :class:`IllegalTransition`
             If the state machine is not currently in LOCKED state.
+        :class:`HoldSlipFault`
+            When the position slips toward closed_empty (key lost / slipped).
+            Transitions to FAULT before raising.
         """
         if self._state != GripperState.LOCKED:
             raise IllegalTransition(self._state, "hold_tick")
@@ -778,6 +917,58 @@ class GripperLockSM:
             return False
         self._hold_read_failures = 0
 
+        # --- Overtravel-aware hold logic ---
+        bands = self._bands_for_role()
+        if (
+            bands is not None
+            and bands.lock_overtravel_goal_deg is not None
+            and bands.locked_low_deg is not None
+            and bands.locked_high_deg is not None
+            and bands.closed_empty_deg is not None
+        ):
+            locked_low = bands.locked_low_deg
+            locked_high = bands.locked_high_deg
+            closed_empty = bands.closed_empty_deg
+
+            if _in_band(present_pos, locked_low, locked_high):
+                # Healthy: servo stalled on key inside the locked band.
+                return False
+
+            if present_pos > locked_high:
+                # Slip toward closed_empty: key lost or slipped out.
+                self._state = GripperState.FAULT
+                self._emit(
+                    "error",
+                    "gripper_hold_slip_fault",
+                    {
+                        "present_deg": present_pos,
+                        "locked_high_deg": locked_high,
+                        "closed_empty_deg": closed_empty,
+                        "reason": "key_lost_or_slipped",
+                    },
+                )
+                raise HoldSlipFault(
+                    self._role, present_pos, locked_high, closed_empty
+                )
+
+            # present_pos < locked_low: drifted toward open.
+            # Re-assert the overtravel goal to drive back into the band.
+            correction_pos = bands.lock_overtravel_goal_deg
+            self._write_gripper(correction_pos, "hold_correction")
+            self._emit(
+                "warning",
+                "gripper_hold_correction",
+                {
+                    "present_deg": present_pos,
+                    "commanded_deg": correction_pos,
+                    "drift_deg": locked_low - present_pos,
+                    "threshold_deg": 0.0,
+                    "reason": "drifted_toward_open_from_overtravel",
+                },
+            )
+            return True
+
+        # --- Legacy hold logic (no overtravel goal configured) ---
         drift = abs(present_pos - self._last_commanded_pos_deg)
         threshold = self._drift_threshold()
 

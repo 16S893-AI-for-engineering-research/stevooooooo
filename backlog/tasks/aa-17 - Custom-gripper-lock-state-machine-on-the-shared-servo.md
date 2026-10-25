@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-25 19:01'
+updated_date: '2026-10-25 19:26'
 labels: []
 milestone: m-2
 dependencies:
@@ -57,4 +57,6 @@ LEFT: open 1531, engaged_unlocked (key in) 1550, locked 1802/1802/1801 (3 full c
 RIGHT: open 1576, locked 1792/1800/1801, closed_empty 2494.
 Owner: lock-and-key; the key is inserted at the open position; locked with key stops short of closed_empty; key detection method = (a) position.
 DESIGN ISSUE FOUND (needs owner decision, AC not changed): GripperLockSM._goal_pos_locked() commands the MIDPOINT of the locked band. Without a key, the servo would also reach that goal, so position could not detect a missing key. For (a) to work, the lock goal must lie BEYOND the key stop (e.g. about 1950-2000 ticks), so: key in = stalls at about 1800 (in band); no key = passes it (MISS). That needs a torque/current limit for the stall. Also: the measured open and closed positions lie outside the EEPROM limits (L 1558-2487, R 1573-2479); a limit update (EEPROM write) is needed before powered gripper use.
+
+Overtravel lock merged 2026-10-25 (orchestrator-reviewed). Lock commands lock_overtravel_goal_deg after applying lock_torque_limit_raw; MISS_NO_KEY_OVERTRAVEL verdict; band-based hold (slip toward closed => HoldSlipFault). Bands filled from the measured samples, still unverified; lock_torque_limit_raw null => live lock refused. REVIEW FINDING, to fix before the powered test: lock() reads back the position immediately after commanding, without waiting for motion or a stall to settle. With a ~600-tick overtravel move the readback would be the pre-move position => false MISS. It needs a bounded settle wait (until velocity is ~0 or a timeout) before verification.
 <!-- SECTION:NOTES:END -->

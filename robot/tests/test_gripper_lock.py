@@ -78,6 +78,10 @@ _BANDS_LEFT = GripperBandConfig(
     engaged_high_deg=130.0,
     locked_low_deg=145.0,
     locked_high_deg=165.0,
+    # overtravel fields: must satisfy locked_high < overtravel_goal < closed_empty
+    lock_overtravel_goal_deg=200.0,
+    closed_empty_deg=250.0,
+    lock_torque_limit_raw=300,
     unverified=False,
 )
 
@@ -88,6 +92,9 @@ _BANDS_RIGHT = GripperBandConfig(
     engaged_high_deg=130.0,
     locked_low_deg=145.0,
     locked_high_deg=165.0,
+    lock_overtravel_goal_deg=200.0,
+    closed_empty_deg=250.0,
+    lock_torque_limit_raw=300,
     unverified=False,
 )
 
@@ -490,8 +497,10 @@ class TestLockVerification:
         sm = _live_sm(transport)
         sm._state = GripperState.APPROACH_READY
 
-        # Feed write response for the lock command; mock read_joint_state separately
-        transport.feed(_write_response(6))
+        # Feed write responses: torque-limit write + goal-position write.
+        # Use queue_reply so each response is released only after the matching write.
+        transport.queue_reply(_write_response(6))  # torque limit
+        transport.queue_reply(_write_response(6))  # goal position
         miss_state = JointState(
             servo_id=6,
             position_deg=90.0,  # outside locked band (145-165) -> MISS
@@ -514,7 +523,9 @@ class TestLockVerification:
         sm = _live_sm(transport)
         sm._state = GripperState.APPROACH_READY
 
-        transport.feed(_write_response(6))
+        # Use queue_reply for half-duplex correctness: torque limit + goal position
+        transport.queue_reply(_write_response(6))  # torque limit
+        transport.queue_reply(_write_response(6))  # goal position
         # Position in locked band (155 deg), but load_raw = 200 > latch_load_max(150) = JAM
         jam_state = JointState(
             servo_id=6,
@@ -537,7 +548,9 @@ class TestLockVerification:
         sm = _live_sm(transport)
         sm._state = GripperState.APPROACH_READY
 
-        transport.feed(_write_response(6))
+        # Use queue_reply for half-duplex correctness: torque limit + goal position
+        transport.queue_reply(_write_response(6))  # torque limit
+        transport.queue_reply(_write_response(6))  # goal position
         # Position at 155 deg (within locked band 145-165), load=50 < 150 = LATCHED
         latched_state = JointState(
             servo_id=6,
@@ -584,38 +597,47 @@ class TestActiveHold:
         assert result is False
 
     def test_hold_tick_drift_triggers_correction(self):
-        """Live hold_tick with drift > threshold: returns True and re-writes position."""
+        """Live hold_tick with position below locked_low_deg: returns True and re-asserts overtravel goal.
+
+        With the overtravel design, hold is healthy while position is inside the
+        locked band.  A position BELOW locked_low_deg indicates the servo drifted
+        toward open; the correction re-asserts the overtravel goal.
+        """
         transport = _make_transport()
         sm = _live_sm(transport)
         sm._state = GripperState.LOCKED
-        sm._last_commanded_pos_deg = 155.0
+        sm._last_commanded_pos_deg = 200.0  # overtravel goal (matches _BANDS_LEFT.lock_overtravel_goal_deg)
 
         # Feed write response for the re-assert command
         transport.feed(_write_response(6))
-        # Mock read to return drifted position (5 deg > 2 deg threshold)
-        with patch.object(sm._bus, "read_position_deg", return_value=160.0):
+        # Mock read to return position below locked_low_deg (145.0) -> drift toward open
+        with patch.object(sm._bus, "read_position_deg", return_value=140.0):
             result = sm.hold_tick()
         assert result is True
 
     def test_hold_tick_correction_writes_commanded_position(self):
-        """Correction re-commands the last commanded position (not the drifted one)."""
+        """Correction re-commands the overtravel goal position (not the drifted one).
+
+        When the servo drifts below locked_low_deg, the correction must write the
+        overtravel goal (lock_overtravel_goal_deg) to drive it back into the band.
+        """
         transport = _make_transport()
         sm = _live_sm(transport)
         sm._state = GripperState.LOCKED
-        sm._last_commanded_pos_deg = 155.0
+        sm._last_commanded_pos_deg = 200.0  # overtravel goal
 
         transport.feed(_write_response(6))
-        with patch.object(sm._bus, "read_position_deg", return_value=160.0):
+        with patch.object(sm._bus, "read_position_deg", return_value=140.0):  # below locked_low
             sm.hold_tick()
 
-        # The last write should encode 155.0 deg
+        # The correction write should encode the overtravel goal (200.0 deg)
         written = transport.written[-1]
         tick_bytes = written[6:8]
         import struct as st
         written_ticks = st.unpack("<H", tick_bytes)[0]
         from inchworm.servo_bus import ticks_to_degrees
         written_deg = ticks_to_degrees(written_ticks)
-        assert abs(written_deg - 155.0) < 1.0  # within tick-rounding tolerance
+        assert abs(written_deg - 200.0) < 1.0  # within tick-rounding tolerance
 
     def test_hold_tick_illegal_from_non_locked(self):
         """hold_tick raises IllegalTransition when not in LOCKED state."""
@@ -627,7 +649,11 @@ class TestActiveHold:
         assert exc_info.value.requested_op == "hold_tick"
 
     def test_hold_tick_logs_correction_event(self):
-        """Correction emits a gripper_hold_correction event to the logger."""
+        """Correction emits a gripper_hold_correction event to the logger.
+
+        When position drifts below locked_low_deg, the overtravel-aware hold
+        logic re-asserts and logs a gripper_hold_correction event.
+        """
         mock_logger = MagicMock()
         transport = _make_transport()
         bus = _make_bus(transport)
@@ -640,10 +666,11 @@ class TestActiveHold:
             dry_run=False,
         )
         sm._state = GripperState.LOCKED
-        sm._last_commanded_pos_deg = 155.0
+        sm._last_commanded_pos_deg = 200.0  # overtravel goal
 
         transport.feed(_write_response(6))
-        with patch.object(sm._bus, "read_position_deg", return_value=160.0):
+        # Position below locked_low_deg (145.0) -> drift toward open -> correction
+        with patch.object(sm._bus, "read_position_deg", return_value=140.0):
             sm.hold_tick()
 
         # Logger should have been called with hold correction event
@@ -1121,3 +1148,404 @@ def test_unlock_refuses_when_gripper_state_unreadable():
         with pytest.raises(UnlockRefused, match="cannot read"):
             sm.unlock()
     assert sm.state == GripperState.LOCKED
+
+
+# ---------------------------------------------------------------------------
+# AA-17 overtravel / key-detection tests (2026-10-25)
+# ---------------------------------------------------------------------------
+
+
+# --- Config ordering validation ---
+
+class TestOvertravelConfigOrdering:
+    """Ordering validator in GripperBandConfig rejects invalid orderings at load time."""
+
+    def _valid_bands(self, **overrides):
+        fields = dict(
+            unlocked_low_deg=80.0,
+            unlocked_high_deg=100.0,
+            engaged_low_deg=80.0,
+            engaged_high_deg=100.0,
+            locked_low_deg=145.0,
+            locked_high_deg=165.0,
+            lock_overtravel_goal_deg=200.0,
+            closed_empty_deg=250.0,
+            lock_torque_limit_raw=300,
+            unverified=False,
+        )
+        fields.update(overrides)
+        return GripperBandConfig(**fields)
+
+    def test_valid_ordering_accepted(self):
+        """Correctly ordered config loads without error."""
+        bands = self._valid_bands()
+        assert bands.lock_overtravel_goal_deg == 200.0
+        assert bands.closed_empty_deg == 250.0
+
+    def test_overtravel_equal_to_locked_high_rejected(self):
+        """lock_overtravel_goal_deg == locked_high_deg must be rejected."""
+        from pydantic import ValidationError as PydanticValidationError
+        with pytest.raises((ValueError, PydanticValidationError)):
+            self._valid_bands(lock_overtravel_goal_deg=165.0)  # == locked_high
+
+    def test_overtravel_less_than_locked_high_rejected(self):
+        """lock_overtravel_goal_deg < locked_high_deg must be rejected."""
+        from pydantic import ValidationError as PydanticValidationError
+        with pytest.raises((ValueError, PydanticValidationError)):
+            self._valid_bands(lock_overtravel_goal_deg=150.0)  # < locked_high
+
+    def test_overtravel_equal_to_closed_empty_rejected(self):
+        """lock_overtravel_goal_deg == closed_empty_deg must be rejected."""
+        from pydantic import ValidationError as PydanticValidationError
+        with pytest.raises((ValueError, PydanticValidationError)):
+            self._valid_bands(lock_overtravel_goal_deg=250.0)  # == closed_empty
+
+    def test_overtravel_greater_than_closed_empty_rejected(self):
+        """lock_overtravel_goal_deg > closed_empty_deg must be rejected."""
+        from pydantic import ValidationError as PydanticValidationError
+        with pytest.raises((ValueError, PydanticValidationError)):
+            self._valid_bands(lock_overtravel_goal_deg=260.0)  # > closed_empty
+
+    def test_unlocked_high_above_locked_low_rejected(self):
+        """unlocked_high_deg >= locked_low_deg must be rejected."""
+        from pydantic import ValidationError as PydanticValidationError
+        with pytest.raises((ValueError, PydanticValidationError)):
+            self._valid_bands(unlocked_high_deg=150.0)  # > locked_low
+
+    def test_null_overtravel_skips_ordering_check(self):
+        """When lock_overtravel_goal_deg is null, ordering check is skipped."""
+        bands = GripperBandConfig(
+            locked_low_deg=145.0,
+            locked_high_deg=165.0,
+            lock_overtravel_goal_deg=None,
+            closed_empty_deg=None,
+        )
+        assert bands.lock_overtravel_goal_deg is None
+
+    def test_hardware_yaml_bands_pass_ordering(self):
+        """The values from hardware.yaml (2026-10-25) pass the ordering validator."""
+        from inchworm.config import load_config
+        cfg = load_config()
+        assert cfg.gripper_lock is not None
+        left = cfg.gripper_lock.arm_left
+        right = cfg.gripper_lock.arm_right
+        assert left is not None and right is not None
+        # Ordering is validated at load; reaching here means it passed.
+        assert left.lock_overtravel_goal_deg is not None
+        assert right.lock_overtravel_goal_deg is not None
+        assert left.locked_high_deg < left.lock_overtravel_goal_deg < left.closed_empty_deg
+        assert right.locked_high_deg < right.lock_overtravel_goal_deg < right.closed_empty_deg
+
+
+# --- Live lock: overtravel goal commanded, torque limit applied before goal ---
+
+class TestOvertravelLock:
+    """lock() commands overtravel goal; torque limit applied before goal in live mode."""
+
+    def test_lock_commands_overtravel_goal_not_midpoint(self):
+        """In dry-run, lock() commands lock_overtravel_goal_deg, not the locked-band midpoint."""
+        sm = _dry_sm()
+        sm.reset()
+        sm.set_approach_ready()
+        sm.lock()
+        # overtravel goal = 200.0 deg; midpoint would be (145+165)/2 = 155.0
+        assert sm._last_commanded_pos_deg == 200.0
+
+    def test_live_lock_applies_torque_limit_before_goal(self):
+        """live lock() calls set_torque_limit with lock_torque_limit_raw before write_position_deg."""
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.APPROACH_READY
+
+        calls = []
+
+        original_set_torque = sm._bus.set_torque_limit
+        original_write_pos = sm._channel.write_position_deg
+
+        def recording_torque(servo_id, torque_limit_raw):
+            calls.append(("torque", servo_id, torque_limit_raw))
+            transport.queue_reply(_write_response(servo_id))
+            original_set_torque(servo_id, torque_limit_raw)
+
+        def recording_write_pos(pos_deg):
+            calls.append(("goal_pos", pos_deg))
+            transport.queue_reply(_write_response(6))
+            original_write_pos(pos_deg)
+
+        latched_state = JointState(
+            servo_id=6,
+            position_deg=155.0,
+            speed_raw=0,
+            load_raw=50,
+            voltage_v=12.0,
+            temperature_c=35,
+            current_raw=100,
+        )
+
+        with patch.object(sm._bus, "set_torque_limit", side_effect=recording_torque), \
+             patch.object(sm._channel, "write_position_deg", side_effect=recording_write_pos), \
+             patch.object(sm._bus, "read_joint_state", return_value=latched_state):
+            sm.lock()
+
+        assert len(calls) == 2, f"Expected 2 calls (torque + goal), got: {calls!r}"
+        assert calls[0][0] == "torque", f"First call should be torque limit, got: {calls[0]}"
+        assert calls[1][0] == "goal_pos", f"Second call should be goal pos, got: {calls[1]}"
+        # torque limit value should match config
+        assert calls[0][2] == 300  # _BANDS_LEFT.lock_torque_limit_raw
+        # goal position should be overtravel goal
+        assert calls[1][1] == 200.0  # _BANDS_LEFT.lock_overtravel_goal_deg
+
+    def test_live_lock_null_overtravel_goal_refuses(self):
+        """Live lock raises OvertravelNotConfigured when lock_overtravel_goal_deg is null."""
+        from inchworm.gripper_lock import OvertravelNotConfigured
+        from inchworm.config import GripperBandConfig, GripperLockConfig, GripperVerificationThresholds
+        bands_no_ot = GripperBandConfig(
+            unlocked_low_deg=80.0,
+            unlocked_high_deg=100.0,
+            engaged_low_deg=80.0,
+            engaged_high_deg=100.0,
+            locked_low_deg=145.0,
+            locked_high_deg=165.0,
+            lock_overtravel_goal_deg=None,
+            closed_empty_deg=250.0,
+            lock_torque_limit_raw=300,
+            unverified=False,
+        )
+        cfg = GripperLockConfig(
+            arm_left=bands_no_ot,
+            arm_right=bands_no_ot,
+            verification=_THRESHOLDS,
+        )
+        transport = _make_transport()
+        sm = _live_sm(transport, lock_config=cfg)
+        sm._state = GripperState.APPROACH_READY
+        with pytest.raises(OvertravelNotConfigured) as exc_info:
+            sm.lock()
+        assert "lock_overtravel_goal_deg" in str(exc_info.value)
+        assert isinstance(exc_info.value, GripperLockError)
+
+    def test_live_lock_null_torque_limit_refuses(self):
+        """Live lock raises OvertravelNotConfigured when lock_torque_limit_raw is null."""
+        from inchworm.gripper_lock import OvertravelNotConfigured
+        from inchworm.config import GripperBandConfig, GripperLockConfig
+        bands_no_tl = GripperBandConfig(
+            unlocked_low_deg=80.0,
+            unlocked_high_deg=100.0,
+            engaged_low_deg=80.0,
+            engaged_high_deg=100.0,
+            locked_low_deg=145.0,
+            locked_high_deg=165.0,
+            lock_overtravel_goal_deg=200.0,
+            closed_empty_deg=250.0,
+            lock_torque_limit_raw=None,
+            unverified=False,
+        )
+        cfg = GripperLockConfig(
+            arm_left=bands_no_tl,
+            arm_right=bands_no_tl,
+            verification=_THRESHOLDS,
+        )
+        transport = _make_transport()
+        sm = _live_sm(transport, lock_config=cfg)
+        sm._state = GripperState.APPROACH_READY
+        with pytest.raises(OvertravelNotConfigured) as exc_info:
+            sm.lock()
+        assert "lock_torque_limit_raw" in str(exc_info.value)
+
+    def test_dry_run_null_overtravel_still_succeeds(self):
+        """Dry-run with null overtravel fields: lock succeeds (overtravel check skipped)."""
+        from inchworm.config import GripperBandConfig, GripperLockConfig
+        bands_no_ot = GripperBandConfig(
+            unlocked_low_deg=80.0,
+            unlocked_high_deg=100.0,
+            engaged_low_deg=80.0,
+            engaged_high_deg=100.0,
+            locked_low_deg=145.0,
+            locked_high_deg=165.0,
+            lock_overtravel_goal_deg=None,
+            closed_empty_deg=None,
+            unverified=True,
+        )
+        cfg = GripperLockConfig(arm_left=bands_no_ot, arm_right=bands_no_ot)
+        sm = _dry_sm(lock_config=cfg)
+        sm.reset()
+        sm.set_approach_ready()
+        verdict = sm.lock()
+        assert verdict == LockVerdict.LATCHED
+
+
+# --- Verification: LATCHED requires position within locked band ---
+
+class TestOvertravelVerification:
+    """verify_lock_state correctly classifies key-present vs no-key scenarios."""
+
+    def _make_state(self, pos_deg, load_raw=50, current_raw=100):
+        return JointState(
+            servo_id=6,
+            position_deg=pos_deg,
+            speed_raw=0,
+            load_raw=load_raw,
+            voltage_v=12.0,
+            temperature_c=35,
+            current_raw=current_raw,
+        )
+
+    def test_position_in_locked_band_is_latched(self):
+        """Key present: servo stalled in band -> LATCHED."""
+        state = self._make_state(155.0)  # inside [145, 165]
+        verdict = verify_lock_state(state, _BANDS_LEFT, _THRESHOLDS)
+        assert verdict == LockVerdict.LATCHED
+
+    def test_position_beyond_locked_high_is_miss_no_key_overtravel(self):
+        """No key: servo reached overtravel goal (beyond locked_high) -> MISS_NO_KEY_OVERTRAVEL."""
+        state = self._make_state(200.0)  # > locked_high (165) and < closed_empty (250)
+        verdict = verify_lock_state(state, _BANDS_LEFT, _THRESHOLDS)
+        assert verdict == LockVerdict.MISS_NO_KEY_OVERTRAVEL
+
+    def test_miss_no_key_overtravel_reason_in_lock_failed_detail(self):
+        """LockVerificationFailed raised with no_key_overtravel in detail."""
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.APPROACH_READY
+
+        transport.queue_reply(_write_response(6))  # torque limit
+        transport.queue_reply(_write_response(6))  # goal position
+        overtravel_state = JointState(
+            servo_id=6,
+            position_deg=200.0,  # beyond locked_high (165) -> no key
+            speed_raw=0,
+            load_raw=50,
+            voltage_v=12.0,
+            temperature_c=35,
+            current_raw=100,
+        )
+        with patch.object(sm._bus, "read_joint_state", return_value=overtravel_state):
+            with pytest.raises(LockVerificationFailed) as exc_info:
+                sm.lock()
+        assert exc_info.value.verdict == LockVerdict.MISS_NO_KEY_OVERTRAVEL
+        assert "no_key_overtravel" in exc_info.value.detail
+        assert sm.state == GripperState.FAULT
+
+    def test_position_below_locked_low_is_miss(self):
+        """Position below locked band (e.g. jammed open) -> MISS (not overtravel)."""
+        state = self._make_state(90.0)  # below locked_low (145)
+        verdict = verify_lock_state(state, _BANDS_LEFT, _THRESHOLDS)
+        assert verdict == LockVerdict.MISS
+
+    def test_miss_no_key_overtravel_is_gripper_lock_error(self):
+        """LockVerificationFailed(MISS_NO_KEY_OVERTRAVEL) is a GripperLockError."""
+        exc = LockVerificationFailed(LockVerdict.MISS_NO_KEY_OVERTRAVEL, "no_key_overtravel: pos=200")
+        assert isinstance(exc, GripperLockError)
+        assert exc.verdict == LockVerdict.MISS_NO_KEY_OVERTRAVEL
+
+
+# --- Hold monitor: overtravel-aware band-based hold ---
+
+class TestOvertravelHold:
+    """hold_tick uses band-based logic when overtravel is configured."""
+
+    def test_hold_healthy_while_stalled_in_band_no_reassert(self):
+        """Position inside locked band while stalled on key: no correction, returns False."""
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.LOCKED
+        sm._last_commanded_pos_deg = 200.0  # overtravel goal
+
+        # Position inside locked band [145, 165]: healthy hold, no correction
+        with patch.object(sm._bus, "read_position_deg", return_value=155.0):
+            result = sm.hold_tick()
+        assert result is False
+        assert sm.state == GripperState.LOCKED
+
+    def test_hold_healthy_multiple_ticks_no_spam(self):
+        """Multiple hold_tick calls while stalled in band: none trigger correction."""
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.LOCKED
+        sm._last_commanded_pos_deg = 200.0
+
+        with patch.object(sm._bus, "read_position_deg", return_value=158.0):
+            for _ in range(10):
+                result = sm.hold_tick()
+                assert result is False
+        assert sm.state == GripperState.LOCKED
+        # No writes should have been made
+        assert transport.written == []
+
+    def test_slip_toward_closed_faults_with_hold_slip_fault(self):
+        """Position beyond locked_high toward closed_empty: HoldSlipFault raised, state=FAULT."""
+        from inchworm.gripper_lock import HoldSlipFault
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.LOCKED
+        sm._last_commanded_pos_deg = 200.0
+
+        # Position beyond locked_high (165) -> key lost/slipped
+        with patch.object(sm._bus, "read_position_deg", return_value=180.0):
+            with pytest.raises(HoldSlipFault) as exc_info:
+                sm.hold_tick()
+        assert sm.state == GripperState.FAULT
+        assert exc_info.value.role == "arm_left"
+        assert exc_info.value.present_deg == 180.0
+        assert isinstance(exc_info.value, GripperLockError)
+
+    def test_slip_toward_closed_logs_fault_event(self):
+        """HoldSlipFault emits gripper_hold_slip_fault error event to logger."""
+        from inchworm.gripper_lock import HoldSlipFault
+        mock_logger = MagicMock()
+        transport = _make_transport()
+        bus = _make_bus(transport)
+        sm = GripperLockSM(
+            bus=bus,
+            role="arm_left",
+            config=_LOCK_CONFIG,
+            opposite_arm_locked_fn=lambda: True,
+            logger=mock_logger,
+            dry_run=False,
+        )
+        sm._state = GripperState.LOCKED
+        sm._last_commanded_pos_deg = 200.0
+
+        with patch.object(sm._bus, "read_position_deg", return_value=180.0):
+            with pytest.raises(HoldSlipFault):
+                sm.hold_tick()
+
+        called_event_types = [
+            call.kwargs.get("event_type")
+            for call in mock_logger.error.call_args_list
+            if "event_type" in call.kwargs
+        ]
+        assert "gripper_hold_slip_fault" in called_event_types
+
+    def test_drift_toward_open_reasserts_overtravel_goal(self):
+        """Position below locked_low: hold re-asserts overtravel goal and returns True."""
+        transport = _make_transport()
+        sm = _live_sm(transport)
+        sm._state = GripperState.LOCKED
+        sm._last_commanded_pos_deg = 200.0
+
+        transport.feed(_write_response(6))
+        # Position below locked_low (145) -> drift toward open
+        with patch.object(sm._bus, "read_position_deg", return_value=140.0):
+            result = sm.hold_tick()
+        assert result is True
+        assert sm.state == GripperState.LOCKED
+
+        # The write should encode the overtravel goal (200.0 deg)
+        import struct as st
+        written = transport.written[-1]
+        tick_bytes = written[6:8]
+        written_ticks = st.unpack("<H", tick_bytes)[0]
+        from inchworm.servo_bus import ticks_to_degrees
+        written_deg = ticks_to_degrees(written_ticks)
+        assert abs(written_deg - 200.0) < 1.0
+
+    def test_hold_slip_fault_is_gripper_lock_error(self):
+        """HoldSlipFault is a GripperLockError."""
+        from inchworm.gripper_lock import HoldSlipFault
+        assert issubclass(HoldSlipFault, GripperLockError)
+
+    def test_overtravel_not_configured_is_gripper_lock_error(self):
+        """OvertravelNotConfigured is a GripperLockError."""
+        from inchworm.gripper_lock import OvertravelNotConfigured
+        assert issubclass(OvertravelNotConfigured, GripperLockError)

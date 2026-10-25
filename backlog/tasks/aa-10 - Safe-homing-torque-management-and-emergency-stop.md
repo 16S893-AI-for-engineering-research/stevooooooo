@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-24 22:39'
+updated_date: '2026-10-25 19:23'
 labels: []
 milestone: m-1
 dependencies:
@@ -62,6 +62,8 @@ Implementation complete. New modules: inchworm/torque.py, inchworm/homing.py, in
 Orchestrator changes 2026-10-24 (provisional, pending the owner decision in the comment): EStop.stop() now HOLDS arms by default (TorqueManager.hold_arm/hold_all: re-command present position, torque ON, gripper untouched). It releases torque only with release_on_stop=True or for overcurrent/overtemperature faults. Tests: test_default_estop_holds_arms_not_releases, test_release_on_stop_disables_torque, test_thermal_and_overcurrent_faults_release[...], test_unreachable_fault_holds. Full suite: 583 passed. AC#4 stays unchecked until the owner confirms the stop semantics.
 
 LIVE FINDING 2026-10-24 (read-only check before any motion; owner present): all 12 servos read torque_enable=0 and goal_position=0 deg, while present positions were 3-275 deg. Enabling torque would have driven every joint at full speed to 0 deg (up to 275 deg of travel), including the arms slamming and the grippers moving. FIX in ArmServoBus.set_torque_enable(True): read present, write goal := present, read the goal back and refuse with ServoRangeError if it does not match, and only then write torque_enable. This is the single code path for enabling torque (TorqueManager, homing, estop hold, measure_limits all go through it). Tests: test_enable_sends_correct_packet (4-step sequence), test_enable_refuses_if_goal_readback_mismatch. MockSerialTransport gained queue_reply() (half-duplex reply after write). Suite 1500 passed.
+
+Owner decision 2026-10-25: e-stop HOLDS arm position (torque stays on; the tube may be attached). Confirms the provisional default. Torque release only on explicit request or an overcurrent/overtemperature fault. AC#4 still needs a supervised live e-stop test.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
