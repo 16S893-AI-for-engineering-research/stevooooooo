@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-25 23:05'
+updated_date: '2026-10-26 03:23'
 labels: []
 milestone: m-1
 dependencies:
@@ -92,6 +92,8 @@ Owner 2026-10-24: wrist_roll, viewed from the gripper tip looking back toward th
 2026-10-25: servo_calibration set to unverified: false. The owner accepts the mid-range zeros for the non-pan joints (only the left pan had an obstructed range). Supporting data: the hand-placed fold readings agree between arms within 0.5-6 deg. Residual risk: absolute zero accuracy of the pitch joints is not measured independently; AA-11 #3 pose residuals will expose any error. Live motion is still blocked by the unverified soft limits and the placeholder collision geometry.
 
 CAD analysis 2026-10-25 (worker, orchestrator-reviewed; robot/calibration_data/cad_collision_report_2026-10-25.md, script robot/tools/cad/analyze_step_final.py). Found: two Base_SO101 instances 182.5 mm apart along STEP Y (matches the 183.676 pitch); tube Part 13 (about 80x186x81 mm, Z 273-358 mm, 3 positions); DexArm-region parts at STEP -Y; chassis plate not identified. REVIEW FINDINGS (orchestrator): (1) CollisionModel checks keep-out boxes in each ARM BASE frame, while the CAD boxes are in the STEP/chassis frame; they cannot be used until the base_to_chassis transforms (xyz+rpy) are set. The CAD gives the base xyz; rpy needs the STEP placement or owner confirmation. (2) CollisionModel checks only 6 points per arm (joint origins + TCP), not link volumes, so a link segment or the gripper body can pass through a box between points. That is a gap to fix (segment sampling or capsules) before relying on it for combined-joint safety. Owner questions: which arm is nearer the DexArm; the frame convention.
+
+Owner 2026-10-25: the LEFT arm is nearer the DexArm; the CAD (CAD/Assembly 1.step) is up to date with the real build. So CAD arm A (STEP Y about 214 mm, nearer the DexArm at -Y) = LEFT, arm B (Y about 397) = RIGHT.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

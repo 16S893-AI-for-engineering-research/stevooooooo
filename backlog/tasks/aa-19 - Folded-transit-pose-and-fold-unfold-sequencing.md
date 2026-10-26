@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-25 23:04'
+updated_date: '2026-10-26 03:28'
 labels: []
 milestone: m-2
 dependencies:
@@ -101,6 +101,8 @@ RIGHT q_rad [-0.0836, -0.9802, 1.6874, -1.5509, 1.4435] (deg -4.8, -56.2, 96.7, 
 Findings: (1) both elbows are at their mechanical end-stop, outside the EEPROM/soft limits (L 3119 > max 3091; R 3076 > max 3046), so the fold uses the full elbow travel; the limit update must include it (owner approval, EEPROM). (2) left shoulder_pan reads +35.9 deg while right reads -4.8 deg; asked the owner whether this asymmetry is intended. Not yet written to config; AC#1 also needs real collision validation.
 
 2026-10-25: folded_transit set in config to [0.0, -1.25, 1.64, -1.31, 1.36] (both arms) from the hand-placed fold. pan = 0 per the owner (both point at the DexArm). lift/elbow are 2-3 deg short of the end stops. wrist_roll = the mean of the arms. The OLD PLACEHOLDER HAD LIFT/ELBOW SIGNS REVERSED (+1.2/-1.57), so a powered fold would have folded the wrong way; fold and unfold waypoint signs corrected. Unfold ordering test made sign-independent (abs lift). EEPROM limits widened so the fold is in-limits (owner-approved). AC#1 is NOT checked: the collision validation still uses placeholder geometry.
+
+Correction and evidence 2026-10-25: the earlier note said the old placeholder fold had its signs 'REVERSED'. More precisely, its lift/elbow signs are the OPPOSITE of the measured fold. In the URDF model the old pose reaches OUTWARD (wrist about 308 mm forward) rather than folding. Independent check against the CAD (owner: the CAD matches the build, and the CAD shows the folded pose): the wrist link (Wrist_Roll_Pitch) sits about 70 mm from the base centre toward the DexArm (STEP -Y), and the upper/under-arm centres sit at or behind the base centre. That matches the measured-fold FK (wrist 94 mm forward, elbow 36 mm behind the shoulder). Arm forward = STEP -Y = toward the DexArm, consistent with the pan landmark. Not a full verification: the base_link origin offset is not yet extracted.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
