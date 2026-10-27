@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-27 15:35'
+updated_date: '2026-10-27 17:40'
 labels: []
 dependencies: []
 priority: high
@@ -53,4 +53,13 @@ Stage 1 (worker): STEP text parser for placements; per-part meshes in the chassi
 Owner measurements 2026-10-25 (tape): (a) arm base to arm base edge-to-edge is correct (CAD 182.5 mm). (b) Bottom of the DexArm BASE to the closest edge of the LEFT SO-101 BASE = 71.108 mm. The rest of the SO-101 overhangs, so it gets closer than that. (c) Table surface to the FAR side of the tube is about 360 mm. The tube runs PARALLEL to the table. Environment: no wires in the way; the SO-101s can reach the table surface (the table must be a collision object); the DexArm cannot reach the table. Left pan: NO LONGER obstructed, so its limits must be re-measured.
 
 2026-10-25: approach changed with the owner. Assemble the model from open-source models (SO-101 URDF; DexArm URDF) plus owner-exported STLs, instead of classifying STEP parts by name (that failed: the DexArm guess was off by about 100 mm and 'Part 1' appears 7 times). DexArm model vendored: robot/vendor/dexarm (ybisk/robot, MIT, 2021, 'WIP' community model; links upper arm and forearm about 150-160 mm, base about 128x145 mm, plausible but unverified). Owner will export: (1) one STL with all arm-base pieces and the mounts they sit on, (2) one STL with the camera mount + Wrist_Roll_Pitch. The WIP branch wip/aa-40-stage1 keeps the STEP placement parser (works, 6 s).
+
+Fits 2026-10-25 (robot/tools/cad/fit_bases.py, fit_all.py; results in calibration_data/aa40_*_2026-10-25.json). Owner exports are in METRES.
+- SO-101 base_link onto the owner bases.stl: L xyz [-114.748, 235.474, 16.464] mm, rpy [0.0002, 0.0014, -1.5712]; R [-114.677, 417.987, 16.445], rpy [-0.0005, 0.0001, -1.5695]. RMS 0.03 mm both ways; spacing 182.51 mm.
+- Wrist_Roll_Pitch in wrist_camera/wrist_gripper: RMS 0.05-0.06 mm (same pose in both files, so the files share a frame). The 32.8 cm3 body is a different part (owner's lock).
+- DexArm B_Fix (community model) onto the export: the export lies on the model to 0.08 mm RMS; model-to-export 2.5 mm RMS (725/3000 model points 3-6 mm INSIDE the export, the same convex hull, so internal detail differs, e.g. ribs). Pose xyz [-114.494, 99.391, 81.744] mm, rpy [-1.5708, -0.0045, 3.1415].
+- 71.108 check: Y gap between the DexArm export base (maxY 99.39) and the left SO-101 base (minY 170.78) = 71.386 mm vs the owner's 71.108 (0.28 mm).
+- CAD-pose solve: fitting left FK to the CAD wrist part gives the CAD arm drawn at [-2.9, -90.4, 90.2, -89.4] deg, residual 3.1 mm / 2.9 deg. That is a square, idealised fold, NOT the real fold (measured [0, -79.2, 96.7, -74.8]), so the CAD cannot validate joint zeros; the real check is the owner comparing renders against photos.
+
+Owner 2026-10-25: in wrist_gripper.stl, Part 10 = lock body and Part 9 = locking key (turns when the gripper locks). Body volumes in that export: lock body probably 32.8 cm3 (47x47x35 mm) at Z about 248 mm; key probably 9.96 cm3 (44x45x28) at Z about 274. The STL carries no names, so the identification is by size/position and needs owner confirmation from the render.
 <!-- SECTION:NOTES:END -->
