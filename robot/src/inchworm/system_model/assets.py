@@ -415,12 +415,24 @@ def load_wrist_gripper_meshes(
     _WRIST_VOL_M3 = 3.225e-5   # wrist_roll_pitch reference volume (from fit data: 32.25 cm3)
     _WRIST_TOL = 0.5e-5        # ±5 cm3 tolerance
 
+    # Exactly ONE body is wrist_roll_pitch: the one closest to the reference
+    # volume (within tolerance).  The lock body (Part 10, ~32.8 cm3) is also
+    # within the tolerance, so a plain tolerance test would match it too and
+    # pin it to wrist_link (AA-40 stage 2 fix).
+    wrist_candidates = [
+        i for i, b in enumerate(bodies)
+        if abs(abs(b.volume) - _WRIST_VOL_M3) < _WRIST_TOL
+    ]
+    wrist_index = (
+        min(wrist_candidates, key=lambda i: abs(abs(bodies[i].volume) - _WRIST_VOL_M3))
+        if wrist_candidates else None
+    )
+
     result: Dict[str, "trimesh.Trimesh"] = {}
     for i, body in enumerate(bodies):
         vol = abs(body.volume)
         vol_cm3 = vol * 1e6
-        # Identify wrist_roll_pitch by volume proximity
-        is_wrist_body = abs(vol - _WRIST_VOL_M3) < _WRIST_TOL
+        is_wrist_body = i == wrist_index
         if is_wrist_body:
             # wrist_roll_pitch: express in wrist_link frame
             T_total = T_chassis_wristlink @ T_wristlink_export
@@ -430,6 +442,10 @@ def load_wrist_gripper_meshes(
             T_chassis_gripperlink = T_chassis_wristlink @ T_wristlink_gripperlink_at_q0
             T_total = T_chassis_gripperlink @ T_gripperlink_export
             name = f"wrist_gripper/body_{i}_{vol_cm3:.1f}cm3"
+        if name in result:
+            raise ValueError(
+                f"wrist_gripper.stl: two bodies map to the same key {name!r}"
+            )
         result[name] = _apply_tf(body, T_total)
     return result
 

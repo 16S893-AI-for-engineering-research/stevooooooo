@@ -32,6 +32,8 @@ dev = [
     "scipy>=1.10",
     "networkx>=3.0",
     "matplotlib>=3.7",
+    # AA-40 stage 2: mesh collision checking (system_model/collision.py).
+    "python-fcl>=0.7",
 ]
 
 [build-system]
@@ -48,6 +50,7 @@ model = [
     "scipy>=1.10",
     "networkx>=3.0",
     "matplotlib>=3.7",
+    "python-fcl>=0.7",
 ]
 # --- AA-40 end ---
 
