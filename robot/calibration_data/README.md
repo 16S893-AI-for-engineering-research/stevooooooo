@@ -122,3 +122,16 @@ Backups: `eeprom_backup_{left,right}_2026-10-25_pre_limit_widen.json`.
 
 Soft limits (rad) recomputed from these, clipped to the URDF limits (elbow upper 1.69,
 wrist_flex +/-1.6581).
+
+## Shoulder pan EEPROM widened to full travel, both arms, 2026-10-25 (owner option a)
+
+The owner removed the left pan obstruction. A read-only torque-off sweep
+(`joint_ranges_left_pan_unobstructed_2026-10-25.json`) measured 642..3370 (239.8 deg),
+which matches the right arm's 758..3477 (239.0 deg). The 24 Oct right-pan cap (decision b)
+existed only because of the obstructed left reading, so the owner chose (a): both pans at
+full measured travel minus 30 ticks. Left 674..2527 -> 672..3340; right 1191..3044 ->
+788..3447. Read back OK. Backups: `eeprom_backup_{left,right}_2026-10-25_pre_pan_widen.json`.
+Soft limits: about -113..+121 deg around the landmark zero, clipped to the URDF +/-110 deg
+(the tighter bound applies). Combined-joint safety relies on the AA-40 collision model.
+Caveat: the recorder kept only the overall min/max, so end-stop repeatability across
+passes was not recorded.

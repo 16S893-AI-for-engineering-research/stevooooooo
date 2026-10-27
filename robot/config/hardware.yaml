@@ -460,10 +460,10 @@ motion_guard:
   # unverified: true → guard refuses LIVE motion (fail-closed).
   # Set method + measured_date after running: scripts/measure_limits.py --live
   left_arm_limits:
-    # EEPROM min 674 ticks around the landmark zero gives -1.9911 rad, beyond the URDF
-    # limit -1.91986; clipped to the URDF value (tighter of the two).
+    # 2026-10-25: pan EEPROM widened to full measured travel (owner option a); soft
+    # limits = EEPROM range around the landmark zero, clipped to URDF +/-1.91986.
     shoulder_pan_lower_rad: -1.9199
-    shoulder_pan_upper_rad: 0.8514
+    shoulder_pan_upper_rad: 1.9199
     shoulder_lift_lower_rad: -1.3982
     shoulder_lift_upper_rad: 1.3384
     elbow_flex_lower_rad: -1.6506
@@ -491,8 +491,8 @@ motion_guard:
       wrist_roll: [500, 3290]
       gripper: [1558, 2487]
   right_arm_limits:
-    shoulder_pan_lower_rad: -1.3376
-    shoulder_pan_upper_rad: 1.5048
+    shoulder_pan_lower_rad: -1.9199
+    shoulder_pan_upper_rad: 1.9199
     shoulder_lift_lower_rad: -1.2977
     shoulder_lift_upper_rad: 1.2364
     elbow_flex_lower_rad: -1.6414

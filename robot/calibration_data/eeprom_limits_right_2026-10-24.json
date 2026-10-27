@@ -1,9 +1,10 @@
 {
   "shoulder_pan": {
     "servo_id": 1,
-    "min_position_limit": 1191,
-    "max_position_limit": 3044,
-    "verified": true
+    "min_position_limit": 788,
+    "max_position_limit": 3447,
+    "verified": true,
+    "widened_2026-10-25": "from 1191..3044; owner option (a): full measured pan travel - 30 tick margin (left unobstructed sweep 642-3370; right sweep 758-3477)"
   },
   "shoulder_lift": {
     "servo_id": 2,
