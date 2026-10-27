@@ -3,19 +3,21 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-27 18:52'
+updated_date: '2026-10-27 20:28'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-27 at commit `75505dc`. Full suite **1551 passed** (the 3 dry-run/soft-limit failures noted on 2026-10-25 are resolved).
+**Last verified:** 2026-10-27 at commit `a2e03fe`. Full suite **1580 passed**.
 
-**Current focus (2026-10-27): AA-40 full-system model** (owner-approved option C, no ROS). Live motion stays blocked (`unverified: true` soft limits) until model-based collision checking is real.
-- Done: owner STL exports (`CAD/exports/`, metres) and precise fits (SO-101 bases 0.03 mm RMS, spacing 182.51 mm; wrists 0.05 mm; DexArm community URDF base fit; the 71.1 mm owner check is 0.28 mm off). Stage 1 is committed: `robot/src/inchworm/system_model/` (scene assembly), `scripts/view_pose.py` (PNG via matplotlib; meshcat not yet installed), tests. The model deps are in the dev group.
-- In flight: stage 2, python-fcl mesh collision wired into motion_guard (fail closed), delegated to a worker sub-agent and pending orchestrator review.
-- Then: owner compares rendered rest/fold against the real robot (AA-40 #6); confirm the lock-body/key identification in wrist_gripper.stl (Part 10 lock, Part 9 key); gripper bands (AA-17); first supervised powered jog.
-- Session 2 facts still valid: joint servo_calibration verified; EEPROM limits widened (fold/gripper/rest inside); left pan unobstructed (240 deg); measured folded_transit and pan-zero poses in `robot/calibration_data/poses_2026-10-25.jsonl`.
+**Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place (already the default; AA-10 #4 waits only for the supervised live test). (2) The tube advances to the right, AWAY from the DexArm: `cycle_runner.advance_physical: away_from_dexarm`; the live preflight checks the sign against AA-16 calibration (fail closed); `advance_direction_owner_confirmed` stays false until seen live. (3) Cura = Rotrics' official published settings (AA-34 Done; `robot/docs/cura_dexarm_profile.md`). (4) No tube fixture design: the owner props the tube simply (AA-23 #4 still needs the pose comparison). (5) Owner will help measure the gripper lock torque: human task **AA-41** proposed (awaiting `accept AA-41`), via `scripts/gripper_lock_probe.py`. (6) Keep the one-camera rule (AA-38 unchanged).
+
+**Current focus: AA-40 stage 2** (python-fcl mesh collision in motion_guard, fail closed). Delegated 2026-10-27 to a worker in an isolated worktree; orchestrator review pending. Live arm motion stays blocked until it lands and the owner compares renders (AA-40 #6).
+- Done in AA-40: owner STL exports and fits (bases 0.03 mm RMS, wrists 0.05 mm, DexArm community URDF; 71.1 mm check 0.28 mm off); stage 1 model + `scripts/view_pose.py`; python-fcl dependency; wrist_gripper fix (the 32.8 cm3 lock body was mis-pinned to wrist_link, now exactly one wrist body).
+- Then: owner compares rendered rest/fold vs the real robot (AA-40 #6) and confirms the lock body/key in the render; AA-41 gripper probe; first supervised powered jog.
+- Gripper: lock() now waits for the servo to settle before verifying (false-MISS finding fixed); live lock still refused until `lock_torque_limit_raw` and the verification thresholds come from AA-41 data.
+- Session 2 facts still valid: joint servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured folded_transit and pan-zero poses in `robot/calibration_data/poses_2026-10-25.jsonl`.
 
 ## 1. Resume in 60 seconds
 
@@ -47,7 +49,7 @@ git log --oneline -5
 
 ## 2. Where the project stands
 
-**Software for every subsystem exists and is tested against mocks.** Done: AA-4, 5, 6, 7, 12, 15, 20, 22 (9/9, In Progress only pending finalization), 28, 33, 37. Every other started task has its software ACs checked with test evidence; only hardware-, owner- or model-dependent ACs remain open. Not started (they need hardware or a trained model end to end): AA-13, 25, 27, 35, 36, 38, 39.
+**Software for every subsystem exists and is tested against mocks.** Done: AA-4, 5, 6, 7, 8, 12, 15, 20, 22, 28, 33, 34, 37. Every other started task has its software ACs checked with test evidence; only hardware-, owner- or model-dependent ACs remain open. Not started (they need hardware or a trained model end to end): AA-13, 25, 27, 35, 36, 38, 39.
 
 Modules in `robot/src/inchworm/`:
 - **Devices:** discovery (cameras by usbipd BusId via vhci), PySerialTransport, servo_bus, dexarm, laser, camera_arbiter, camera_capture.
@@ -115,13 +117,9 @@ Order matters: each step unblocks the next. All scripts are in `robot/scripts/`,
 
 ## 4. Pending owner decisions
 
-1. **E-stop semantics (AA-10 #4):** the current provisional default is HOLD arms in place (torque on); release torque only on request or for overcurrent/overtemperature. Confirm, or choose limp.
-2. **Advance direction and which arm advances the tube (AA-21):** this is a config-driven choice, marked for confirmation.
-3. **Nozzle, material and print temperatures for the Cura profile (AA-34 #5):** see `robot/docs/cura_dexarm_profile.md`.
-4. **Tube fixture design** per `robot/docs/tube_fixture.md` (decision-1).
-5. Whether to relax the single-camera rule after AA-38 is measured.
+None open as of 2026-10-27 (all six were answered; see the top of this doc). Still owed from the owner at the hardware: accept and run AA-41; the AA-40 #6 render comparison; confirm the installed nozzle is the stock 0.4 mm and the filament 1.75 mm PLA (AA-34 doc §10).
 
-Software follow-ups: none outstanding. Live jog, `scripts/fault_inject_hw.py` and attach verification landed in `92ac565`.
+Software follow-ups: AA-40 stage 2 (in flight).
 
 ## 5. Decisions already made (do not silently revisit)
 

@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-25 06:50'
+updated_date: '2026-10-27 20:28'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -36,6 +36,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - Delta-style desktop arm, controlled over USB serial with a **Marlin-style G-code dialect** (Rotrics firmware). Has a module interface for the 3D print head.
 - Carries both the print head and the laser-line scanner assembly.
 - Slicing for print segments is done by the owner in **Cura**; a correct DexArm machine/printer profile must be installed in Cura first. The agent may request a sliced G-code file as a human task but must not assume a profile already exists.
+- **3D print module facts (Rotrics sources, fetched 2026-10-27; see `robot/docs/cura_dexarm_profile.md` §0):** stock nozzle 0.4 mm, 1.75 mm filament, no heated bed (firmware `TEMP_SENSOR_BED 0`), hotend firmware cutoff 275 C (`HEATER_0_MAXTEMP`), cold-extrusion lock below 170 C, Rotrics' Cura profiles print PLA at 205 C, at up to 50 mm/s. `M888 P3` selects the 3D print module (firmware `M_dexarm.cpp`; it also writes EEPROM and applies the module tool offset); `M2000`/`M2001` set G0 to straight-line/fast mode. Source facts only: the owner has not yet confirmed that the installed nozzle and filament are stock.
 
 ## 4. Cameras
 
