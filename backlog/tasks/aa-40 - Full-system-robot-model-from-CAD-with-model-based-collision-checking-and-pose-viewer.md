@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-27 14:13'
+updated_date: '2026-10-27 14:48'
 labels: []
 dependencies: []
 priority: high
@@ -46,3 +46,9 @@ Build a full-system kinematic and geometric model of the as-built robot from CAD
 Tooling decision (orchestrator 2026-10-25): python-fcl + trimesh for collision, since FCL handles concave meshes and MuJoCo would reduce meshes to convex hulls, making the chassis and DexArm falsely large. meshcat for the viewer: a browser viewer driven from Python with a persistent server, so new poses need no setup; the Windows browser reaches WSL localhost. Offscreen PNG snapshots let the orchestrator self-check.
 Stage 1 (worker): STEP text parser for placements; per-part meshes in the chassis frame (STEP tessellation of the non-arm parts; vendored SO-101 meshes for the arms); model assembly; meshcat viewer + PNG snapshot; render the rest and fold. Stage 2: FCL collision module, motion_guard integration, tests.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Owner measurements 2026-10-25 (tape): (a) arm base to arm base edge-to-edge is correct (CAD 182.5 mm). (b) Bottom of the DexArm BASE to the closest edge of the LEFT SO-101 BASE = 71.108 mm. The rest of the SO-101 overhangs, so it gets closer than that. (c) Table surface to the FAR side of the tube is about 360 mm. The tube runs PARALLEL to the table. Environment: no wires in the way; the SO-101s can reach the table surface (the table must be a collision object); the DexArm cannot reach the table. Left pan: NO LONGER obstructed, so its limits must be re-measured.
+<!-- SECTION:NOTES:END -->
