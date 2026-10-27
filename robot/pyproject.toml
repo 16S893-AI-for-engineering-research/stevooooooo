@@ -37,6 +37,19 @@ packages = ["src/inchworm"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "slow: tests that parse the full 57 MB STEP file (mark to run: pytest -m slow)",
+]
+
+[project.optional-dependencies]
+# --- AA-40 stage 1: system model extras (heavy; not required for core robot) ---
+model = [
+    "trimesh>=5.2.0",
+    "numpy-stl>=4.1.1",
+    "meshcat>=0.3.2",
+    "matplotlib>=3.10.9",
+]
+# --- AA-40 end ---
 
 [project.scripts]
 inchworm-discover = "inchworm.discover:main"

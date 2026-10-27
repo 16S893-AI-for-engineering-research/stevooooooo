@@ -1,0 +1,10 @@
+STL meshes for the SO-101 arm (URDF link meshes).
+
+Source: https://github.com/TheRobotStudio/SO-ARM100
+Commit: a758567c3978dfeefe282ede0500085a48fe8f78 (2026-10-06)
+Path:   Simulation/SO101/assets/
+
+These files are the same meshes referenced by so101_new_calib.urdf.
+License: Apache 2.0 (same repo as the URDF).
+
+Vendored by AA-40 stage 1 because the original SOURCE.txt noted meshes were omitted.
