@@ -4,6 +4,7 @@ title: Measure concurrent camera streaming on the USB 3.2 dock
 status: To Do
 assignee: []
 created_date: '2026-10-24 16:07'
+updated_date: '2026-10-27 20:06'
 labels: []
 milestone: m-1
 dependencies:
@@ -35,3 +36,9 @@ The owner replaced the USB 2.0 dock with a USB 3.2 dock and asked whether camera
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Owner 2026-10-27: keep the single-camera rule for now, even after the dock change. The arbiter stays unchanged; this task remains a measurement task only.
+<!-- SECTION:NOTES:END -->

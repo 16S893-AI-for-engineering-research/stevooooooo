@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-24 18:49'
+updated_date: '2026-10-27 20:06'
 labels: []
 milestone: m-3
 dependencies:
@@ -86,6 +86,8 @@ AC#8 checked: all three labels (success/failure/aborted) retained and distinguis
 AC#9 checked: mock arbiter verified called with follower camera role only; leader camera role never acquired.
 
 AC#10 checked: inspector reports episode count, duration distribution, success rate, per-joint offset coverage histogram with under-covered bins flagged. Output pasted in test_teleop_capture.py::test_inspect_dataset_runs.
+
+Owner 2026-10-27: no designed fixture; the owner will prop the tube up simply for demonstrations. AC#4 (fixture specified and validated against the real crawl configuration) is NOT changed: the 'documented build' will be a short description of the prop setup, and the frame/joint-pose comparison still has to be done once it exists.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

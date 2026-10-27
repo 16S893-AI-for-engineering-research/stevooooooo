@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-25 19:23'
+updated_date: '2026-10-27 20:06'
 labels: []
 milestone: m-1
 dependencies:
@@ -64,6 +64,8 @@ Orchestrator changes 2026-10-24 (provisional, pending the owner decision in the 
 LIVE FINDING 2026-10-24 (read-only check before any motion; owner present): all 12 servos read torque_enable=0 and goal_position=0 deg, while present positions were 3-275 deg. Enabling torque would have driven every joint at full speed to 0 deg (up to 275 deg of travel), including the arms slamming and the grippers moving. FIX in ArmServoBus.set_torque_enable(True): read present, write goal := present, read the goal back and refuse with ServoRangeError if it does not match, and only then write torque_enable. This is the single code path for enabling torque (TorqueManager, homing, estop hold, measure_limits all go through it). Tests: test_enable_sends_correct_packet (4-step sequence), test_enable_refuses_if_goal_readback_mismatch. MockSerialTransport gained queue_reply() (half-duplex reply after write). Suite 1500 passed.
 
 Owner decision 2026-10-25: e-stop HOLDS arm position (torque stays on; the tube may be attached). Confirms the provisional default. Torque release only on explicit request or an overcurrent/overtemperature fault. AC#4 still needs a supervised live e-stop test.
+
+Owner re-confirmed 2026-10-27: e-stop HOLDS in place (torque stays on), matching the implemented default (test_default_estop_holds_arms_not_releases). AC#4 remains unchecked only for the supervised live e-stop test (both arms + DexArm halted, laser relay off, recoverable).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

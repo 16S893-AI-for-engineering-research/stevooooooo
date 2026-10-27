@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-24 18:53'
+updated_date: '2026-10-27 20:25'
 labels: []
 milestone: m-2
 dependencies:
@@ -81,6 +81,8 @@ Note: IK fails at lattice index 2+ with unverified arm-base transforms (Approach
 Advance arm choice: the moving arm M leapfrogs the holding arm H. FrameModel.complete_advance() is called after M locks and before fold. Advance direction is +1 (config-driven, advance_direction_owner_confirmed: false by default -- owner must confirm). Both grippers-unlocked invariant asserted in all fault paths.
 
 AC#7 needs owner-supervised hardware session: uv run python scripts/dry_cycle.py --live --cycles 5
+
+Owner decision 2026-10-27: the tube advances to the right, AWAY from the DexArm. Recorded as cycle_runner.advance_physical: away_from_dexarm (new config field) with advance_direction: 1 in a new hardware.yaml cycle_runner block. The live preflight now checks the sign geometrically: advance_direction * calibration.tube_axis.axis_direction must point from dexarm_base toward the arm-base midpoint (|cos| >= 0.5); missing calibration, an undecided advance_physical, a perpendicular axis or a wrong sign are each preflight failures (fail closed). This also covers a PCA axis fit that comes out reversed. advance_direction_owner_confirmed stays false until the owner sees the tube move away from the DexArm in the first supervised live cycle. Tests: TestAdvancePhysicalDirection (9), tests/test_cycle.py 49 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

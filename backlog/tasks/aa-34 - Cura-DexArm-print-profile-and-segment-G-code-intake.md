@@ -1,11 +1,11 @@
 ---
 id: AA-34
 title: Cura DexArm print profile and segment G-code intake
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:14'
-updated_date: '2026-10-24 19:15'
+updated_date: '2026-10-27 20:25'
 labels: []
 milestone: m-6
 dependencies:
@@ -35,7 +35,7 @@ See doc-1 sections 3 and 8.
 - [x] #2 Validation rejects a segment whose coordinate origin or Z reference is inconsistent with the current leveled print frame, naming the specific inconsistency
 - [x] #3 The leveling correction from AA-33 is applied to the segment transform rather than requiring a re-slice per hop, and the applied transform is logged with the segment
 - [x] #4 Streaming to the DexArm reports progress, confirms completion, and aborts safely on firmware error with the nozzle retracted and the laser off
-- [ ] #5 Required Cura profile settings for this DexArm and this nozzle and material are documented in the repository so a slice can be reproduced
+- [x] #5 Required Cura profile settings for this DexArm and this nozzle and material are documented in the repository so a slice can be reproduced
 - [x] #6 A dry-run mode parses and validates a segment and reports the planned bounding box without commanding motion
 - [x] #7 Tests cover validation acceptance, each rejection reason and dry-run output on sample G-code files
 <!-- AC:END -->
@@ -62,6 +62,8 @@ Tests added: test_retract_fails_then_quickstop, test_e_passthrough_absolute_mode
 Test evidence: uv run pytest tests/test_gcode_intake.py -> 73 passed; uv run pytest -> 1278 passed.
 
 Orchestrator verification 2026-10-24 after the fix lane: DexArmDriver.print_move is bounds-checked before transmit and carries E/F; stream_segment applies frame.apply() to every streamed XYZ (test_frame_transform_applied_to_streamed_moves), tracks M82/M83 (test_e_passthrough_absolute_mode/relative_mode), rejects G2/G3 at stream time (documented in cura_dexarm_profile.md), and on abort retracts with an M410 quickstop fallback (test_retract_fails_then_quickstop) with the laser off always attempted. Orchestrator hardening: a failed M114 start-position query now REFUSES in live mode instead of assuming (0,0,0) (test updated). `uv run pytest -q tests/test_gcode_intake.py` all pass; full suite 1392 passed. AC#5 stays unchecked: owner nozzle and material confirmation.
+
+Owner decision 2026-10-27: use the Cura settings Rotrics publishes. docs/cura_dexarm_profile.md rewritten from the official sources (Rotrics manual Cura page; DexArm-3DPrint-Cura.zip from the Rotrics Download Center, sha256 95ec7537...f7ed, not vendored since it carries no licence; Rotrics firmware Configuration.h and M_dexarm.cpp). Normal-DexArm: 0.4 mm nozzle, 1.75 mm PLA, 205 C, 0.2 mm layers, 30 mm/s print / 50 mm/s travel, 6 mm @ 30 mm/s retraction, no heated bed. Robot deviations: Rotrics start G-code M888 P3 / M2000 removed from segments (M888 writes EEPROM + tool offset; M2000 is G0 mode, irrelevant since streaming uses bounded G1); the driver now names MODULE_3D_PRINT = 3 from the firmware source. Cura's auto-inserted M105 avoided by the start template. hardware.yaml gained a gcode_intake block from firmware limits: max_nozzle_temp_c 260 (firmware 275), max_bed_temp_c ~0 (TEMP_SENSOR_BED 0), feedrate unchanged 9000. Evidence: tools/cura/slice_rotrics_normal.sh with CuraEngine 4.13.0 (Ubuntu packages, extracted locally) produced tests/data/rotrics_normal_10x10x1mm.gcode; TestRotricsProfileSlice (4 tests) parses it in strict dialect, validates it against those limits through an arm-frame offset, and dry-run streams every motion line. test_load_config_with_gcode_intake_none replaced by a firmware-limits check plus a no-block parse test (the block now exists on purpose). tests/test_gcode_intake.py 80 passed. Residual: owner to confirm the installed nozzle is the stock 0.4 mm and the filament is 1.75 mm PLA; first real print is AA-35.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -73,3 +75,9 @@ created: 2026-10-24 19:01
 Orchestrator review 2026-10-24 (P0 functional): stream_segment (1) DROPS the extruder axis: motion lines are sent as DexArmDriver.move_absolute(x,y,z) with no E, so a print would extrude nothing; G2/G3 arcs are also flattened to straight moves. (2) Does NOT apply the AA-33 print-frame correction to streamed coordinates (only at validation), so the leveling correction never reaches the arm. (3) Assumes the start position is (0,0,0) instead of querying it. (4) The abort retract via move_relative depends on M114 and bounds and can fail exactly when the firmware is in error. Fix: add a bounded 'print move' API on the DexArm driver (in an AA-34 block) that carries E/F and is bounds-checked AFTER the frame transform, query the start position, convert or reject arcs explicitly, and test the abort retract when move_relative fails (fall back to raw 'G91\nG1 Z+r' through a documented emergency path or the M410 quickstop). AC#3 and AC#4 are unchecked until then.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+G-code intake (parse/validate/stream with AA-33 frame, bounded print_move, safe abort) plus the Cura profile documented from Rotrics' official published settings and firmware limits; a headless slice with those settings passes the intake (TestRotricsProfileSlice). All 7 ACs verified by tests.
+<!-- SECTION:FINAL_SUMMARY:END -->

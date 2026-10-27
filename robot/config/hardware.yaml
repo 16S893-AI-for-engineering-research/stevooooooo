@@ -997,3 +997,33 @@ print_frame:
   # Verification residual tolerance for ry (rad). unverified: true
   residual_tolerance_ry_rad: 0.05  # unverified: true
 # --- AA-33 end ---
+# --- AA-21 ---
+# Dry/real crawl cycle runner (AA-21).
+cycle_runner:
+  initial_moving_arm: left   # config-driven choice; owner may change
+  # +1 / -1 multiplier on the calibrated tube axis (AA-16 tube_axis).
+  # The live preflight checks the sign against advance_physical from calibration.
+  advance_direction: 1
+  # Owner decision 2026-10-27: "the tube moves to the right, away from the DexArm".
+  advance_physical: away_from_dexarm
+  # Stays false until the first supervised live cycle shows the tube really
+  # moves away from the DexArm (owner observation).
+  advance_direction_owner_confirmed: false
+  supervisor_success_at_step: 2
+# --- AA-21 end ---
+# --- AA-34 ---
+# G-code intake limits (inchworm.gcode_intake).  Sources (2026-10-27):
+#   Rotrics firmware Marlin_For_DexArm Configuration.h: HEATER_0_MAXTEMP 275,
+#   TEMP_SENSOR_BED 0 (no heated bed), DEFAULT_NOMINAL_FILAMENT_DIA 1.75;
+#   Rotrics official Cura profile (DexArm-3DPrint-Cura.zip): 205 C, <= 50 mm/s.
+# See robot/docs/cura_dexarm_profile.md.
+gcode_intake:
+  # 150 mm/s; the Rotrics profile never exceeds 50 mm/s (3000 mm/min).
+  max_feedrate_mm_min: 9000.0
+  # 15 C below the firmware's 275 C cutoff; PLA at Rotrics' 205 C fits easily.
+  max_nozzle_temp_c: 260.0
+  # No bed heater on the DexArm: any non-zero bed temperature is rejected.
+  max_bed_temp_c: 0.0001
+  z_origin_tolerance_mm: 1.0   # unverified: tune after AA-33 leveling
+  retract_z_mm: 3.0
+# --- AA-34 end ---

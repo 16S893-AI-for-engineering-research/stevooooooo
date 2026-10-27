@@ -235,6 +235,12 @@ _PARK_Z: float = 200.0
 _PARK_FEEDRATE: float = 3000.0
 
 
+# Rotrics M888 module IDs (firmware source: Rotrics-Dev/Marlin_For_DexArm,
+# Marlin/src/gcode/control/M_dexarm.cpp, GcodeSuite::M888).  The Rotrics Cura
+# guide's start G-code uses "M888 P3" for the 3D print module.
+MODULE_3D_PRINT: int = 3
+
+
 class DexArmDriver:
     """Marlin-style G-code driver for the Rotrics DexArm.
 
@@ -634,8 +640,11 @@ class DexArmDriver:
         Parameters
         ----------
         module_id:
-            Rotrics module ID integer (0 = 3D print head per Rotrics docs,
-            but this is unverified).
+            Rotrics module ID integer.  From the Rotrics firmware source
+            (Marlin_For_DexArm ``M_dexarm.cpp`` ``GcodeSuite::M888``):
+            0 = pen, 1 = laser, 2 = pump, 3 = 3D print (:data:`MODULE_3D_PRINT`),
+            5 = custom (needs T/A), 6 = rotary.  M888 also saves the setting to
+            EEPROM and applies the module's tool offset.
         dry_run:
             When ``True``, log without sending.
         """

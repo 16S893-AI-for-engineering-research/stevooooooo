@@ -1128,7 +1128,71 @@ class CycleRunner:
                 "then set advance_direction_owner_confirmed: true before live use."
             )
 
+        # 6. Physical advance sense (owner decision 2026-10-27: away from the
+        #    DexArm).  Live only; fail closed when it cannot be checked.
+        if not self._dry_run:
+            failures.extend(self._advance_physical_failures())
+
         return failures
+
+    def _advance_physical_failures(self) -> List[str]:
+        """Check that ``advance_direction`` moves the tube the owner's way.
+
+        Uses the AA-16 calibration: the advance vector in the chassis frame is
+        ``advance_direction * tube_axis.axis_direction``.  "away_from_dexarm"
+        means it points from the DexArm base toward the midpoint of the two
+        arm bases (all three sit in line, doc-1 s2).  Any missing input is a
+        failure (fail closed).
+        """
+        want = self._cycle_cfg.advance_physical
+        if want is None:
+            return [
+                "cycle_runner.advance_physical is not set; the owner must state "
+                "which way the tube advances (away_from_dexarm / toward_dexarm)."
+            ]
+        cal = self._config.calibration if self._config is not None else None
+        missing: List[str] = []
+        axis = None
+        if cal is None or cal.tube_axis is None or cal.tube_axis.axis_direction is None:
+            missing.append("tube_axis")
+        else:
+            axis = np.asarray(cal.tube_axis.axis_direction, dtype=np.float64)
+        positions: Dict[str, np.ndarray] = {}
+        for name in ("dexarm_base", "left_arm_base", "right_arm_base"):
+            block = getattr(cal, name, None) if cal is not None else None
+            if block is None or block.transform is None:
+                missing.append(name)
+            else:
+                positions[name] = np.asarray(block.transform, dtype=np.float64)[:3, 3]
+        if missing:
+            return [
+                "cannot verify the physical advance direction: AA-16 calibration "
+                f"missing for {', '.join(missing)}."
+            ]
+        assert axis is not None
+        norm = float(np.linalg.norm(axis))
+        if norm < 1e-9:
+            return ["calibration.tube_axis.axis_direction is a zero vector."]
+        advance = self._cycle_cfg.advance_direction * axis / norm
+        away = 0.5 * (positions["left_arm_base"] + positions["right_arm_base"]) - positions["dexarm_base"]
+        away_norm = float(np.linalg.norm(away))
+        if away_norm < 1e-9:
+            return ["DexArm base and arm-base midpoint coincide; cannot orient the advance."]
+        cos = float(np.dot(advance, away / away_norm))
+        # Require a clear sense, not a near-perpendicular axis (|cos| >= 0.5).
+        if abs(cos) < 0.5:
+            return [
+                f"tube axis is nearly perpendicular to the DexArm-to-arms line "
+                f"(cos={cos:.3f}); check the AA-16 calibration."
+            ]
+        got = "away_from_dexarm" if cos > 0 else "toward_dexarm"
+        if got != want:
+            return [
+                f"advance_direction={self._cycle_cfg.advance_direction} moves the tube "
+                f"{got} (cos={cos:.3f}) but the owner decision is {want}; "
+                "flip cycle_runner.advance_direction."
+            ]
+        return []
 
     # ------------------------------------------------------------------
     # Safety helpers

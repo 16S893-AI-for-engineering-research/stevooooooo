@@ -932,3 +932,99 @@ def test_live_fold_requires_fold_sequencer(cfg, chains, guards):
     with pytest.raises(CycleFaultError, match="fold_sequencer"):
         runner._safe_fold_both(0, CyclePlan(cycle_index=0, moving_arm="left",
                                             holding_arm="right", target_lattice_index=1))
+
+
+# ---------------------------------------------------------------------------
+# Owner decision 2026-10-27: the tube advances AWAY from the DexArm.
+# Live preflight checks the configured sign against AA-16 calibration.
+# ---------------------------------------------------------------------------
+
+
+def _cal_with_layout(axis_direction):
+    """Calibration with the as-built in-line layout (AA-40 fits, chassis frame):
+    DexArm base at Y~0.099 m, left arm Y~0.235 m, right arm Y~0.418 m."""
+    from inchworm.config import (
+        AA16CalibrationConfig, AA16RigidCalibration, AA16TubeAxisCalibration,
+    )
+
+    def rigid(y):
+        T = np.eye(4)
+        T[:3, 3] = [-0.115, y, 0.016]
+        return AA16RigidCalibration(transform=T.tolist())
+
+    return AA16CalibrationConfig(
+        dexarm_base=rigid(0.099),
+        left_arm_base=rigid(0.235),
+        right_arm_base=rigid(0.418),
+        tube_axis=AA16TubeAxisCalibration(axis_direction=list(axis_direction)),
+    )
+
+
+class TestAdvancePhysicalDirection:
+    def _runner(self, cfg, chains, guards, cal, **cycle_kw):
+        live_cfg = cfg.model_copy(update={"calibration": cal})
+        return _make_runner(
+            cfg, chains, guards, dry_run=False, sm_dry_run=True,
+            cycle_cfg=CycleRunnerConfig(**cycle_kw), config=live_cfg,
+        )
+
+    def test_away_from_dexarm_passes_when_sign_matches(self, cfg, chains, guards):
+        r = self._runner(cfg, chains, guards, _cal_with_layout([0, 1, 0]),
+                         advance_direction=1, advance_physical="away_from_dexarm")
+        assert r._advance_physical_failures() == []
+
+    def test_wrong_sign_is_refused(self, cfg, chains, guards):
+        r = self._runner(cfg, chains, guards, _cal_with_layout([0, 1, 0]),
+                         advance_direction=-1, advance_physical="away_from_dexarm")
+        f = r._advance_physical_failures()
+        assert len(f) == 1 and "toward_dexarm" in f[0] and "flip" in f[0]
+
+    def test_axis_fit_sign_flip_is_caught(self, cfg, chains, guards):
+        # A PCA fit may return the axis either way; the check must follow it.
+        r = self._runner(cfg, chains, guards, _cal_with_layout([0, -1, 0]),
+                         advance_direction=1, advance_physical="away_from_dexarm")
+        assert r._advance_physical_failures() != []
+
+    def test_missing_calibration_fails_closed(self, cfg, chains, guards):
+        from inchworm.config import AA16CalibrationConfig
+        r = self._runner(cfg, chains, guards, AA16CalibrationConfig(),
+                         advance_physical="away_from_dexarm")
+        f = r._advance_physical_failures()
+        assert len(f) == 1 and "tube_axis" in f[0] and "dexarm_base" in f[0]
+
+    def test_undecided_fails_closed(self, cfg, chains, guards):
+        r = self._runner(cfg, chains, guards, _cal_with_layout([0, 1, 0]))
+        f = r._advance_physical_failures()
+        assert len(f) == 1 and "advance_physical" in f[0]
+
+    def test_perpendicular_axis_refused(self, cfg, chains, guards):
+        r = self._runner(cfg, chains, guards, _cal_with_layout([1, 0, 0]),
+                         advance_physical="away_from_dexarm")
+        assert "perpendicular" in r._advance_physical_failures()[0]
+
+    def test_live_preflight_reports_it(self, cfg, chains, guards, monkeypatch):
+        from inchworm.config import AA16CalibrationConfig
+        _patch_plan_approach(monkeypatch, cfg, chains)
+        r = self._runner(cfg, chains, guards, AA16CalibrationConfig(),
+                         advance_physical="away_from_dexarm",
+                         advance_direction_owner_confirmed=True)
+        with pytest.raises(PreflightError) as exc_info:
+            r.run_one_cycle(0)
+        assert any("physical advance direction" in f for f in exc_info.value.failures)
+
+    def test_dry_run_preflight_skips_it(self, cfg, chains, guards):
+        from inchworm.config import AA16CalibrationConfig
+        live_cfg = cfg.model_copy(update={"calibration": AA16CalibrationConfig()})
+        r = _make_runner(cfg, chains, guards, dry_run=True, config=live_cfg)
+        failures = r._preflight_check(r._left_sm, r._right_sm)
+        assert not any("physical advance" in f or "advance_physical" in f for f in failures)
+        # ...while the same runner in live mode does report it.
+        r._dry_run = False
+        failures = r._preflight_check(r._left_sm, r._right_sm)
+        assert any("advance_physical is not set" in f for f in failures)
+
+    def test_hardware_yaml_records_owner_decision(self, cfg):
+        assert cfg.cycle_runner is not None
+        assert cfg.cycle_runner.advance_physical == "away_from_dexarm"
+        # Not confirmed until the first supervised live cycle is observed.
+        assert cfg.cycle_runner.advance_direction_owner_confirmed is False

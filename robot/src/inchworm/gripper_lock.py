@@ -98,6 +98,7 @@ deliberate orchestrator code that holds the capability token.
 from __future__ import annotations
 
 import enum
+import time
 from typing import Callable, Optional
 
 from inchworm.config import (
@@ -298,6 +299,9 @@ class LockVerdict(enum.Enum):
     MISS = "MISS"
     MISS_NO_KEY_OVERTRAVEL = "MISS_NO_KEY_OVERTRAVEL"
     UNVERIFIED = "UNVERIFIED"
+    # The servo was still moving when the settle timeout expired, so the
+    # position cannot be classified (fail closed -> FAULT).
+    NOT_SETTLED = "NOT_SETTLED"
 
 
 # ---------------------------------------------------------------------------
@@ -798,12 +802,17 @@ class GripperLockSM:
             )
             return LockVerdict.LATCHED
 
-        # Live: read back and verify
+        # Live: wait for the servo to stop moving, then read back and verify.
+        # (Review finding 2026-10-25: reading immediately after commanding a
+        # ~600-tick overtravel move returns the pre-move position -> false MISS.)
         gripper_servo_id = self._bus._servo_id_for_joint("gripper")
-        joint_state = self._bus.read_joint_state(gripper_servo_id)
+        joint_state, settled = self._wait_for_settle(gripper_servo_id)
         bands = self._bands_for_role()
         thresholds = self._verification_thresholds()
-        verdict = verify_lock_state(joint_state, bands, thresholds)
+        if settled:
+            verdict = verify_lock_state(joint_state, bands, thresholds)
+        else:
+            verdict = LockVerdict.NOT_SETTLED
 
         if verdict == LockVerdict.LATCHED:
             self._state = GripperState.LOCKED
@@ -836,6 +845,49 @@ class GripperLockSM:
             {"verdict": verdict.name, "detail": detail},
         )
         raise LockVerificationFailed(verdict, detail)
+
+    def _wait_for_settle(self, servo_id: int) -> "tuple[JointState, bool]":
+        """Poll the gripper until it has stopped moving or the timeout expires.
+
+        Settled means two consecutive reads with ``|speed_raw| <=
+        settle_speed_max_raw`` and a position change <=
+        ``settle_position_tol_deg``.  Returns ``(last_state, settled)``.  Read
+        errors propagate (the caller's state is LOCKING; an exception leaves
+        the lock unconfirmed, never LOCKED).
+        """
+        cfg = self._config
+        timeout = cfg.lock_settle_timeout_s if cfg is not None else 2.0
+        poll = cfg.lock_settle_poll_s if cfg is not None else 0.02
+        speed_max = cfg.settle_speed_max_raw if cfg is not None else 5
+        pos_tol = cfg.settle_position_tol_deg if cfg is not None else 0.3
+
+        t0 = time.monotonic()
+        prev = self._bus.read_joint_state(servo_id)
+        polls = 1
+        while True:
+            time.sleep(poll)
+            cur = self._bus.read_joint_state(servo_id)
+            polls += 1
+            if (
+                abs(cur.speed_raw) <= speed_max
+                and abs(prev.speed_raw) <= speed_max
+                and abs(cur.position_deg - prev.position_deg) <= pos_tol
+            ):
+                self._emit("info", "gripper_lock_settled", {
+                    "position_deg": cur.position_deg,
+                    "elapsed_s": round(time.monotonic() - t0, 4),
+                    "polls": polls,
+                })
+                return cur, True
+            if time.monotonic() - t0 >= timeout:
+                self._emit("error", "gripper_lock_not_settled", {
+                    "position_deg": cur.position_deg,
+                    "speed_raw": cur.speed_raw,
+                    "timeout_s": timeout,
+                    "polls": polls,
+                })
+                return cur, False
+            prev = cur
 
     def hold_tick(self) -> bool:
         """Re-assert locked position if drift is detected; fault on key slip.

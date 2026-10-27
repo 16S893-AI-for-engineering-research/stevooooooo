@@ -1549,3 +1549,75 @@ class TestOvertravelHold:
         """OvertravelNotConfigured is a GripperLockError."""
         from inchworm.gripper_lock import OvertravelNotConfigured
         assert issubclass(OvertravelNotConfigured, GripperLockError)
+
+
+# ---------------------------------------------------------------------------
+# Lock settle wait (review finding 2026-10-25: no readback before the
+# overtravel move has finished).
+# ---------------------------------------------------------------------------
+
+
+def _js(pos, speed):
+    return JointState(servo_id=6, position_deg=pos, speed_raw=speed, load_raw=50,
+                      voltage_v=12.0, temperature_c=35, current_raw=100)
+
+
+_FAST_SETTLE = _LOCK_CONFIG.model_copy(update={
+    "lock_settle_timeout_s": 0.2, "lock_settle_poll_s": 0.001,
+})
+
+
+class TestLockSettleWait:
+    def _sm(self):
+        transport = _make_transport()
+        sm = _live_sm(transport, lock_config=_FAST_SETTLE)
+        sm._state = GripperState.APPROACH_READY
+        transport.queue_reply(_write_response(6))  # torque limit
+        transport.queue_reply(_write_response(6))  # goal position
+        return sm
+
+    def test_moving_servo_is_waited_out_not_read_as_miss(self):
+        # Pre-move readback (unlocked position, a MISS if verified at once),
+        # then motion, then a stall on the key inside the locked band.
+        seq = [_js(90.0, 0), _js(120.0, 400), _js(150.0, 300),
+               _js(155.0, 2), _js(155.1, 0)]
+        sm = self._sm()
+        with patch.object(sm._bus, "read_joint_state", side_effect=seq) as rd:
+            assert sm.lock() == LockVerdict.LATCHED
+        assert rd.call_count == len(seq)
+        assert sm.state == GripperState.LOCKED
+
+    def test_never_settles_faults_closed(self):
+        sm = self._sm()
+        moving = [_js(100.0 + i, 300) for i in range(100000)]
+        with patch.object(sm._bus, "read_joint_state", side_effect=moving):
+            with pytest.raises(LockVerificationFailed) as exc_info:
+                sm.lock()
+        assert exc_info.value.verdict == LockVerdict.NOT_SETTLED
+        assert sm.state == GripperState.FAULT
+
+    def test_settled_no_key_overtravel_still_detected(self):
+        seq = [_js(90.0, 0), _js(150.0, 400), _js(199.8, 1), _js(200.0, 0)]
+        sm = self._sm()
+        with patch.object(sm._bus, "read_joint_state", side_effect=seq):
+            with pytest.raises(LockVerificationFailed) as exc_info:
+                sm.lock()
+        assert exc_info.value.verdict == LockVerdict.MISS_NO_KEY_OVERTRAVEL
+
+    def test_speed_zero_but_position_jumping_is_not_settled(self):
+        # Reported speed 0 is not trusted alone: position must also be steady.
+        sm = self._sm()
+        jumping = [_js(100.0 + 5 * i, 0) for i in range(100000)]
+        with patch.object(sm._bus, "read_joint_state", side_effect=jumping):
+            with pytest.raises(LockVerificationFailed) as exc_info:
+                sm.lock()
+        assert exc_info.value.verdict == LockVerdict.NOT_SETTLED
+
+    def test_read_error_during_settle_never_locks(self):
+        from inchworm.servo_bus import ServoTimeoutError
+        sm = self._sm()
+        with patch.object(sm._bus, "read_joint_state",
+                          side_effect=[_js(90.0, 300), ServoTimeoutError(6, "read")]):
+            with pytest.raises(ServoTimeoutError):
+                sm.lock()
+        assert sm.state != GripperState.LOCKED

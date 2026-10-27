@@ -538,6 +538,18 @@ class GripperLockConfig(_Strict):
     drift_threshold_deg: Optional[Degrees] = None   # unverified: true
     # Thresholds for latch/jam/miss classification. UNVERIFIED placeholders.
     verification: Optional[GripperVerificationThresholds] = None
+    # Lock settle wait (review finding 2026-10-25): after commanding the lock
+    # goal, poll the servo until it has stopped moving before verifying, so a
+    # still-moving servo is not read as a MISS.  Settled = |speed_raw| <=
+    # settle_speed_max_raw AND the position changed <= settle_position_tol_deg
+    # since the previous poll.  No settle within lock_settle_timeout_s ->
+    # NOT_SETTLED verdict -> FAULT (fail closed).  Placeholder values: a
+    # ~600-tick overtravel move at the servo's default speed takes well under
+    # 1 s; confirm in the supervised powered lock test.
+    lock_settle_timeout_s: float = Field(default=2.0, gt=0)     # unverified: true
+    lock_settle_poll_s: float = Field(default=0.02, gt=0)       # unverified: true
+    settle_speed_max_raw: int = Field(default=5, ge=0)          # unverified: true
+    settle_position_tol_deg: float = Field(default=0.3, gt=0)   # unverified: true
 # --- AA-17 end ---
 
 
@@ -1184,6 +1196,15 @@ class CycleRunnerConfig(_Strict):
     advance_direction: int = Field(default=1)
     # Must be set True by owner after verifying advance_direction on hardware.
     advance_direction_owner_confirmed: bool = False
+    # Owner decision (2026-10-27): the physical sense of one advance.
+    # "away_from_dexarm" = the tube moves away from the DexArm (to the right).
+    # None = undecided; live mode refuses to start.  In live mode the runner
+    # checks geometrically, from the AA-16 calibration, that
+    # advance_direction * tube_axis points this way (fail closed if the
+    # calibration needed for the check is missing).
+    advance_physical: Optional[str] = Field(
+        default=None, pattern=r"^(away_from_dexarm|toward_dexarm)$"
+    )
     # Number of policy steps before the scripted seating detector succeeds (dry-run).
     supervisor_success_at_step: int = Field(default=2, ge=0)
 

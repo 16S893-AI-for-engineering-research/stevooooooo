@@ -765,12 +765,24 @@ class TestIdentityPrintFrame:
 
 
 class TestHardwareConfigIntegration:
-    def test_load_config_with_gcode_intake_none(self) -> None:
-        """Default hardware.yaml (gcode_intake absent) loads without error."""
+    def test_load_config_gcode_intake_firmware_limits(self) -> None:
+        """hardware.yaml gcode_intake carries the DexArm firmware-derived limits
+        (2026-10-27: block added; it was previously absent -> None)."""
         from inchworm.config import load_config, DEFAULT_CONFIG_PATH
         cfg = load_config(DEFAULT_CONFIG_PATH)
-        # gcode_intake block is absent from hardware.yaml -> None
-        assert cfg.gcode_intake is None
+        gi = cfg.gcode_intake
+        assert gi is not None
+        assert gi.max_nozzle_temp_c < 275.0          # firmware HEATER_0_MAXTEMP
+        assert gi.max_bed_temp_c < 1.0               # no heated bed
+        assert gi.max_feedrate_mm_min <= 9000.0      # not loosened
+
+    def test_parse_config_without_gcode_intake_block(self) -> None:
+        """A config without the block still loads (gcode_intake -> None)."""
+        import yaml
+        from inchworm.config import parse_config, DEFAULT_CONFIG_PATH
+        base = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text())
+        base.pop("gcode_intake", None)
+        assert parse_config(base).gcode_intake is None
 
     def test_parse_config_with_gcode_intake_block(self) -> None:
         """gcode_intake block in config parses correctly."""
@@ -844,3 +856,58 @@ def test_m114_failure_live_raises_typed_abort_and_runs_safety_sequence():
     with pytest.raises(GCodeStreamAborted, match="M114"):
         stream_segment(seg, NoPos(), laser_driver=laser)
     assert laser.off_calls >= 1
+
+
+# ---------------------------------------------------------------------------
+# AC#5: a slice made with the documented Rotrics profile passes the intake
+# (docs/cura_dexarm_profile.md; tools/cura/slice_rotrics_normal.sh).
+# ---------------------------------------------------------------------------
+
+
+class _OffsetFrame:
+    """Translate the centred Cura slice into the DexArm arm frame (as the
+    AA-33 print frame does), here to a nominal print point Y=300 mm."""
+
+    frame_id = "test-offset"
+
+    def apply(self, xyz):
+        return (xyz[0], xyz[1] + 300.0, xyz[2])
+
+
+class TestRotricsProfileSlice:
+    _FIRMWARE_LIMITS = GCodeIntakeConfig(
+        # DexArm firmware: HEATER_0_MAXTEMP 275, no heated bed (TEMP_SENSOR_BED 0).
+        max_nozzle_temp_c=260.0,
+        max_bed_temp_c=0.0001,
+        max_feedrate_mm_min=9000.0,
+    )
+
+    def _seg(self):
+        return parse_segment(_fixture("rotrics_normal_10x10x1mm.gcode"))
+
+    def test_parses_in_strict_dialect(self) -> None:
+        seg = self._seg()
+        assert seg.motion_line_count > 100
+        assert seg.first_z == pytest.approx(0.2)
+
+    def test_validates_against_firmware_limits_in_arm_frame(self) -> None:
+        seg = self._seg()
+        validate_segment(seg, _WS, config=self._FIRMWARE_LIMITS,
+                         frame=_OffsetFrame(), frame_z0=0.2)
+
+    def test_profile_temperature_and_speeds(self) -> None:
+        text = _fixture("rotrics_normal_10x10x1mm.gcode")
+        assert "M109 S205" in text and "M140" not in text and "M190" not in text
+        assert "G28" not in text and "M888" not in text and "M2000" not in text
+        feeds = [float(t[1:]) for line in text.splitlines() if not line.startswith(";")
+                 for t in line.split(";")[0].split() if t.startswith("F")]
+        # Fastest move is the 50 mm/s travel (3000 mm/min).
+        assert max(feeds) == pytest.approx(3000.0)
+
+    def test_dry_run_stream_moves_into_arm_frame(self) -> None:
+        seg = self._seg()
+        driver = _MockDriver()
+        stream_segment(seg, driver, frame=_OffsetFrame(), dry_run=True)
+        assert len(driver.print_moves) == seg.motion_line_count
+        ys = [m[1] for m in driver.moves]
+        assert min(ys) > 290.0 and max(ys) < 310.0
