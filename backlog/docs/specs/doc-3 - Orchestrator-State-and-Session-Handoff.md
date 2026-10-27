@@ -3,15 +3,19 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-25 18:07'
+updated_date: '2026-10-27 18:52'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-25 at commit `8790fd6`. **3 tests FAIL at this commit (known, to fix first):** test_jog_live::test_dry_run_abs_exits_zero, test_kinematics::TestJogDryRun::test_jog_dry_run_abs, test_script_imports dry-run fold_cycle.py. Cause: the new real soft limits (rad, from EEPROM limits) now reject dry-run targets and placeholder fold poses that only fit the old URDF limits. The guard is behaving correctly; the tests and placeholder poses need updating, not the limits.
+**Last verified:** 2026-10-27 at commit `75505dc`. Full suite **1551 passed** (the 3 dry-run/soft-limit failures noted on 2026-10-25 are resolved).
 
-**Session 2 (2026-10-25) state:** robot powered, 7/7 USB attached, torque OFF on all 12 servos, EEPROM limits intact, laser OFF. Joint servo_calibration VERIFIED (zeros = mid-range, all signs +1, both arms the same orientation). Soft limits in rad filled in but kept `unverified: true` (live blocked until the collision geometry is real). Next with the owner: gripper bands (AA-17) using read-only `scripts/gripper_sample.py --arm left --label <open|engaged|locked> --live --out calibration_data/gripper_samples_2026-10-25.jsonl`; left gripper baseline 1531 ticks (134.6 deg). The owner chose option (c): gripper bands now, then soft limits and CAD collision geometry, then the first supervised powered move.
+**Current focus (2026-10-27): AA-40 full-system model** (owner-approved option C, no ROS). Live motion stays blocked (`unverified: true` soft limits) until model-based collision checking is real.
+- Done: owner STL exports (`CAD/exports/`, metres) and precise fits (SO-101 bases 0.03 mm RMS, spacing 182.51 mm; wrists 0.05 mm; DexArm community URDF base fit; the 71.1 mm owner check is 0.28 mm off). Stage 1 is committed: `robot/src/inchworm/system_model/` (scene assembly), `scripts/view_pose.py` (PNG via matplotlib; meshcat not yet installed), tests. The model deps are in the dev group.
+- In flight: stage 2, python-fcl mesh collision wired into motion_guard (fail closed), delegated to a worker sub-agent and pending orchestrator review.
+- Then: owner compares rendered rest/fold against the real robot (AA-40 #6); confirm the lock-body/key identification in wrist_gripper.stl (Part 10 lock, Part 9 key); gripper bands (AA-17); first supervised powered jog.
+- Session 2 facts still valid: joint servo_calibration verified; EEPROM limits widened (fold/gripper/rest inside); left pan unobstructed (240 deg); measured folded_transit and pan-zero poses in `robot/calibration_data/poses_2026-10-25.jsonl`.
 
 ## 1. Resume in 60 seconds
 

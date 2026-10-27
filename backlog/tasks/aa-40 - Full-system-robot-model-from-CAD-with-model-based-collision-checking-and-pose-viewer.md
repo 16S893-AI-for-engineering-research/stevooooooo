@@ -3,10 +3,11 @@ id: AA-40
 title: >-
   Full-system robot model from CAD with model-based collision checking and pose
   viewer
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@orchestrator'
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-27 17:40'
+updated_date: '2026-10-27 18:52'
 labels: []
 dependencies: []
 priority: high
@@ -45,6 +46,8 @@ Build a full-system kinematic and geometric model of the as-built robot from CAD
 <!-- SECTION:PLAN:BEGIN -->
 Tooling decision (orchestrator 2026-10-25): python-fcl + trimesh for collision, since FCL handles concave meshes and MuJoCo would reduce meshes to convex hulls, making the chassis and DexArm falsely large. meshcat for the viewer: a browser viewer driven from Python with a persistent server, so new poses need no setup; the Windows browser reaches WSL localhost. Offscreen PNG snapshots let the orchestrator self-check.
 Stage 1 (worker): STEP text parser for placements; per-part meshes in the chassis frame (STEP tessellation of the non-arm parts; vendored SO-101 meshes for the arms); model assembly; meshcat viewer + PNG snapshot; render the rest and fold. Stage 2: FCL collision module, motion_guard integration, tests.
+
+Stage 2 plan (orchestrator 2026-10-27): new robot/src/inchworm/system_model/collision.py on python-fcl. Collision objects per arm link (URDF meshes + custom wrist parts), static bases/mounts, a table half-space at table_z, DexArm, tube (position parameter). Allowed-contact list is explicit and minimal: kinematically adjacent links, and each arm base_link vs the mount it is bolted to; every other entry needs a written reason. Margin from hardware.yaml (motion_guard.collision.mesh_margin_m, conservative default, unverified). The existing keep-out box check stays (additive layer, not removed). MotionGuard gains a mesh-collision check that needs the other arm's pose; unknown other-arm pose, a missing model/mesh or a missing fcl gives a violation (fail closed). Gripper-vs-tube contact is NOT allowed by default (owner question for insertion phases). Tests: measured folded_transit and pan_zero poses collision-free, known colliding poses detected (arm-table, arm-arm, arm-DexArm), interior-of-trajectory collision detected, missing model fails closed, per-check timing reported.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -62,4 +65,6 @@ Fits 2026-10-25 (robot/tools/cad/fit_bases.py, fit_all.py; results in calibratio
 - CAD-pose solve: fitting left FK to the CAD wrist part gives the CAD arm drawn at [-2.9, -90.4, 90.2, -89.4] deg, residual 3.1 mm / 2.9 deg. That is a square, idealised fold, NOT the real fold (measured [0, -79.2, 96.7, -74.8]), so the CAD cannot validate joint zeros; the real check is the owner comparing renders against photos.
 
 Owner 2026-10-25: in wrist_gripper.stl, Part 10 = lock body and Part 9 = locking key (turns when the gripper locks). Body volumes in that export: lock body probably 32.8 cm3 (47x47x35 mm) at Z about 248 mm; key probably 9.96 cm3 (44x45x28) at Z about 274. The STL carries no names, so the identification is by size/position and needs owner confirmation from the render.
+
+2026-10-27 orchestrator: stage 1 committed 75505dc (system_model package: fitted placements, scene assembly, view_pose.py PNG/meshcat, tests). Model deps (trimesh, scipy, networkx, matplotlib) added to the dev group so a bare uv run pytest runs them; previously a partial env made view_pose dry-run and test_wrist_frame_bookkeeping fail. Full suite 1551 passed. Self-check: wrist export roundtrip 0.000 mm, wrist FK offset 3.14 mm (the CAD idealised fold, see the notes above). meshcat itself is not installed yet (PNG path via matplotlib works; pyglet missing so the trimesh renderer falls back). Stage 2 (FCL collision + motion_guard wiring) next.
 <!-- SECTION:NOTES:END -->
