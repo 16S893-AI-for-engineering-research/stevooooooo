@@ -25,6 +25,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=7.0",
+    # AA-40: the system-model tests and the view_pose.py dry-run smoke test
+    # need the `model` extra; include it so a bare `uv run pytest` runs them
+    # instead of failing on a partially installed environment.
+    "trimesh>=4.0",
+    "scipy>=1.10",
+    "networkx>=3.0",
+    "matplotlib>=3.7",
 ]
 
 [build-system]
@@ -34,9 +41,22 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/inchworm"]
 
+[project.optional-dependencies]
+# --- AA-40: system model (heavy; not required for core robot) ---
+model = [
+    "trimesh>=4.0",
+    "scipy>=1.10",
+    "networkx>=3.0",
+    "matplotlib>=3.7",
+]
+# --- AA-40 end ---
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "model: tests that require the model optional-extra (trimesh etc.)",
+]
 
 [project.scripts]
 inchworm-discover = "inchworm.discover:main"
