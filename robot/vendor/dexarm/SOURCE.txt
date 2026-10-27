@@ -1,0 +1,12 @@
+Rotrics DexArm URDF + STL meshes (community model, "WIP" per its README).
+
+Source:  https://github.com/ybisk/robot  (path URDF/)
+Commit:  3f11fea1e1ff258116371e1132eafee447f7d023 (2021-03-20)
+License: MIT (Copyright (c) 2021 Yonatan Bisk), see LICENSE in this directory.
+Mirror:  https://github.com/mounteverset/dexarm_description (identical STLs; ROS2 package,
+         no license declared) - NOT used as the source.
+
+Vendored 2026-10-25 for AA-40 (full-system model). Not verified against the real DexArm:
+the model is community-made and marked WIP; validate its base against the owner's
+CAD export and the 71.108 mm base-to-left-SO101-base measurement before relying on it.
+Meshes are in mm (URDF scale 0.001). Parallel-linkage joints use <mimic>.

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-27 14:48'
+updated_date: '2026-10-27 15:35'
 labels: []
 dependencies: []
 priority: high
@@ -51,4 +51,6 @@ Stage 1 (worker): STEP text parser for placements; per-part meshes in the chassi
 
 <!-- SECTION:NOTES:BEGIN -->
 Owner measurements 2026-10-25 (tape): (a) arm base to arm base edge-to-edge is correct (CAD 182.5 mm). (b) Bottom of the DexArm BASE to the closest edge of the LEFT SO-101 BASE = 71.108 mm. The rest of the SO-101 overhangs, so it gets closer than that. (c) Table surface to the FAR side of the tube is about 360 mm. The tube runs PARALLEL to the table. Environment: no wires in the way; the SO-101s can reach the table surface (the table must be a collision object); the DexArm cannot reach the table. Left pan: NO LONGER obstructed, so its limits must be re-measured.
+
+2026-10-25: approach changed with the owner. Assemble the model from open-source models (SO-101 URDF; DexArm URDF) plus owner-exported STLs, instead of classifying STEP parts by name (that failed: the DexArm guess was off by about 100 mm and 'Part 1' appears 7 times). DexArm model vendored: robot/vendor/dexarm (ybisk/robot, MIT, 2021, 'WIP' community model; links upper arm and forearm about 150-160 mm, base about 128x145 mm, plausible but unverified). Owner will export: (1) one STL with all arm-base pieces and the mounts they sit on, (2) one STL with the camera mount + Wrist_Roll_Pitch. The WIP branch wip/aa-40-stage1 keeps the STEP placement parser (works, 6 s).
 <!-- SECTION:NOTES:END -->
