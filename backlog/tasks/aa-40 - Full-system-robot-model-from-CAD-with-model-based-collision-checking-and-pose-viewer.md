@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-27 18:52'
+updated_date: '2026-10-27 21:25'
 labels: []
 dependencies: []
 priority: high
@@ -67,4 +67,8 @@ Fits 2026-10-25 (robot/tools/cad/fit_bases.py, fit_all.py; results in calibratio
 Owner 2026-10-25: in wrist_gripper.stl, Part 10 = lock body and Part 9 = locking key (turns when the gripper locks). Body volumes in that export: lock body probably 32.8 cm3 (47x47x35 mm) at Z about 248 mm; key probably 9.96 cm3 (44x45x28) at Z about 274. The STL carries no names, so the identification is by size/position and needs owner confirmation from the render.
 
 2026-10-27 orchestrator: stage 1 committed 75505dc (system_model package: fitted placements, scene assembly, view_pose.py PNG/meshcat, tests). Model deps (trimesh, scipy, networkx, matplotlib) added to the dev group so a bare uv run pytest runs them; previously a partial env made view_pose dry-run and test_wrist_frame_bookkeeping fail. Full suite 1551 passed. Self-check: wrist export roundtrip 0.000 mm, wrist FK offset 3.14 mm (the CAD idealised fold, see the notes above). meshcat itself is not installed yet (PNG path via matplotlib works; pyglet missing so the trimesh renderer falls back). Stage 2 (FCL collision + motion_guard wiring) next.
+
+2026-10-27 stage 2, first worker: timed out after 30 min, exploring only (no files changed). Findings, the DexArm one verified by the orchestrator: (1) assets.load_dexarm_meshes applies URDF visual origins without the joint-origin chain, so moving DexArm links sit 130-300 mm off, inside the SO-101 region (stage-1 In_1 bbox Y[-66,115] mm vs raw assembly-frame STL Y[-193,-12]; the CAD report puts the DexArm at Y[-215,0]). The stage-1 renders are therefore wrong for the DexArm. (2) The tube cylinder is 81 mm long; CAD Part 13 is 185.7 mm along Y. (3) bases.stl duplicates both SO-101 bases (and the DexArm base). (4) The stored pan q_rad for the fold in poses_2026-10-25.jsonl predates the pan landmark zero; recomputed from ticks, the left fold pan is about +3.3 deg, not 35.9. (5) Possible real contacts at the measured fold (self pairs at the end stops; left upper_arm vs right wrist about 9 mm): to be quantified after the fixes, never allowed blindly. Re-delegated with these as fixed facts (90 min limit, checkpoint 10 min before).
+
+2026-10-27: the second stage-2 worker was stopped by the owner after about 45 min of exploration with no deliverable written (worktree removed, nothing merged). Owner decision: the owner will provide a better, simplified gripper STL, and the orchestrator will do stage 2 itself, not via a sub-agent. Stage 2 waits for that STL. The findings noted above (DexArm FK, tube length, duplicate bases, stale pan q) still apply.
 <!-- SECTION:NOTES:END -->

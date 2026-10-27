@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-27 20:28'
+updated_date: '2026-10-27 21:25'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -13,7 +13,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 
 **Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place (already the default; AA-10 #4 waits only for the supervised live test). (2) The tube advances to the right, AWAY from the DexArm: `cycle_runner.advance_physical: away_from_dexarm`; the live preflight checks the sign against AA-16 calibration (fail closed); `advance_direction_owner_confirmed` stays false until seen live. (3) Cura = Rotrics' official published settings (AA-34 Done; `robot/docs/cura_dexarm_profile.md`). (4) No tube fixture design: the owner props the tube simply (AA-23 #4 still needs the pose comparison). (5) Owner will help measure the gripper lock torque: human task **AA-41** proposed (awaiting `accept AA-41`), via `scripts/gripper_lock_probe.py`. (6) Keep the one-camera rule (AA-38 unchanged).
 
-**Current focus: AA-40 stage 2** (python-fcl mesh collision in motion_guard, fail closed). Delegated 2026-10-27 to a worker in an isolated worktree; orchestrator review pending. Live arm motion stays blocked until it lands and the owner compares renders (AA-40 #6).
+**Current focus: AA-40 stage 2** (python-fcl mesh collision in motion_guard, fail closed). WAITING for the owner's simplified gripper STL; owner instruction 2026-10-27: the orchestrator does stage 2 itself, NOT via sub-agents (two workers stalled exploring). Known stage-1 bugs to fix first: DexArm FK (joint origins skipped, links 130-300 mm off), tube 81 mm instead of 185.7 mm, duplicate bases in bases.stl, stale pan q in poses jsonl (see AA-40 notes). Live arm motion stays blocked until it lands and the owner compares renders (AA-40 #6).
 - Done in AA-40: owner STL exports and fits (bases 0.03 mm RMS, wrists 0.05 mm, DexArm community URDF; 71.1 mm check 0.28 mm off); stage 1 model + `scripts/view_pose.py`; python-fcl dependency; wrist_gripper fix (the 32.8 cm3 lock body was mis-pinned to wrist_link, now exactly one wrist body).
 - Then: owner compares rendered rest/fold vs the real robot (AA-40 #6) and confirms the lock body/key in the render; AA-41 gripper probe; first supervised powered jog.
 - Gripper: lock() now waits for the servo to settle before verifying (false-MISS finding fixed); live lock still refused until `lock_torque_limit_raw` and the verification thresholds come from AA-41 data.
@@ -119,7 +119,7 @@ Order matters: each step unblocks the next. All scripts are in `robot/scripts/`,
 
 None open as of 2026-10-27 (all six were answered; see the top of this doc). Still owed from the owner at the hardware: accept and run AA-41; the AA-40 #6 render comparison; confirm the installed nozzle is the stock 0.4 mm and the filament 1.75 mm PLA (AA-34 doc §10).
 
-Software follow-ups: AA-40 stage 2 (in flight).
+Software follow-ups: AA-40 stage 2 (orchestrator, after the owner's gripper STL). Hold the AA-40 #6 render comparison until the DexArm FK fix (current renders misplace the DexArm).
 
 ## 5. Decisions already made (do not silently revisit)
 
