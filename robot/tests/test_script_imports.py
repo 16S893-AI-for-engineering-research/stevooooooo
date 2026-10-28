@@ -48,6 +48,7 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     "read_pose.py": [],
     "gripper_sample.py": ["--arm", "left", "--label", "open"],
     "gripper_lock_probe.py": ["--arm", "left", "--torque", "150", "--key"],
+    "restore_drive_config.py": ["--arm", "left"],
     "record_joint_ranges.py": ["--arm", "left"],
     # attach_usb queries the LIVE usbipd device list even in --dry-run, so its
     # result depends on what is powered on. Smoke-test --help instead.
