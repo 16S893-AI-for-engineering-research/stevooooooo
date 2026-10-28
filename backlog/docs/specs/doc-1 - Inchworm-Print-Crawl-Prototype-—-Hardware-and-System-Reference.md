@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-28 01:48'
+updated_date: '2026-10-28 22:45'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -32,6 +32,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - Servo IDs have already been assigned by the owner. **No purpose-built leader arms exist.** Per **decision-1** (2026-10-24), demonstrations use **cross-arm teleoperation**: one follower, torque off, acts as the leader for the other, while the tube is held by a **fixture**. A torque-off arm can never hold the tube.
 - **Mounting (owner, 2026-10-24): both SO-101 arms are mounted in the SAME orientation, not mirrored.** The robot's front faces the DexArm, which sits on the structure's left. Servo cable exits: ID1 down; IDs 2-4 to the robot's left; IDs 5-6 down. All 12 servos have the same direction setting (phase reg 0x0C): a higher reading means clockwise when viewed with the servo's cable exiting away from the viewer, which is counter-clockwise in the `pictures/robot.png` side view (owner confirmed). Joint signs vs URDF: pan, lift, elbow and wrist_flex +1 (derived); wrist_roll pending a test.
 - Gearing: both followers use STS3215 at **1/345 on all joints**. A purpose-built SO-101 leader uses 1/191 (pan), 1/345 (shoulder lift), 1/191 (elbow) and 1/147 (wrist flex, wrist roll, gripper), so a follower used as a leader is stiffer to backdrive (source: LeRobot `docs/source/so101.mdx`).
+- **CORRECTION (owner, 2026-10-27): servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are encoder-only "dummy" leader-arm servos with no motor drive**, not powered STS3215 followers. They read position (encoder) and answer the bus as model 777, but cannot produce torque. Signature: firmware 3.10, Max_Voltage 16.0 V, EEPROM drive config zeroed from the factory (Max_Torque, P/D, Protection_Current, Overload, Max_Temp = 0), temperature 0 C and a constant ~950-1000 present current at rest; restoring drive settings made them flag overcurrent (0x08). IDs 1-3 (firmware 3.9) are powered STS3215. Consequence: joints 4-6 cannot be driven; the owner must buy 6 powered servos and rebuild both arms (task AA-43). After the swap, homing offsets, position limits, joint zero/sign calibration and gripper bands for joints 4-6 are invalid and must be re-measured. Until then the arms can still be used as torque-off leaders/readers.
 - **Custom gripper**: the owner replaced the stock gripper with a custom design in which the **lock/latch mechanism and the jaw share the same servo ID**. There is no separate lock servo. Lock vs unlock is therefore a *position band* of the single gripper servo, not a separate actuator. Locking must be commanded by code (never left to a learned policy) and must hold position until the next regrip.
 
 ### Rotrics DexArm — print/scan arm

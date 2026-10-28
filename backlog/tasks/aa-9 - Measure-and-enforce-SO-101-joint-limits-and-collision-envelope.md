@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-27 15:18'
+updated_date: '2026-10-28 22:46'
 labels: []
 milestone: m-1
 dependencies:
@@ -98,6 +98,8 @@ Owner 2026-10-25: the LEFT arm is nearer the DexArm; the CAD (CAD/Assembly 1.ste
 Owner 2026-10-25: the left shoulder_pan is no longer obstructed. Its EEPROM limit (674-2527) and soft limits came from the obstructed sweep and must be RE-MEASURED (a torque-off sweep, then an owner-approved EEPROM write). The pan zero stays landmark-based (pointing at the DexArm), so it is unaffected.
 
 2026-10-25: left pan re-swept unobstructed (642-3370, 239.8 deg), matching the right (239.0). Owner option (a): both pan EEPROM limits widened to full travel - 30 ticks (L 672-3340, R 788-3447), read back OK; the earlier right-pan cap is superseded. Pan soft limits = URDF +/-1.9199 rad (tighter than the EEPROM about -113..+121 deg).
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. Joints 4-6 calibration (homing offsets, limits, zero/sign, soft limits) becomes invalid when they are replaced; re-measured in AA-43.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

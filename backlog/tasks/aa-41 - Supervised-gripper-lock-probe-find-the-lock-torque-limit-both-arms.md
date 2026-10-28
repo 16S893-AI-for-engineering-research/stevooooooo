@@ -2,14 +2,14 @@
 id: AA-41
 title: 'Supervised gripper lock probe: find the lock torque limit (both arms)'
 status: In Progress
-assignee:
-  - '@human'
+assignee: []
 created_date: '2026-10-27 20:23'
-updated_date: '2026-10-28 13:35'
+updated_date: '2026-10-28 22:46'
 labels:
   - human-action
   - human-key-0bb0fd9f151c3229
-dependencies: []
+dependencies:
+  - AA-43
 references:
   - AA-17
 ordinal: 41000
@@ -145,7 +145,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "0bb0fd9f151c322977c1e18a0e1b8ae54336a755edd3dfab34ba499c59ea4e23",
-  "phase": "paused",
+  "phase": "deferred",
   "createdAt": "2026-10-27T20:23:10.960Z",
   "origin": "01a17eda-abe6-765f-b277-eb0952f11682",
   "step": 1,
@@ -165,12 +165,25 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "User-pasted stdout of scripts/gripper_lock_probe.py --live run, 3 JSON-lines + SUMMARY (conversation transcript); log file calibration_data/gripper_lock_probe_2026-10-27.jsonl",
       "advanced": false,
       "at": "2026-10-27T23:48:01.037Z"
+    },
+    {
+      "step": 2,
+      "note": "Resume requested at step 2. Not re-issued: the previous step 2 attempt remains an unresolved deviation (zero gripper motion with load_raw/speed_raw/temperature_c all 0 and constant current_raw 1001, sm_outcome LockVerificationFailed/UNVERIFIED), which indicates a drive/comms/telemetry fault rather than insufficient torque. Torque escalation (step 3) withheld for the same reason. Noted that queued task AA-42 (re-flash STS3215 firmware 3.10 on servos 4-6, both arms) may cover the same servo. Asked the owner whether the orchestrator has changed anything since the failed run; if not, directed to /walk pause and orchestrator diagnosis. No physical action instructed in this turn.",
+      "type": "self-reported",
+      "reference": "Checkpoint recentEvidence for step 2 (2026-10-27T23:48:01Z); human_queue listing showing AA-41 active and AA-42 accepted",
+      "advanced": false,
+      "at": "2026-10-28T16:14:05.718Z"
     }
   ],
   "history": [
     {
       "action": "accept",
       "at": "2026-10-27T23:39:58.714Z",
+      "hash": "aa4d7da9bda03c27e0d30d08002810b875956d2baf240aa5d4ed69079c6be79b"
+    },
+    {
+      "action": "defer",
+      "at": "2026-10-28T21:13:26.623Z",
       "hash": "aa4d7da9bda03c27e0d30d08002810b875956d2baf240aa5d4ed69079c6be79b"
     }
   ],
@@ -189,4 +202,6 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 2026-10-27 after the owner's 12 V power cycle of both arms (USB re-attached with attach_usb.py, 7/7): read-only check. IDs 1-3 both arms: error 0, status 0, temp 30-32 C, current 0. IDs 4-6 both arms (fw 3.10): error 0x08 / status 8 PERSISTS, temp 0 C, current 948-953 raw with torque OFF (was ~1000 before the cycle). Restored EEPROM survived the cycle (maxT 1000/500, P/D, prot current, unloading/LED 33/35). Conclusion: the OverEle flag is reported independently of the unloading mask and is driven by the bogus current reading; it is not latched. Also: these servos have Max_Voltage 16.0 V vs 14.0 V on IDs 1-3, so IDs 4-6 are probably a different STS3215 hardware variant. Next needs an owner decision: let the driver accept error bit 0x08 ONLY on firmware-3.10 servos 4-6 (all other bits still raise), so they can be read and a supervised small move can test whether they move under torque at all.
 
 2026-10-27 web research (no definitive answer): (1) firmware 3.10 is the current STS3215 image on Feetech's server (komatachi-robotics/feetech-flash pins SCServo21-GD32-TTL-250306.bin as 3.10 for model key 9.3); 3.9->3.10 updates are common, so IDs 4-6 were probably updated at some point. (2) The 0o8o0-blip clean-room STS3215 firmware computes Present_Current as ADC minus a power-on warm-up baseline; a bad baseline gives a constant false idle current and false overcurrent, matching our ~950 at rest. In that firmware the OverEle flag is cleared only when Protection_Current is 0 and it also limits PWM output when measured current exceeds Protection_Current, so the false reading could block torque. Not confirmed for factory 3.10. Owner decision: take the official Feetech route: re-flash 3.10 on IDs 4-6 of both arms with FD (Windows). Proposed human task AA-42; the owner declined a servo-1 test move for now.
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. AA-41 now depends on AA-43; the lock probe restarts with a fresh procedure after the swap (new gripper bands needed).
 <!-- SECTION:NOTES:END -->

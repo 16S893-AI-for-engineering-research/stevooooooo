@@ -3,10 +3,11 @@ id: AA-42
 title: >-
   Re-flash STS3215 firmware 3.10 on servos 4-6 of both arms with Feetech FD
   (Windows)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@human'
 created_date: '2026-10-28 13:35'
-updated_date: '2026-10-28 13:35'
+updated_date: '2026-10-28 22:46'
 labels:
   - human-action
   - human-key-8d8f686b9ed669e1
@@ -143,6 +144,12 @@ Preparation: Windows laptop with Feetech FD installed (FD 1.9.8.3 from https://w
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Follow the user-accepted procedure one step at a time, record evidence and stop on deviations. Submit the outcome for orchestrator verification; do not complete the originating project task.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -151,13 +158,64 @@ Preparation: Windows laptop with Feetech FD installed (FD 1.9.8.3 from https://w
 {
   "version": 1,
   "key": "8d8f686b9ed669e1e8cdc5b0ee8e97d3c7e0b6b08c8c35a337431bcc64d03189",
-  "phase": "proposed",
+  "phase": "active",
   "createdAt": "2026-10-28T13:35:30.642Z",
   "origin": "01a17fcd-ad6a-7474-9ab6-a7b139b28469",
-  "step": 0,
-  "evidence": [],
-  "history": []
+  "step": 3,
+  "evidence": [
+    {
+      "step": 1,
+      "note": "Step 1 verified via pasted `usbipd list` output. Both arm adapters present at the expected BusIds with state \"Shared\" (i.e. not attached to WSL, so Windows owns them): 9-3 = 1a86:55d3 USB-Enhanced-SERIAL CH343 (COM3) and 10-4 = 1a86:55d3 CH343 (COM5). Same COM numbers (COM3/COM5) as the previous session and no BusId change, so the step-1 stop conditions do not apply. Noted discrepancy in the procedure text for later steps: the procedure labels 10-4 = left and 9-3 = right, which makes the LEFT arm COM5 and the RIGHT arm COM3, contradicting step 2's \"start with the lower-numbered port for the LEFT arm\". Scope is unaffected because IDs 4-6 are to be flashed on both arms; ports will be referred to by COM/BusId rather than by arm label to avoid mislabelling. Other shared devices (CH340 COM7, cameras, COM6) are unrelated to the arm buses. Not independently verified in Device Manager; usbipd's own COM assignment accepted as equivalent evidence.",
+      "type": "self-reported",
+      "reference": "User-pasted PowerShell output of `usbipd list` (conversation transcript), Connected section listing BusIds 9-3 (COM3) and 10-4 (COM5) as Shared",
+      "advanced": true,
+      "at": "2026-10-28T21:41:38.377Z"
+    },
+    {
+      "step": 2,
+      "note": "Step 2 partially done. Owner opened Feetech FD on COM3 (BusId 9-3) at baud 1000000 and reports \"worked, i see 6 servos\". Servo count matches the expected result and no communication error or duplicate-ID problem was reported. Not advanced: the step's stated verification also requires reading the firmware version of ID 1 (expected 3.9) and ID 4 (expected 3.10), which establishes the pre-flash baseline; owner has not reported those versions yet, nor the explicit ID list. Requested both before moving to the Upgrade tab. No write operations performed.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript (\"worked, i see 6 servos\"); no FD screenshot or version readout supplied",
+      "advanced": false,
+      "at": "2026-10-28T21:42:47.926Z"
+    },
+    {
+      "step": 2,
+      "note": "Step 2 complete. FD open on COM3 (BusId 9-3) at baud 1000000; Search found 6 servos. Baseline firmware read as FD's split main/secondary fields: ID 1 main 3 / secondary 9 = 3.9, ID 4 main 3 / secondary 10 = 3.10. Both match the procedure's expected baseline, so no stop condition. Owner did not transcribe the full ID list digit by digit beyond \"6 servos\" and reported no duplicate or comms error; accepted as matching IDs 1-6. Observation for later interpretation: ID 4 already reports 3.10 pre-flash, so the re-flash rewrites the same official version rather than changing the version string; a post-flash reading of 3.10 is therefore NOT by itself evidence the bogus current baseline is fixed. The decisive check remains the agent's post-flash read of current/temperature/error status/EEPROM on all 12 servos. No writes performed in this step.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: FD firmware main version 3 for ID 1 and ID 4, secondary versions 9 and 10 respectively; 6 servos found on COM3",
+      "advanced": true,
+      "at": "2026-10-28T21:44:44.948Z"
+    },
+    {
+      "step": 3,
+      "note": "Step 3 complete. Search stopped, ID 4 selected on COM3 (BusId 9-3), Upgrade tab opened, Online clicked. Owner reports FD offers firmware version 3.10, matching the procedure's expected version, so the stop condition (unexpected version or no image found) does not apply and the upgrade is cleared to proceed. Owner reported the version only and did not transcribe the image file name, so the file identity is unverified beyond FD's version string; the version was the decisive safety gate. No Upgrade click performed in this step; no servo settings written.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: FD Online firmware box shows version \"3.10\" for ID 4; file name not transcribed",
+      "advanced": true,
+      "at": "2026-10-28T21:46:50.935Z"
+    },
+    {
+      "step": 4,
+      "note": "Step 4 action done, verification incomplete. Owner clicked Upgrade for ID 4 on COM3 (BusId 9-3); progress bar reached 100% but FD showed no completion popup. Owner confirms FD 1.9.8.3 has no status text field in the Upgrade tab, so absence of a popup is treated as unremarkable UI behaviour rather than evidence of failure. ID 4 answers after the flash (rules out a bricked servo, the main risk). Owner subsequently reports all three servos (IDs 4, 5 and 6) were reflashed, i.e. the step-5 actions were performed too, but has supplied NO post-flash firmware readback for any of the three and no fresh ID-list confirmation. Not advanced: both step 4 and step 5 verify on \"ID still listed and shows firmware 3.10\" (FD main 3 / secondary 10). Requested main/secondary versions for IDs 4, 5, 6 plus a fresh Search count. Separately, owner asked to test-move the servos from FD; declined as out of scope (the procedure's preparation forbids any FD write other than the firmware upgrade, and FD jog controls write goal position and enable torque; a servo-1 test move was previously deferred by the owner). Directed to the orchestrator for renewed acceptance if a powered move test is wanted. No motion commanded, no settings written.",
+      "type": "self-reported",
+      "reference": "Owner verbal reports in conversation transcript: progress reached 100%, no popup, no status text in FD, \"id4 answers\", \"all three servos were reflashed\"; no version readback or screenshot supplied",
+      "advanced": false,
+      "at": "2026-10-28T21:51:49.096Z"
+    }
+  ],
+  "history": [
+    {
+      "action": "accept",
+      "at": "2026-10-28T16:11:53.923Z",
+      "hash": "3419bdcae0a19a3637bb37ad5716a18e3c3da7d716854723dc41e03d29e821b0"
+    }
+  ],
+  "acceptedHash": "3419bdcae0a19a3637bb37ad5716a18e3c3da7d716854723dc41e03d29e821b0",
+  "acceptedAt": "2026-10-28T16:11:53.926Z"
 }
 ```
 <!-- /human-handoff-state -->
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. The re-flash is therefore moot: it cannot add a motor driver. Left-arm IDs 4-6 were re-flashed (3.10 over 3.10; ID 4 answered afterwards) before this was known. The owner should close this handoff from the walkthrough tab; the orchestrator will not mark it verified.
 <!-- SECTION:NOTES:END -->

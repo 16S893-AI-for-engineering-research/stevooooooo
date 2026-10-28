@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:09'
-updated_date: '2026-10-27 20:06'
+updated_date: '2026-10-28 22:46'
 labels: []
 milestone: m-1
 dependencies:
@@ -66,6 +66,8 @@ LIVE FINDING 2026-10-24 (read-only check before any motion; owner present): all 
 Owner decision 2026-10-25: e-stop HOLDS arm position (torque stays on; the tube may be attached). Confirms the provisional default. Torque release only on explicit request or an overcurrent/overtemperature fault. AC#4 still needs a supervised live e-stop test.
 
 Owner re-confirmed 2026-10-27: e-stop HOLDS in place (torque stays on), matching the implemented default (test_default_estop_holds_arms_not_releases). AC#4 remains unchecked only for the supervised live e-stop test (both arms + DexArm halted, laser relay off, recoverable).
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. Joints 4-6 calibration (homing offsets, limits, zero/sign, soft limits) becomes invalid when they are replaced; re-measured in AA-43.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

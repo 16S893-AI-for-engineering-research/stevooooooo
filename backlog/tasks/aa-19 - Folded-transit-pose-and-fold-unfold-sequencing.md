@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-26 03:28'
+updated_date: '2026-10-28 22:46'
 labels: []
 milestone: m-2
 dependencies:
@@ -103,6 +103,8 @@ Findings: (1) both elbows are at their mechanical end-stop, outside the EEPROM/s
 2026-10-25: folded_transit set in config to [0.0, -1.25, 1.64, -1.31, 1.36] (both arms) from the hand-placed fold. pan = 0 per the owner (both point at the DexArm). lift/elbow are 2-3 deg short of the end stops. wrist_roll = the mean of the arms. The OLD PLACEHOLDER HAD LIFT/ELBOW SIGNS REVERSED (+1.2/-1.57), so a powered fold would have folded the wrong way; fold and unfold waypoint signs corrected. Unfold ordering test made sign-independent (abs lift). EEPROM limits widened so the fold is in-limits (owner-approved). AC#1 is NOT checked: the collision validation still uses placeholder geometry.
 
 Correction and evidence 2026-10-25: the earlier note said the old placeholder fold had its signs 'REVERSED'. More precisely, its lift/elbow signs are the OPPOSITE of the measured fold. In the URDF model the old pose reaches OUTWARD (wrist about 308 mm forward) rather than folding. Independent check against the CAD (owner: the CAD matches the build, and the CAD shows the folded pose): the wrist link (Wrist_Roll_Pitch) sits about 70 mm from the base centre toward the DexArm (STEP -Y), and the upper/under-arm centres sit at or behind the base centre. That matches the measured-fold FK (wrist 94 mm forward, elbow 36 mm behind the shoulder). Arm forward = STEP -Y = toward the DexArm, consistent with the pan landmark. Not a full verification: the base_link origin offset is not yet extracted.
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. Joints 4-6 calibration (homing offsets, limits, zero/sign, soft limits) becomes invalid when they are replaced; re-measured in AA-43.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

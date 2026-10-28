@@ -5,12 +5,13 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-28 02:26'
+updated_date: '2026-10-28 22:46'
 labels: []
 milestone: m-2
 dependencies:
   - AA-8
   - AA-10
+  - AA-43
 documentation:
   - >-
     backlog/docs/specs/doc-1 -
@@ -63,4 +64,6 @@ Overtravel lock merged 2026-10-25 (orchestrator-reviewed). Lock commands lock_ov
 2026-10-27 orchestrator: settle-wait fix for the review finding (lock() read back immediately after commanding the overtravel move -> false MISS). lock() now polls read_joint_state until two consecutive reads have |speed_raw| <= settle_speed_max_raw and a position change <= settle_position_tol_deg, bounded by lock_settle_timeout_s; timeout -> new LockVerdict.NOT_SETTLED -> FAULT (fail closed); read errors propagate and never leave LOCKED. New GripperLockConfig fields (defaults 2.0 s / 0.02 s / 5 raw / 0.3 deg, unverified). Tests: TestLockSettleWait (5): moving servo waited out and LATCHED, never-settles faults, settled no-key overtravel still detected, speed-0-but-jumping not trusted, read error never locks. tests/test_gripper_lock.py 114 passed. Owner (2026-10-27) offered to help with the torque-limit measurement: scripts/gripper_lock_probe.py (dry-run default; gripper commanded only via GripperLockSM; refuses if any arm joint has torque on; restores torque limit 1000 and torque off on exit; tests/test_gripper_lock_probe.py) and human task AA-41 proposed for the supervised run.
 
 AA-41 finding 2026-10-27: gripper servo (and wrist_flex/wrist_roll) EEPROM drive config is zeroed on both arms (see AA-41 notes); powered lock testing is blocked until it is restored. gripper_lock_probe.py refuses in this state.
+
+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. AA-17 #1-style live lock work blocked on AA-43; gripper bands must be re-measured on the new gripper servo.
 <!-- SECTION:NOTES:END -->
