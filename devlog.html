@@ -41,6 +41,13 @@
     </div>
 
     <div class="panel">
+      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/27/26 &mdash; Teaching AI the physical robot</h3>
+      <p>
+        Big lesson this week was that making AI understand something physical in real life is not easy. Especially when a model is as complicated as this is with 3 different robotic arms with many many parts, it has a hard time distinguishing things. I did not make it easier since alot of the parts in my model are named the same thing. Burned quite a bit of money on that mistake. Instead of just giving it the CAD, I ended up creating a urdf myself to give the agents. This made things much more understandable for it. I also realized I need more of one kind of the servo before I can complete everything and will need to rebuild the arms so that's fun. Went on a goose chase trying to figure that out, as well. Thought I had fried something but turned out they were dummy servos with just encoders so you could use them as a leader arm.
+      </p>
+    </div>
+
+    <div class="panel">
       <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/20/26 &mdash; Planning the robot software</h3>
       <p>
         Starting the software side now that the robot is assembled. I described the system to Pi &mdash; two SO-101 arms gripping attachment points 183.676&nbsp;mm apart, a DexArm carrying the print head and a line laser, all on a fixed chassis with the tube being the part that moves &mdash; and had it break the work into tasks small enough for sub-agents. It produced 33 tasks across 7 milestones with 227 acceptance criteria. Two of my constraints reordered things: the crawl cycle can't be tested until the learned insertion works, and the DexArm's repeatability has to be measured before the laser calibration so its positioning error doesn't get mistaken for optical error later. I also asked how we keep sub-agents from quietly rewriting requirements to match whatever they built; the project had no Definition of Done at all, so every task now inherits rules requiring evidence instead of code inspection. Getting the walkthrough tab to open took four separate fixes.
