@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'"><title>Root cause found: encoder-only servos on both arms block powered wrist motion</title><style>
+:root{color-scheme:light;--paper:#fcfcfa;--ink:#242a30;--muted:#535e68;--rule:#d9dfe2;--tint:#f0f3f4;--link:#185a86;--warning:#933a22}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:850px;margin:auto;padding:48px 28px 80px}h1,h2,h3,h4{line-height:1.25;text-wrap:balance}h1{font-size:2.1rem;margin:8px 0 18px}h2{font-size:1.45rem;margin:36px 0 16px}h3{font-size:1.1rem}h4{font-size:1rem;margin-bottom:8px}p{margin:12px 0;white-space:pre-line;overflow-wrap:anywhere}p code,li code,td code,th code,h2 code{font-size:.88em;background:var(--tint);padding:1px 4px;border-radius:3px}.math-display{overflow-x:auto;overflow-y:hidden;margin:16px 0}.katex-display{margin:0}a.ref{text-decoration-style:dotted}.prose-table{margin:18px 0;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)}.prose-table th{border-bottom:1px solid var(--ink);font-weight:600}.prose-table td,.prose-table th{white-space:normal;min-width:5rem}.prose-table tbody tr:last-child td{border-bottom:0}ol{padding-left:24px}a{color:var(--link);text-underline-offset:3px;overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid #a65f00;outline-offset:4px}:target{scroll-margin-top:20px}.mode,.secondary,figcaption{font-size:.875rem;color:var(--muted)}.mode{letter-spacing:.04em}.lead{font-size:1.15rem}.status{font-size:.8rem;font-weight:600;border:1px solid var(--rule);padding:2px 6px;border-radius:4px;margin-right:6px;white-space:nowrap}.warning{color:var(--warning);font-weight:600}.evidence{border-left:2px solid var(--rule);padding-left:16px;margin:20px 0}.evidence p{margin:8px 0}.record-id{font-size:.75rem;color:var(--muted);margin-left:5px}section,header,details{min-width:0}details{border-top:1px solid var(--rule);padding:12px 0}summary{cursor:pointer;overflow-wrap:anywhere}summary:hover{color:var(--link)}details[open]>summary{margin-bottom:16px}details details{margin:12px 0 0 16px}.record>summary{font-weight:600}.record>summary .secondary{font-weight:400}pre{background:var(--tint);padding:14px;overflow:auto;max-height:34rem;font-size:.8rem;line-height:1.6;tab-size:4}pre code{white-space:pre;overflow-wrap:normal}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}blockquote{margin:10px 0}blockquote pre{max-height:18rem}.table-scroll{overflow:auto;max-height:32rem}table{border-collapse:collapse;width:100%;font-size:.875rem}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--rule);padding:9px 12px;white-space:pre-wrap;overflow-wrap:anywhere;min-width:7rem}dl{font-size:.875rem;display:grid;grid-template-columns:9rem minmax(0,1fr);gap:8px 16px}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}ul{padding-left:24px}li{margin:12px 0;overflow-wrap:anywhere}figure{margin:26px 0}figure img{display:block;width:100%;height:auto}.image-map{position:relative;width:100%;line-height:0}.image-map>a{position:absolute;display:block;border:2px solid transparent;border-radius:3px}.image-map>a:hover{background:#185a8618;border-color:#185a8680}.image-map>a:focus-visible{outline:3px solid #a65f00;outline-offset:0;background:#ffffff55}.figure-links{font-size:.875rem;display:flex;flex-wrap:wrap;gap:8px 20px;list-style:none;padding:0}.figure-links li{margin:0}figcaption{margin-top:10px}#limits{border-left:3px solid #ad7952;padding-left:18px}#log,#technical{margin-top:32px}.prepared-output>h4{color:var(--muted)}.toc{font-size:.875rem;border-left:2px solid var(--rule);padding:2px 0 2px 14px;margin:0 0 24px}.toc p{margin:0 0 4px;color:var(--muted);font-weight:600;white-space:normal}.toc ol{margin:0;padding-left:18px}.toc li{margin:3px 0}.toc a{text-decoration:none}.toc a:hover{text-decoration:underline}@media(min-width:1320px){.toc{position:fixed;top:48px;left:calc(50% - 425px - 240px);width:210px;max-height:calc(100vh - 96px);overflow:auto}}.with-tool{display:flex;align-items:center;gap:10px}.copy,.log-tools button{font:inherit;font-size:.75rem;font-weight:400;padding:2px 9px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);cursor:pointer}.copy:hover{border-color:var(--link);color:var(--link)}.log-tools{display:flex;gap:8px;margin:0 0 8px}.log-tools button{font:inherit;font-size:.8rem;padding:3px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);cursor:pointer}.log-tools button:hover{border-color:var(--link);color:var(--link)}pre.diff code>span{display:block;margin:0 -14px;padding:0 14px}.d-add{background:#dcebf9;color:#0b3d6b}.d-del{background:#fbe1d7;color:#7a2408}.d-hunk{color:#6b4a9b;background:#f1ecf7}.d-file{font-weight:600;color:var(--ink)}pre.diff code{display:block;min-width:max-content}.diff-key{font-size:.8rem;margin:4px 0 6px;white-space:normal}.diff-key span{padding:1px 6px;border-radius:3px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;margin-right:6px}section>ul>li,section>ol>li,.lead li{margin:6px 0;line-height:1.55}section ul ul{margin:4px 0}
+@media(max-width:500px){body{font-size:16px}main{padding:24px 18px 48px}h1{font-size:1.7rem}h2{font-size:1.3rem}dl{grid-template-columns:1fr;gap:3px}dd{margin-bottom:10px}details details{margin-left:8px}}
+@media print{.toc,.log-tools,.copy{display:none}.d-add,.d-del,.d-hunk{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:white;color:black;font-size:11pt}main{max-width:none;padding:0}a{color:inherit}pre,.table-scroll{max-height:none}pre{white-space:pre-wrap}pre code{white-space:pre-wrap;overflow-wrap:anywhere}figure{break-inside:avoid}.image-map>a{display:none}summary{color:black}}
+</style></head><body><main>
+<nav class="toc" aria-label="Contents"><p>Contents</p><ol><li><a href="#root-cause">Encoder-only servos discovered on both arms</a></li><li><a href="#blocked-tasks">Directly blocked: gripper lock and torque probe</a></li><li><a href="#early-symptom">The 2026-10-24 observation should have triggered diagnosis</a></li><li><a href="#eeprom-writes">EEPROM writes on 2026-10-27 are harmless on encoder-only parts</a></li><li><a href="#tests-pass">Existing tests continue to pass</a></li><li><a href="#checks">Checks</a></li><li><a href="#limits">Material limits</a></li><li><a href="#log">Exact command log</a></li></ol></nav><header><p class="mode">Verification</p><h1>Root cause found: encoder-only servos on both arms block powered wrist motion</h1><p>Scope: <a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/commit/e2a191905d3ab90fab2c2f34831715976c70de53">Last commit: root cause and task creation</a></p></header>
+<section id="overview"><div class="lead"><p>Servos ID 4-6 on each arm are encoder-only models with no motor drive. This halts <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-17%20-%20Custom-gripper-lock-state-machine-on-the-shared-servo.md" title="AA-17 · backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md · e2a191905d3a" rel="noreferrer">gripper lock</a>, <a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">torque probe</a>, and downstream wrist/gripper tasks. <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-1%20-%20Inchworm-Print-Crawl-Prototype-%E2%80%94-Hardware-and-System-Reference.md" title="doc-1 · backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md · e2a191905d3a" rel="noreferrer">the hardware and system reference document</a> and <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-3%20-%20Orchestrator-State-and-Session-Handoff.md" title="doc-3 · backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md · e2a191905d3a" rel="noreferrer">the orchestrator state and session handoff guide</a> are updated; <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a> is created to buy replacement servos and recalibrate joints 4-6.&quot;, &quot;title&quot;:&quot;Root cause found: encoder-only servos on both arms block powered wrist motion</p></div></section>
+<section id="root-cause"><h2>Encoder-only servos discovered on both arms</h2><p>Servos ID 4-6 on both SO-101 arms are passive position readers:</p><ul><li>Firmware 3.10, model 777 (reported via CAN bus)</li><li>EEPROM drive config zeroed from factory (Max_Torque, P/D, Protection_Current, Overload, Max_Temp all 0)</li><li>Temperature reads constant 0 °C, present current ~950–1000 mA at rest</li><li>Persistent 0x08 overcurrent flag on every read</li><li>Read joint position via encoder but <strong>cannot produce torque</strong></li></ul><p>These parts explain weeks of failed debugging. Powered wrist and gripper motion is impossible until <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">6 powered servos are purchased and both arms rebuilt</a>.</p><div class="evidence"><p>doc-1 updated with encoder-only servo identification and consequence</p><p><a href="#r4">Show the doc-1 hardware spec changes related to encoder-only servos<small class="record-id">r4</small></a></p></div></section>
+<section id="blocked-tasks"><h2>Directly blocked: gripper lock and torque probe</h2><p>Servos 4-6 control wrist_flex, wrist_roll, and gripper (joint IDs 4, 5, 6). Directly blocked:</p><ul><li><a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-17%20-%20Custom-gripper-lock-state-machine-on-the-shared-servo.md" title="AA-17 · backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md · e2a191905d3a" rel="noreferrer">the gripper lock state machine work on the shared servo</a>: cannot command lock state machine via joint 6 (gripper servo)</li><li><a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">the torque-limit probe work for the gripper lock on both arms</a>: cannot run gripper torque-limit probe</li></ul><p>Also blocked are fold-with-gripper and dry-cycle work, and all downstream learned-policy and print tasks requiring wrist or gripper motion. After <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a> completes, <a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">the torque-limit probe work for the gripper lock on both arms</a> receives a fresh procedure with valid calibration data for joints 4-6.</p><div class="evidence"><p>doc-3 records blocked tasks and defers <a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">the torque-limit probe work for the gripper lock on both arms</a> to post-<a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a></p><p><a href="#r7">Show changes to doc-3 (orchestrator state)<small class="record-id">r7</small></a></p></div></section>
+<section id="early-symptom"><h2>The 2026-10-24 observation should have triggered diagnosis</h2><p>The owner noted on 2026-10-24: &quot;0 C, ~930 current on some servos&quot; but did not chase it. This signature is diagnostic of encoder-only servos:</p><ul><li>Near-zero temperature: no motor heating</li><li>High resting current: encoder IC draws current, motor drive stage is unpowered</li></ul><p>Weeks of EEPROM manipulation, overcurrent masking, and re-calibration attempts followed before the root cause was isolated. <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-3%20-%20Orchestrator-State-and-Session-Handoff.md" title="doc-3 · backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md · e2a191905d3a" rel="noreferrer">the orchestrator state and session handoff guide</a> now records this lesson learned.</p><div class="evidence"><p>doc-3 records the lesson: early observation should have identified the hardware difference</p><p><a href="#r7">Show changes to doc-3 (orchestrator state)<small class="record-id">r7</small></a></p></div></section>
+<section id="eeprom-writes"><h2>EEPROM writes on 2026-10-27 are harmless on encoder-only parts</h2><p>Several EEPROM drive parameters (unloading, LED, protection current) were written to IDs 4-6 on 2026-10-27 to try to clear the 0x08 flag. On encoder-only servos with zeroed drive configs, these writes store benign values.</p><p>Backups exist in <code>calibration_data/eeprom_*2026-10-27T23-*</code>. After <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a> installs powered servos, <strong>all homing offsets, position limits, and joint zero/sign calibration for joints 4-6 become invalid</strong> and must be re-measured.</p><div class="evidence"><p>doc-3 confirms EEPROM writes made on 2026-10-27 are moot after servo swap</p><p><a href="#r7">Show changes to doc-3 (orchestrator state)<small class="record-id">r7</small></a></p></div></section>
+<section id="tests-pass"><h2>Existing tests continue to pass</h2><p>E-stop tests (22 tests) and gripper lock tests (114 tests) pass without modification. No code changes to the motion layer or state machines were required by this root-cause clarification:</p><ul><li><code>test_estop.py</code>: 22/22 pass ✓</li><li><code>test_gripper_lock.py</code>: 114/114 pass ✓</li></ul><p>Tasks and docs are updated to reflect hardware reality; new servo swapping and calibration work is deferred to <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a>.</p><div class="evidence"><p>E-stop tests: 22/22 pass</p><p><a href="#r14">Verify the e-stop tests pass (related to AA-10 notes in this commit)<small class="record-id">r14</small></a></p></div><div class="evidence"><p>Gripper lock tests: 114/114 pass</p><p><a href="#r15">Verify gripper lock tests pass (AA-17 task updated in this commit)<small class="record-id">r15</small></a></p></div></section>
+<section id="checks"><h2>Checks</h2><ul><li><span class="status">passed</span><strong><a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-1%20-%20Inchworm-Print-Crawl-Prototype-%E2%80%94-Hardware-and-System-Reference.md" title="doc-1 · backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md · e2a191905d3a" rel="noreferrer">doc-1 hardware spec</a> corrected with encoder-only servo identification</strong><p>Encoder-only servo signature (firmware 3.10, zeroed EEPROM, 0 °C, ~950 mA rest current) and consequence documented</p><a href="#r4">Show the doc-1 hardware spec changes related to encoder-only servos<small class="record-id">r4</small></a></li><li><span class="status">passed</span><strong><a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">AA-43 servo swap task</a> created with acceptance criteria</strong><p>High-priority task scope: buy 6 powered STS3215 servos, rebuild both arms, measure homing offsets, position limits, joint zero/sign calibration, and gripper bands</p><a href="#r11">Show the newly created AA-43 servo swap and recalibration task<small class="record-id">r11</small></a></li><li><span class="status">passed</span><strong><a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a> added as dependency to <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-17%20-%20Custom-gripper-lock-state-machine-on-the-shared-servo.md" title="AA-17 · backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md · e2a191905d3a" rel="noreferrer">the gripper lock state machine work on the shared servo</a> and <a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">the torque-limit probe work for the gripper lock on both arms</a></strong><p>Both tasks now declare blocking dependency on servo swap completion</p><a href="#r10">Show all changes to backlog tasks in this commit<small class="record-id">r10</small></a></li><li><span class="status">passed</span><strong><a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-3%20-%20Orchestrator-State-and-Session-Handoff.md" title="doc-3 · backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md · e2a191905d3a" rel="noreferrer">the orchestrator state and session handoff guide</a> updated with root cause and lesson learned</strong><p>Doc-3 blocker section now identifies encoder-only parts, closes <a class="ref" href="#ref-aa-42-feetech" title="AA-42 · backlog/tasks/aa-42-re-flash-servos-4-6-with-Feetech-FD-Windows.md">the planned FD re-flash task (now moot due to the encoder-only discovery)</a> as moot, defers <a class="ref" href="#ref-aa-41-probe-torque" title="AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md">the torque-limit probe work for the gripper lock on both arms</a> to fresh procedure after <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a></p><a href="#r7">Show changes to doc-3 (orchestrator state)<small class="record-id">r7</small></a></li><li><span class="status">passed</span><strong>E-stop tests pass</strong><p>test_estop.py: 22 tests pass (no regressions from task documentation updates)</p><a href="#r14">Verify the e-stop tests pass (related to AA-10 notes in this commit)<small class="record-id">r14</small></a></li><li><span class="status">passed</span><strong>Gripper lock tests pass</strong><p>test_gripper_lock.py: 114 tests pass (settle-wait logic and lock settling verified)</p><a href="#r15">Verify gripper lock tests pass (AA-17 task updated in this commit)<small class="record-id">r15</small></a></li></ul></section>
+<section id="limits"><h2>Material limits</h2><ul><li class="warning"><p>Files changed during the walkthrough: backlog/tasks/aa-42 - Re-flash-STS3215-firmware-3.10-on-servos-4-6-of-both-arms-with-Feetech-FD-Windows.md.</p><a href="#r0">Before snapshot<small class="record-id">r0</small></a> · <a href="#r17">After snapshot<small class="record-id">r17</small></a></li><li><p>Changed path backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md is unavailable as a committed file at the resolved head.</p></li><li><p>Reference &quot;the torque-limit probe work for the gripper lock on both arms&quot;: backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md is not a committed file at the scope head.</p><a href="#r10">Show all changes to backlog tasks in this commit<small class="record-id">r10</small></a></li><li><p>Reference &quot;the planned FD re-flash task (now moot due to the encoder-only discovery)&quot;: backlog/tasks/aa-42-re-flash-servos-4-6-with-Feetech-FD-Windows.md is not a committed file at the scope head.</p><a href="#r7">Show changes to doc-3 (orchestrator state)<small class="record-id">r7</small></a></li><li><p>Show the new AA-43 task content for servo swap and recalibration: Command exited with status 1.</p><a href="#r9">Show the new AA-43 task content for servo swap and recalibration<small class="record-id">r9</small></a></li><li><p>Show all changes to backlog tasks in this commit: Command exited with status 141.</p><a href="#r10">Show all changes to backlog tasks in this commit<small class="record-id">r10</small></a></li><li><p>Verify that all tests pass in the current commit: Command timed out.</p><a href="#r13">Verify that all tests pass in the current commit<small class="record-id">r13</small></a></li><li><p>Scope covers committed content only; uncommitted working-tree content is not included.</p></li></ul></section>
+<details id="changes"><summary>Changed files</summary><ul><li><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-1%20-%20Inchworm-Print-Crawl-Prototype-%E2%80%94-Hardware-and-System-Reference.md#L35-L36" rel="noreferrer">backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md</a> <span class="secondary">35-36</span><p>Added CORRECTION: servos ID 4-6 are encoder-only leader servos.</p></li><li><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-3%20-%20Orchestrator-State-and-Session-Handoff.md#L19-L20" rel="noreferrer">backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md</a> <span class="secondary">19-20</span><p>Updated blocker status with root cause findings.</p></li><li><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-17%20-%20Custom-gripper-lock-state-machine-on-the-shared-servo.md#L12" rel="noreferrer">backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md</a> <span class="secondary">12</span><p>Added <a class="ref" href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" title="AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3a" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a> as dependency.</p></li><li>backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md <span class="secondary">152-208</span><p>Implementation plan and step-1/step-2 progress added.</p></li><li><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md#L1-L41" rel="noreferrer">backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md</a> <span class="secondary">1-41</span><p>New high-priority task for servo swap and recalibration.</p></li></ul></details><details id="references"><summary>References</summary><ul><li id="ref-aa-43-servo-swap"><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-43%20-%20Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md" rel="noreferrer">the new task to replace encoder-only servos 4-6 with powered STS3215 servos and recalibrate joints 4-6</a><br><span class="secondary">AA-43 · backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md · e2a191905d3ab90fab2c2f34831715976c70de53</span> <a href="#r11">Where it was read<small class="record-id">r11</small></a></li><li id="ref-aa-17-gripper-lock"><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/tasks/aa-17%20-%20Custom-gripper-lock-state-machine-on-the-shared-servo.md" rel="noreferrer">the gripper lock state machine work on the shared servo</a><br><span class="secondary">AA-17 · backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md · e2a191905d3ab90fab2c2f34831715976c70de53</span> <a href="#r10">Where it was read<small class="record-id">r10</small></a></li><li id="ref-aa-41-probe-torque">the torque-limit probe work for the gripper lock on both arms<br><span class="secondary">AA-41 · backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md</span><br><span class="warning">backlog/tasks/aa-41 - Probe-find-the-lock-torque-limit-both-arms.md is not a committed file at the scope head.</span> <a href="#r10">Where it was read<small class="record-id">r10</small></a></li><li id="ref-aa-42-feetech">the planned FD re-flash task (now moot due to the encoder-only discovery)<br><span class="secondary">AA-42 · backlog/tasks/aa-42-re-flash-servos-4-6-with-Feetech-FD-Windows.md</span><br><span class="warning">backlog/tasks/aa-42-re-flash-servos-4-6-with-Feetech-FD-Windows.md is not a committed file at the scope head.</span> <a href="#r7">Where it was read<small class="record-id">r7</small></a></li><li id="ref-doc-1-spec"><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-1%20-%20Inchworm-Print-Crawl-Prototype-%E2%80%94-Hardware-and-System-Reference.md" rel="noreferrer">the hardware and system reference document</a><br><span class="secondary">doc-1 · backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md · e2a191905d3ab90fab2c2f34831715976c70de53</span> <a href="#r4">Where it was read<small class="record-id">r4</small></a></li><li id="ref-doc-3-state"><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/blob/e2a191905d3ab90fab2c2f34831715976c70de53/backlog/docs/specs/doc-3%20-%20Orchestrator-State-and-Session-Handoff.md" rel="noreferrer">the orchestrator state and session handoff guide</a><br><span class="secondary">doc-3 · backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md · e2a191905d3ab90fab2c2f34831715976c70de53</span> <a href="#r7">Where it was read<small class="record-id">r7</small></a></li></ul></details><details id="scope"><summary>Scope and commits</summary><p>Last commit: root cause and task creation · committed content</p><dl><dt>Head commit</dt><dd>e2a191905d3ab90fab2c2f34831715976c70de53</dd></dl><ul><li><a href="https://github.com/16S893-AI-for-engineering-research/stevooooooo/commit/e2a191905d3ab90fab2c2f34831715976c70de53" rel="noreferrer">Owner root cause: servos 4-6 on both arms are encoder-only leader servos; doc-1 correction; AA-43 servo swap + recalibration (blocks AA-17, AA-41); task notes; doc-3</a><br><small>e2a191905d3ab90fab2c2f34831715976c70de53</small></li></ul></details><details id="log"><summary>Exact command log · 18 records</summary><p class="log-tools"><button type="button" data-records="open">Expand all</button><button type="button" data-records="close">Collapse all</button></p><details class="record" id="r0"><summary>Working tree before the walkthrough (taken by the tool, not the agent) <span class="secondary">— exit 0<small class="record-id">r0</small></span></summary><section class="output"><h4>Stdout</h4><pre><code> D CAD/exports/wrist_gripper.stl
+?? CAD/exports/gripper_update.stl
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r0">Copy</button></h4><pre id="cmd-r0"><code>git status --porcelain --untracked-files=all -- . &#39;:(exclude).walkthrough&#39;</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:28.798Z</dd><dt>Duration (ms)</dt><dd>90</dd><dt>Execution status</dt><dd>exit 0</dd><dt>Snapshot</dt><dd>before</dd></dl><details><summary>Recorded tree snapshot</summary><pre><code>{
+  &quot;CAD/exports/wrist_gripper.stl&quot;: &quot;missing&quot;,
+  &quot;CAD/exports/gripper_update.stl&quot;: &quot;05a6cecae212d39982952a96fc0dabbba0ac8c987a5a24c84b147a8f8dc9e94f&quot;,
+  &quot;.pi/&quot;: &quot;directory&quot;,
+  &quot;CAD/&quot;: &quot;directory&quot;,
+  &quot;assets/&quot;: &quot;directory&quot;,
+  &quot;backlog/&quot;: &quot;directory&quot;,
+  &quot;css/&quot;: &quot;directory&quot;,
+  &quot;js/&quot;: &quot;directory&quot;,
+  &quot;papers/&quot;: &quot;directory&quot;,
+  &quot;pictures/&quot;: &quot;directory&quot;,
+  &quot;robot/&quot;: &quot;directory&quot;,
+  &quot;sim/&quot;: &quot;directory&quot;,
+  &quot;tools/&quot;: &quot;directory&quot;
+}</code></pre></details></details><details class="record" id="r1"><summary>Read the backlog workflow guidance before planning this task <span class="secondary">— exit 0<small class="record-id">r1</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>## Backlog.md Overview (CLI)
+
+This project uses Backlog.md to track features, bugs, and structured work as tasks.
+
+### When to Use Backlog
+
+Create a task when the work requires planning, decisions, or handoff notes.
+
+Ask: &quot;Do I need to think about HOW to do this?&quot;
+
+- Yes: search for an existing task first, then create one if needed.
+- No: do the small mechanical change directly.
+
+Create tasks for work like bug fixes that need investigation, feature work, API changes, refactors, or anything that should be reviewed as a commitment. Skip task creation for questions, explanations, quick lookups, and obvious mechanical edits.
+
+### Start Every Request Here
+
+Use this overview to decide what to read or run next.
+
+Search and read before changing anything:
+
+- `backlog search &quot;query&quot; --plain`
+- `backlog task list --status &quot;&lt;todo status&gt;&quot; --plain`
+- `backlog task list --status &quot;&lt;active status&gt;&quot; --plain`
+- `backlog task list --search &quot;login&quot; --labels frontend,bug --limit 20 --plain`
+- `backlog task view AA-123 --plain`
+
+Lists print every match by default. To read a long list in windows, add `--max-count &lt;n&gt;` and `--skip &lt;n&gt;` to `task list`, `search`, `draft list`, `milestone list`, `doc list`, `doc search`, or `decision list`. Windows apply after filtering, sorting, and `--limit`, in the order the output prints, so consecutive windows of an unchanged backlog join into the complete output. Output cut by a window ends with `Showing &lt;first&gt;-&lt;last&gt; of &lt;total&gt; items. Next: &lt;command&gt;`; run that command for the following items. The last window has no `Next:` part, and a `--skip` past the end prints `Showing 0 of &lt;total&gt; items.` `--count` prints only the number of items the same command would list; it cannot be combined with `--json`. With `--json`, a cut list adds `total` and `nextSkip` (`null` after the last window).
+
+Use `--json` instead of `--plain` on `task list`, `task view`, `task &lt;id&gt;`, or `search` when a script needs stable versioned fields. Do not combine the two flags. For a live task list, use `backlog task list --json --watch`: it emits the same complete, pretty-printed JSON response initially and whenever the result changes. Read successive JSON values and replace the previous list with each response; do not parse individual lines. Filters and local task scope are unchanged. Intermediate edits may be coalesced; restart for a fresh snapshot. The watch ends when the process that started it ends.
+
+### Detailed Guides
+
+**Required: read the matching guide below before creating, executing, or finalizing tasks. Do not rely on this overview alone for these actions.** The overview only tells you when to act; the guides define the required procedure, and skipping them produces inconsistent tasks and metadata.
+
+- `backlog instructions task-creation`
+  -&gt; Read before creating tasks: how to search, scope, and create tasks
+- `backlog instructions task-execution`
+  -&gt; Read before planning or updating task work: how to plan, update, and work through tasks
+- `backlog instructions task-finalization`
+  -&gt; Read before finishing tasks: how to verify, summarize, and finish tasks
+
+Use `backlog &lt;command&gt; --help` before unfamiliar operations. Command help includes input fields, read/write behavior, output shape, and examples.
+
+### Core Principle
+
+Backlog tracks committed work: what will be built, fixed, or changed. Use the CLI for Backlog changes so metadata, file names, relationships, and history stay consistent.
+
+Important: Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use Backlog commands so automatic metadata stays complete.
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r1">Copy</button></h4><pre id="cmd-r1"><code>backlog instructions overview</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:28.800Z</dd><dt>Duration (ms)</dt><dd>292</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r2"><summary>Show the last commit and which files changed <span class="secondary">— exit 0<small class="record-id">r2</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>e2a1919 Owner root cause: servos 4-6 on both arms are encoder-only leader servos; doc-1 correction; AA-43 servo swap + recalibration (blocks AA-17, AA-41); task notes; doc-3
+ ...-\342\200\224-Hardware-and-System-Reference.md&quot; |  3 +-
+ ...c-3 - Orchestrator-State-and-Session-Handoff.md |  4 +-
+ ...-homing-torque-management-and-emergency-stop.md |  4 +-
+ ...ipper-lock-state-machine-on-the-shared-servo.md |  5 +-
+ ...lded-transit-pose-and-fold-unfold-sequencing.md |  4 +-
+ ...k-probe-find-the-lock-torque-limit-both-arms.md | 25 ++++++--
+ ...vos-4-6-of-both-arms-with-Feetech-FD-Windows.md | 72 +++++++++++++++++++---
+ ...th-powered-servos-and-recalibrate-joints-4-6.md | 41 ++++++++++++
+ ...e-SO-101-joint-limits-and-collision-envelope.md |  4 +-
+ 9 files changed, 143 insertions(+), 19 deletions(-)
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r2">Copy</button></h4><pre id="cmd-r2"><code>git log -1 --oneline --stat HEAD</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:30.300Z</dd><dt>Duration (ms)</dt><dd>27</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r3"><summary>Show the commit metadata and message in full <span class="secondary">— exit 0<small class="record-id">r3</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>commit e2a191905d3ab90fab2c2f34831715976c70de53
+Author:     Stimperley85 &lt;stimperley85@gmail.com&gt;
+AuthorDate: Wed Oct 28 18:46:18 2026 -0400
+Commit:     Stimperley85 &lt;stimperley85@gmail.com&gt;
+CommitDate: Wed Oct 28 18:46:18 2026 -0400
+
+    Owner root cause: servos 4-6 on both arms are encoder-only leader servos; doc-1 correction; AA-43 servo swap + recalibration (blocks AA-17, AA-41); task notes; doc-3
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r3">Copy</button></h4><pre id="cmd-r3"><code>git show HEAD --no-patch --format=fuller</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:31.316Z</dd><dt>Duration (ms)</dt><dd>13</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r4"><summary>Show the doc-1 hardware spec changes related to encoder-only servos <span class="secondary">— exit 0<small class="record-id">r4</small></span></summary><section class="output"><h4>Stdout</h4><p class="diff-key"><span class="d-add">+2 added</span> <span class="d-del">−1 removed</span></p><pre class="diff"><code><span class="d-hunk">@@ -3,7 +3,7 @@ id: doc-1
+</span> title: Inchworm Print-Crawl Prototype — Hardware and System Reference
+ type: specification
+ created_date: &#39;2026-10-20 21:06&#39;
+<span class="d-del">-updated_date: &#39;2026-10-28 01:48&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:45&#39;
+</span> ---
+ Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
+ 
+<span class="d-hunk">@@ -32,6 +32,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
+</span> - Servo IDs have already been assigned by the owner. **No purpose-built leader arms exist.** Per **decision-1** (2026-10-24), demonstrations use **cross-arm teleoperation**: one follower, torque off, acts as the leader for the other, while the tube is held by a **fixture**. A torque-off arm can never hold the tube.
+ - **Mounting (owner, 2026-10-24): both SO-101 arms are mounted in the SAME orientation, not mirrored.** The robot&#39;s front faces the DexArm, which sits on the structure&#39;s left. Servo cable exits: ID1 down; IDs 2-4 to the robot&#39;s left; IDs 5-6 down. All 12 servos have the same direction setting (phase reg 0x0C): a higher reading means clockwise when viewed with the servo&#39;s cable exiting away from the viewer, which is counter-clockwise in the `pictures/robot.png` side view (owner confirmed). Joint signs vs URDF: pan, lift, elbow and wrist_flex +1 (derived); wrist_roll pending a test.
+ - Gearing: both followers use STS3215 at **1/345 on all joints**. A purpose-built SO-101 leader uses 1/191 (pan), 1/345 (shoulder lift), 1/191 (elbow) and 1/147 (wrist flex, wrist roll, gripper), so a follower used as a leader is stiffer to backdrive (source: LeRobot `docs/source/so101.mdx`).
+<span class="d-add">+- **CORRECTION (owner, 2026-10-27): servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are encoder-only &quot;dummy&quot; leader-arm servos with no motor drive**, not powered STS3215 followers. They read position (encoder) and answer the bus as model 777, but cannot produce torque. Signature: firmware 3.10, Max_Voltage 16.0 V, EEPROM drive config zeroed from the factory (Max_Torque, P/D, Protection_Current, Overload, Max_Temp = 0), temperature 0 C and a constant ~950-1000 present current at rest; restoring drive settings made them flag overcurrent (0x08). IDs 1-3 (firmware 3.9) are powered STS3215. Consequence: joints 4-6 cannot be driven; the owner must buy 6 powered servos and rebuild both arms (task AA-43). After the swap, homing offsets, position limits, joint zero/sign calibration and gripper bands for joints 4-6 are invalid and must be re-measured. Until then the arms can still be used as torque-off leaders/readers.
+</span> - **Custom gripper**: the owner replaced the stock gripper with a custom design in which the **lock/latch mechanism and the jaw share the same servo ID**. There is no separate lock servo. Lock vs unlock is therefore a *position band* of the single gripper servo, not a separate actuator. Locking must be commanded by code (never left to a learned policy) and must hold position until the next regrip.
+ 
+ ### Rotrics DexArm — print/scan arm
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r4">Copy</button></h4><pre id="cmd-r4"><code>git show HEAD -- &quot;backlog/docs/specs/doc-1 - Inchworm-Print-Crawl-Prototype-—-Hardware-and-System-Reference.md&quot; | grep -A 30 &quot;@@&quot;</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:32.701Z</dd><dt>Duration (ms)</dt><dd>10</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r5"><summary>Show the new AA-43 task for servo swap and recalibration <span class="secondary">— exit 0<small class="record-id">r5</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r5">Copy</button></h4><pre id="cmd-r5"><code>git show HEAD -- &quot;backlog/tasks/AA-43*&quot; 2&gt;/dev/null | head -100</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:34.025Z</dd><dt>Duration (ms)</dt><dd>8</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r6"><summary>Find the AA-43 task file created in this commit <span class="secondary">— exit 0<small class="record-id">r6</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r6">Copy</button></h4><pre id="cmd-r6"><code>find . -name &quot;*AA-43*&quot; -type f 2&gt;/dev/null</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:35.035Z</dd><dt>Duration (ms)</dt><dd>446</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r7"><summary>Show changes to doc-3 (orchestrator state) <span class="secondary">— exit 0<small class="record-id">r7</small></span></summary><section class="output"><h4>Stdout</h4><p class="diff-key"><span class="d-add">+2 added</span> <span class="d-del">−2 removed</span></p><pre class="diff"><code><span class="d-file">diff --git a/backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md b/backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md
+</span><span class="d-file">index 9cec3c3..bc73765 100644
+</span><span class="d-file">--- a/backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md	
+</span><span class="d-file">+++ b/backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md	
+</span><span class="d-hunk">@@ -3,7 +3,7 @@ id: doc-3
+</span> title: Orchestrator State and Session Handoff
+ type: guide
+ created_date: &#39;2026-10-20 21:37&#39;
+<span class="d-del">-updated_date: &#39;2026-10-28 13:35&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:46&#39;
+</span> ---
+ Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
+ 
+<span class="d-hunk">@@ -16,7 +16,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain,
+</span> **Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot &amp;&amp; uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
+ - Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
+ - Why stage 2 took three tries: two sub-agents explored without writing; the third orchestrator attempt crashed on an API error (a tool call without a result). Lesson: do model work directly, in small committed slices.
+<span class="d-del">-- **BLOCKER (AA-41, 2026-10-27):** servos 4-6 on both arms (firmware 3.10): zeroed drive config restored, then (owner decision a) overcurrent/overheat masked from unloading (33/35), all owner-approved, torque off, backups in calibration_data/eeprom_*2026-10-27T23-*. Their current reads a bogus ~1000 at rest. Still open: status 0x08 (overcurrent) persists on every reply, so the driver raises on reads of IDs 4-6. Owner power-cycled both arms 2026-10-27: 0x08 PERSISTS (not latched; driven by the bogus current ~950 at rest). Owner decision: official Feetech route: re-flash 3.10 on IDs 4-6 with FD on Windows, human task **AA-42** (proposed, awaiting `accept AA-42`). After it: re-attach USB (attach_usb.py), re-read all 12 servos (error, current, temperature, EEPROM). If the restored EEPROM survived and the current reads ~0 at rest, set unloading/LED back to 44/47 and plan a supervised small move. Then one supervised small move per servo, then AA-41 from step 1.
+</span><span class="d-add">+- **BLOCKER, ROOT CAUSE FOUND (owner 2026-10-27):** servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are **encoder-only leader-arm servos with no motor drive** (doc-1 s3). They read position but cannot move; that explains the zeroed drive EEPROM, 0 C, ~950 current and 0x08 flag. Owner will buy 6 powered servos and rebuild both arms: **AA-43** (swap + recalibrate joints 4-6; AA-17 and AA-41 depend on it). Until then, no powered wrist/gripper motion; joints 1-3 are powered and fine. AA-42 (FD re-flash) is moot; the owner closes it in the walkthrough tab. AA-41 is deferred and gets a fresh procedure after AA-43. EEPROM writes made to IDs 4-6 on 2026-10-27 are harmless (backups in calibration_data/eeprom_*2026-10-27T23-*). Lesson: the 2026-10-24 observation &#39;0 C, ~930 current on some servos&#39; was this hardware difference and should have been chased then.
+</span> - Session 2 facts still valid: servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured poses in `robot/calibration_data/poses_2026-10-25.jsonl` (the stored pan q is stale; recompute from ticks, as view_pose.py does).
+ 
+ ## 1. Resume in 60 seconds
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r7">Copy</button></h4><pre id="cmd-r7"><code>git diff HEAD~1 HEAD -- &quot;backlog/docs/specs/doc-3 - Orchestrator-State-and-Session-Handoff.md&quot; | head -80</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:36.774Z</dd><dt>Duration (ms)</dt><dd>17</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r8"><summary>Show changes to AA-41 probe task and its new understanding <span class="secondary">— exit 0<small class="record-id">r8</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r8">Copy</button></h4><pre id="cmd-r8"><code>git diff HEAD~1 HEAD -- &quot;backlog/tasks/AA-41*&quot; | head -150</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:38.065Z</dd><dt>Duration (ms)</dt><dd>10</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r9"><summary>Show the new AA-43 task content for servo swap and recalibration <span class="secondary">— exit 1<small class="record-id">r9</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r9">Copy</button></h4><pre id="cmd-r9"><code>git show HEAD | grep -A 70 &quot;AA-43.*Servos.*4-6&quot; | head -80</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:39.342Z</dd><dt>Duration (ms)</dt><dd>13</dd><dt>Execution status</dt><dd>exit 1</dd></dl></details><details class="record" id="r10"><summary>Show all changes to backlog tasks in this commit <span class="secondary">— exit 141 · truncated output<small class="record-id">r10</small></span></summary><section class="output"><h4>Stdout</h4><p class="warning">Truncated: 9679 bytes omitted from stdout. This is not the complete output.</p><p class="diff-key"><span class="d-add">+36 added</span> <span class="d-del">−7 removed</span></p><pre class="diff"><code><span class="d-file">diff --git a/backlog/tasks/aa-10 - Safe-homing-torque-management-and-emergency-stop.md b/backlog/tasks/aa-10 - Safe-homing-torque-management-and-emergency-stop.md
+</span><span class="d-file">index c7a7b52..b073a51 100644
+</span><span class="d-file">--- a/backlog/tasks/aa-10 - Safe-homing-torque-management-and-emergency-stop.md	
+</span><span class="d-file">+++ b/backlog/tasks/aa-10 - Safe-homing-torque-management-and-emergency-stop.md	
+</span><span class="d-hunk">@@ -5,7 +5,7 @@ status: In Progress
+</span> assignee:
+   - &#39;@agent&#39;
+ created_date: &#39;2026-10-20 21:09&#39;
+<span class="d-del">-updated_date: &#39;2026-10-27 20:06&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:46&#39;
+</span> labels: []
+ milestone: m-1
+ dependencies:
+<span class="d-hunk">@@ -66,6 +66,8 @@ LIVE FINDING 2026-10-24 (read-only check before any motion; owner present): all
+</span> Owner decision 2026-10-25: e-stop HOLDS arm position (torque stays on; the tube may be attached). Confirms the provisional default. Torque release only on explicit request or an overcurrent/overtemperature fault. AC#4 still needs a supervised live e-stop test.
+ 
+ Owner re-confirmed 2026-10-27: e-stop HOLDS in place (torque stays on), matching the implemented default (test_default_estop_holds_arms_not_releases). AC#4 remains unchecked only for the supervised live e-stop test (both arms + DexArm halted, laser relay off, recoverable).
+<span class="d-add">+
+</span><span class="d-add">+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. Joints 4-6 calibration (homing offsets, limits, zero/sign, soft limits) becomes invalid when they are replaced; re-measured in AA-43.
+</span> &lt;!-- SECTION:NOTES:END --&gt;
+ 
+ ## Comments
+<span class="d-file">diff --git a/backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md b/backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md
+</span><span class="d-file">index bf21e87..93c3d09 100644
+</span><span class="d-file">--- a/backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md	
+</span><span class="d-file">+++ b/backlog/tasks/aa-17 - Custom-gripper-lock-state-machine-on-the-shared-servo.md	
+</span><span class="d-hunk">@@ -5,12 +5,13 @@ status: In Progress
+</span> assignee:
+   - &#39;@agent&#39;
+ created_date: &#39;2026-10-20 21:11&#39;
+<span class="d-del">-updated_date: &#39;2026-10-28 02:26&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:46&#39;
+</span> labels: []
+ milestone: m-2
+ dependencies:
+   - AA-8
+   - AA-10
+<span class="d-add">+  - AA-43
+</span> documentation:
+   - &gt;-
+     backlog/docs/specs/doc-1 -
+<span class="d-hunk">@@ -63,4 +64,6 @@ Overtravel lock merged 2026-10-25 (orchestrator-reviewed). Lock commands lock_ov
+</span> 2026-10-27 orchestrator: settle-wait fix for the review finding (lock() read back immediately after commanding the overtravel move -&gt; false MISS). lock() now polls read_joint_state until two consecutive reads have |speed_raw| &lt;= settle_speed_max_raw and a position change &lt;= settle_position_tol_deg, bounded by lock_settle_timeout_s; timeout -&gt; new LockVerdict.NOT_SETTLED -&gt; FAULT (fail closed); read errors propagate and never leave LOCKED. New GripperLockConfig fields (defaults 2.0 s / 0.02 s / 5 raw / 0.3 deg, unverified). Tests: TestLockSettleWait (5): moving servo waited out and LATCHED, never-settles faults, settled no-key overtravel still detected, speed-0-but-jumping not trusted, read error never locks. tests/test_gripper_lock.py 114 passed. Owner (2026-10-27) offered to help with the torque-limit measurement: scripts/gripper_lock_probe.py (dry-run default; gripper commanded only via GripperLockSM; refuses if any arm joint has torque on; restores torque limit 1000 and torque off on exit; tests/test_gripper_lock_probe.py) and human task AA-41 proposed for the supervised run.
+ 
+ AA-41 finding 2026-10-27: gripper servo (and wrist_flex/wrist_roll) EEPROM drive config is zeroed on both arms (see AA-41 notes); powered lock testing is blocked until it is restored. gripper_lock_probe.py refuses in this state.
+<span class="d-add">+
+</span><span class="d-add">+ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive
+</span>[... 9679 bytes cut by walkthrough_record ...]
+<span class="d-del">-28 13:35&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:46&#39;
+</span> labels:
+   - human-action
+   - human-key-8d8f686b9ed669e1
+<span class="d-hunk">@@ -143,6 +144,12 @@ Preparation: Windows laptop with Feetech FD installed (FD 1.9.8.3 from https://w
+</span> - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+ &lt;!-- DOD:END --&gt;
+ 
+<span class="d-add">+## Implementation Plan
+</span><span class="d-add">+
+</span><span class="d-add">+&lt;!-- SECTION:PLAN:BEGIN --&gt;
+</span><span class="d-add">+Follow the user-accepted procedure one step at a time, record evidence and stop on deviations. Submit the outcome for orchestrator verification; do not complete the originating project task.
+</span><span class="d-add">+&lt;!-- SECTION:PLAN:END --&gt;
+</span><span class="d-add">+
+</span> ## Implementation Notes
+ 
+ &lt;!-- SECTION:NOTES:BEGIN --&gt;
+<span class="d-hunk">@@ -151,13 +158,64 @@ Preparation: Windows laptop with Feetech FD installed (FD 1.9.8.3 from https://w
+</span> {
+   &quot;version&quot;: 1,
+   &quot;key&quot;: &quot;8d8f686b9ed669e1e8cdc5b0ee8e97d3c7e0b6b08c8c35a337431bcc64d03189&quot;,
+<span class="d-del">-  &quot;phase&quot;: &quot;proposed&quot;,
+</span><span class="d-add">+  &quot;phase&quot;: &quot;active&quot;,
+</span>   &quot;createdAt&quot;: &quot;2026-10-28T13:35:30.642Z&quot;,
+   &quot;origin&quot;: &quot;01a17fcd-ad6a-7474-9ab6-a7b139b28469&quot;,
+<span class="d-del">-  &quot;step&quot;: 0,
+</span><span class="d-del">-  &quot;evidence&quot;: [],
+</span><span class="d-del">-  &quot;history&quot;: []
+</span><span class="d-add">+  &quot;step&quot;: 3,
+</span><span class="d-add">+  &quot;evidence&quot;: [
+</span><span class="d-add">+    {
+</span><span class="d-add">+      &quot;step&quot;: 1,
+</span><span class="d-add">+      &quot;note&quot;: &quot;Step 1 verified via pasted `usbipd list` output. Both arm adapters present at the expected BusIds with state \&quot;Shared\&quot; (i.e. not attached to WSL, so Windows owns them): 9-3 = 1a86:55d3 USB-Enhanced-SERIAL CH343 (COM3) and 10-4 = 1a86:55d3 CH343 (COM5). Same COM numbers (COM3/COM5) as the previous session and no BusId change, so the step-1 stop conditions do not apply. Noted discrepancy in the procedure text for later steps: the procedure labels 10-4 = left and 9-3 = right, which makes the LEFT arm COM5 and the RIGHT arm COM3, contradicting step 2&#39;s \&quot;start with the lower-numbered port for the LEFT arm\&quot;. Scope is unaffected because IDs 4-6 are to be flashed on both arms; ports will be referred to by COM/BusId rather than by arm label to avoid mislabelling. Other shared devices (CH340 COM7, cameras, COM6) are unrelated to the arm buses. Not independently verified in Device Manager; usbipd&#39;s own COM assignment accepted as equivalent evidence.&quot;,
+</span><span class="d-add">+      &quot;type&quot;: &quot;self-reported&quot;,
+</span><span class="d-add">+      &quot;reference&quot;: &quot;User-pasted PowerShell output of `usbipd list` (conversation transcript), Connected section listing BusIds 9-3 (COM3) and 10-4 (COM5) as Shared&quot;,
+</span><span class="d-add">+      &quot;advanced&quot;: true,
+</span><span class="d-add">+      &quot;at&quot;: &quot;2026-10-28T21:41:38.377Z&quot;
+</span><span class="d-add">+    },
+</span><span class="d-add">+    {
+</span><span class="d-add">+      &quot;step&quot;: 2,
+</span><span class="d-add">+      &quot;note&quot;: &quot;Step 2 partially done. Owner opened Feetech FD on COM3 (BusId 9-3) at baud 1000000 and reports \&quot;worked, i see 6 servos\&quot;. Servo count matches the expected result and no communication error or duplicate-ID problem was reported. Not advanced: the step&#39;s stated verification also requires reading the firmware version of ID 1 (expected 3.9) and ID 4 (expected 3.10), which establishes the pre-flash baseline; owner has not reported those versions yet, nor the explicit ID list. Requested both before moving to the Upgrade tab. No write operations performed.&quot;,
+</span><span class="d-add">+      &quot;type&quot;: &quot;self-reported&quot;,
+</span><span class="d-add">+      &quot;reference&quot;: &quot;Owner verbal report in conversation transcript (\&quot;worked, i see 6 servos\&quot;); no FD screenshot or version readout supplied&quot;,
+</span><span class="d-add">+      &quot;advanced&quot;: false,
+</span><span class="d-add">+      &quot;at&quot;: &quot;2026-10-28T21:42:47.926Z&quot;
+</span><span class="d-add">+    },
+</span><span class="d-add">+    {
+</span><span class="d-add">+      &quot;step&quot;: 2,
+</span><span class="d-add">+      &quot;note&quot;: &quot;Step 2 complete. FD open on COM3 (BusId 9-3) at baud 1000000; Search found 6 servos. Baseline firmware read as FD&#39;s split main/secondary fields: ID 1 main 3 / secondary 9 = 3.9, ID 4 main 3 / secondary 10 = 3.10. Both match the procedure&#39;s expected baseline, so no stop condition. Owner did not transcribe the full ID list digit by digit beyond \&quot;6 servos\&quot; and reported no duplicate or comms error; accepted as matching IDs 1-6. Observation for later interpretation: ID 4 already reports 3.10 pre-flash, so the re-flash rewrites the same official version rather than changing the version string; a post-flash reading of 3.10 is therefore NOT by itself evidence the bogus current baseline is fixed. The decisive check remains the agent&#39;s post-flash read of current/temperature/error status/EEPROM on all 12 servos. No writes performed in this step.&quot;,
+</span></code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r10">Copy</button></h4><pre id="cmd-r10"><code>git diff HEAD~1 HEAD -- &quot;backlog/tasks/&quot; | head -200</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:40.404Z</dd><dt>Duration (ms)</dt><dd>23</dd><dt>Execution status</dt><dd>exit 141</dd></dl></details><details class="record" id="r11"><summary>Show the newly created AA-43 servo swap and recalibration task <span class="secondary">— exit 0<small class="record-id">r11</small></span></summary><section class="output"><h4>Stdout</h4><p class="diff-key"><span class="d-add">+41 added</span> <span class="d-del">−0 removed</span></p><pre class="diff"><code>commit e2a191905d3ab90fab2c2f34831715976c70de53
+Author: Stimperley85 &lt;stimperley85@gmail.com&gt;
+Date:   Wed Oct 28 18:46:18 2026 -0400
+
+    Owner root cause: servos 4-6 on both arms are encoder-only leader servos; doc-1 correction; AA-43 servo swap + recalibration (blocks AA-17, AA-41); task notes; doc-3
+
+<span class="d-file">diff --git a/backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md b/backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md
+</span><span class="d-file">new file mode 100644
+</span><span class="d-file">index 0000000..4daddee
+</span><span class="d-file">--- /dev/null
+</span><span class="d-file">+++ b/backlog/tasks/aa-43 - Replace-encoder-only-servos-4-6-on-both-arms-with-powered-servos-and-recalibrate-joints-4-6.md	
+</span><span class="d-hunk">@@ -0,0 +1,41 @@
+</span><span class="d-add">+---
+</span><span class="d-add">+id: AA-43
+</span><span class="d-add">+title: &gt;-
+</span><span class="d-add">+  Replace encoder-only servos 4-6 on both arms with powered servos and
+</span><span class="d-add">+  recalibrate joints 4-6
+</span><span class="d-add">+status: To Do
+</span><span class="d-add">+assignee: []
+</span><span class="d-add">+created_date: &#39;2026-10-28 22:45&#39;
+</span><span class="d-add">+updated_date: &#39;2026-10-28 22:45&#39;
+</span><span class="d-add">+labels:
+</span><span class="d-add">+  - hardware
+</span><span class="d-add">+dependencies: []
+</span><span class="d-add">+priority: high
+</span><span class="d-add">+type: task
+</span><span class="d-add">+ordinal: 43000
+</span><span class="d-add">+---
+</span><span class="d-add">+
+</span><span class="d-add">+## Description
+</span><span class="d-add">+
+</span><span class="d-add">+&lt;!-- SECTION:DESCRIPTION:BEGIN --&gt;
+</span><span class="d-add">+Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on both SO-101 arms are encoder-only leader-arm servos with no motor drive (doc-1 section 3). Joints 4-6 therefore cannot be driven, which blocks every powered wrist or gripper motion (AA-17 lock, AA-41 probe, AA-19 fold, AA-21 dry cycle and everything downstream). The owner will buy 6 powered servos and rebuild both arms. Then everything stored per servo for joints 4-6 is invalid and must be redone: EEPROM homing offsets and position limits, the joint zero/sign calibration, the soft limits, and the gripper position bands. The new servo model and gearing must be recorded in doc-1.
+</span><span class="d-add">+&lt;!-- SECTION:DESCRIPTION:END --&gt;
+</span><span class="d-add">+
+</span><span class="d-add">+## Acceptance Criteria
+</span><span class="d-add">+&lt;!-- AC:BEGIN --&gt;
+</span><span class="d-add">+- [ ] #1 doc-1 records the replacement servo model, gearing and firmware for IDs 4-6 on both arms, from the owner or the part listing
+</span><span class="d-add">+- [ ] #2 All 12 servos answer with error byte 0, plausible temperature, and near-zero present current at rest with torque off, recorded by a read-only scan
+</span><span class="d-add">+- [ ] #3 IDs 4-6 on both arms have homing offsets and Min/Max position limits re-measured and written with an EEPROM backup and read-back, owner-supervised
+</span><span class="d-add">+- [ ] #4 servo_calibration, soft limits and gripper bands for joints 4-6 are re-measured on hardware and updated in hardware.yaml with their source
+</span><span class="d-add">+- [ ] #5 A supervised small powered move of each of IDs 4-6 on both arms reaches its goal within tolerance, logged
+</span><span class="d-add">+&lt;!-- AC:END --&gt;
+</span><span class="d-add">+
+</span><span class="d-add">+## Definition of Done
+</span><span class="d-add">+&lt;!-- DOD:BEGIN --&gt;
+</span><span class="d-add">+- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+</span><span class="d-add">+- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+</span><span class="d-add">+- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+</span><span class="d-add">+- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+</span><span class="d-add">+- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+</span><span class="d-add">+- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+</span><span class="d-add">+&lt;!-- DOD:END --&gt;
+</span></code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r11">Copy</button></h4><pre id="cmd-r11"><code>git show HEAD -- &quot;backlog/tasks/aa-43&quot;* 2&gt;/dev/null | head -150</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:41.967Z</dd><dt>Duration (ms)</dt><dd>7</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r12"><summary>Show the test suite structure for this project <span class="secondary">— exit 0<small class="record-id">r12</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>tests/test_approach.py: 27
+tests/test_ast_guard.py: 1
+tests/test_attach_usb.py: 26
+tests/test_backends.py: 32
+tests/test_calibration.py: 32
+tests/test_camera_arbiter.py: 19
+tests/test_camera_capture.py: 50
+tests/test_cell_collision.py: 37
+tests/test_config.py: 23
+tests/test_constants.py: 4
+tests/test_cycle.py: 49
+tests/test_dexarm.py: 98
+tests/test_discovery.py: 33
+tests/test_estop.py: 22
+tests/test_events_summarizer.py: 85
+tests/test_fault_inject_hw.py: 17
+tests/test_fold.py: 42
+tests/test_frames.py: 68
+tests/test_gcode_intake.py: 80
+tests/test_gripper_lock.py: 114
+tests/test_gripper_lock_probe.py: 9
+tests/test_homing.py: 12
+tests/test_jog_live.py: 11
+tests/test_kinematics.py: 31
+tests/test_laser.py: 39
+tests/test_laser_line.py: 27
+tests/test_lerobot_adapter.py: 40
+tests/test_leveling.py: 24
+tests/test_motion_guard.py: 50
+tests/test_policy_runner.py: 51
+tests/test_print_frame.py: 48
+tests/test_record_joint_ranges.py: 3
+tests/test_recovery.py: 50
+tests/test_restore_drive_config.py: 6
+tests/test_scanner_calibration.py: 23
+tests/test_script_imports.py: 69
+tests/test_seating.py: 57
+tests/test_servo_bus.py: 73
+tests/test_supervisor.py: 49
+tests/test_system_model.py: 11
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r12">Copy</button></h4><pre id="cmd-r12"><code>cd robot &amp;&amp; uv run pytest --co -q 2&gt;&amp;1 | head -40</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:43.220Z</dd><dt>Duration (ms)</dt><dd>6267</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r13"><summary>Verify that all tests pass in the current commit <span class="secondary">— timed out<small class="record-id">r13</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r13">Copy</button></h4><pre id="cmd-r13"><code>cd robot &amp;&amp; uv run pytest --tb=no -q 2&gt;&amp;1 | tail -20</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:47:50.949Z</dd><dt>Duration (ms)</dt><dd>60007</dd><dt>Execution status</dt><dd>timed out</dd></dl></details><details class="record" id="r14"><summary>Verify the e-stop tests pass (related to AA-10 notes in this commit) <span class="secondary">— exit 0<small class="record-id">r14</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0
+rootdir: /home/stevotimp/893/robot
+configfile: pyproject.toml
+collected 22 items
+
+tests/test_estop.py ......................                               [100%]
+
+============================== 22 passed in 3.48s ==============================
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r14">Copy</button></h4><pre id="cmd-r14"><code>cd robot &amp;&amp; timeout 30 uv run pytest tests/test_estop.py -v 2&gt;&amp;1 | head -80</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:48:52.397Z</dd><dt>Duration (ms)</dt><dd>3813</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r15"><summary>Verify gripper lock tests pass (AA-17 task updated in this commit) <span class="secondary">— exit 0<small class="record-id">r15</small></span></summary><section class="output"><h4>Stdout</h4><pre><code>============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0
+rootdir: /home/stevotimp/893/robot
+configfile: pyproject.toml
+collected 114 items
+
+tests/test_gripper_lock.py ............................................. [ 39%]
+.....................................................................    [100%]
+
+============================= 114 passed in 10.14s =============================
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r15">Copy</button></h4><pre id="cmd-r15"><code>cd robot &amp;&amp; timeout 30 uv run pytest tests/test_gripper_lock.py -v 2&gt;&amp;1 | tail -30</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:48:57.435Z</dd><dt>Duration (ms)</dt><dd>10777</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r16"><summary>Find the actual task file names for AA-19 and AA-21 <span class="secondary">— exit 0<small class="record-id">r16</small></span></summary><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r16">Copy</button></h4><pre id="cmd-r16"><code>find backlog/tasks -name &quot;*AA-19*&quot; -o -name &quot;*AA-21*&quot; | head -5</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:50:15.431Z</dd><dt>Duration (ms)</dt><dd>13</dd><dt>Execution status</dt><dd>exit 0</dd></dl></details><details class="record" id="r17"><summary>Working tree when walkthrough_write was called (taken by the tool, not the agent) <span class="secondary">— exit 0<small class="record-id">r17</small></span></summary><section class="output"><h4>Stdout</h4><pre><code> D CAD/exports/wrist_gripper.stl
+ M &quot;backlog/tasks/aa-42 - Re-flash-STS3215-firmware-3.10-on-servos-4-6-of-both-arms-with-Feetech-FD-Windows.md&quot;
+?? CAD/exports/gripper_update.stl
+</code></pre></section><h4 class="with-tool">Exact command <button type="button" class="copy" data-copy="cmd-r17">Copy</button></h4><pre id="cmd-r17"><code>git status --porcelain --untracked-files=all -- . &#39;:(exclude).walkthrough&#39;</code></pre><h4>Technical metadata</h4><dl><dt>Working directory</dt><dd>/home/stevotimp/893</dd><dt>Started</dt><dd>2026-10-28T22:50:31.925Z</dd><dt>Duration (ms)</dt><dd>25</dd><dt>Execution status</dt><dd>exit 0</dd><dt>Snapshot</dt><dd>after</dd></dl><details><summary>Recorded tree snapshot</summary><pre><code>{
+  &quot;CAD/exports/wrist_gripper.stl&quot;: &quot;missing&quot;,
+  &quot;backlog/tasks/aa-42 - Re-flash-STS3215-firmware-3.10-on-servos-4-6-of-both-arms-with-Feetech-FD-Windows.md&quot;: &quot;f66c369f4d3fdd593baa6e34d361ac6b1cc185360bbcfa7907173c3433e03375&quot;,
+  &quot;CAD/exports/gripper_update.stl&quot;: &quot;05a6cecae212d39982952a96fc0dabbba0ac8c987a5a24c84b147a8f8dc9e94f&quot;,
+  &quot;.pi/&quot;: &quot;directory&quot;,
+  &quot;CAD/&quot;: &quot;directory&quot;,
+  &quot;assets/&quot;: &quot;directory&quot;,
+  &quot;backlog/&quot;: &quot;directory&quot;,
+  &quot;css/&quot;: &quot;directory&quot;,
+  &quot;js/&quot;: &quot;directory&quot;,
+  &quot;papers/&quot;: &quot;directory&quot;,
+  &quot;pictures/&quot;: &quot;directory&quot;,
+  &quot;robot/&quot;: &quot;directory&quot;,
+  &quot;sim/&quot;: &quot;directory&quot;,
+  &quot;tools/&quot;: &quot;directory&quot;
+}</code></pre></details></details></details><details id="technical"><summary>Report metadata</summary><dl><dt>Repository</dt><dd>893</dd><dt>Branch</dt><dd>main</dd><dt>Commit</dt><dd>e2a1919</dd><dt>Working tree</dt><dd>uncommitted changes</dd><dt>Recorded on</dt><dd>2026-10-28 22:50</dd><dt>Model</dt><dd>MIT-parley/bedrock/claude-haiku-4-5</dd><dt>Budget</dt><dd>20 commands (built-in default), 5 min total (built-in default)</dd><dt>Working directory</dt><dd>/home/stevotimp/893</dd></dl></details>
+</main><script>(() => {
+  function reveal() {
+    let id; try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    let node = target;
+    while (node) { if (node.tagName === 'DETAILS') node.open = true; node = node.parentElement; }
+    target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'start' });
+  }
+  addEventListener('hashchange', reveal);
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest && event.target.closest('button[data-records]');
+    if (!button) return;
+    const open = button.getAttribute('data-records') === 'open';
+    for (const record of document.querySelectorAll('#log details.record')) record.open = open;
+  });
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest && event.target.closest('button[data-copy]');
+    if (!button) return;
+    const source = document.getElementById(button.getAttribute('data-copy'));
+    if (!source) return;
+    const text = source.textContent;
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const area = document.createElement('textarea');
+      area.value = text; document.body.appendChild(area); area.select();
+      document.execCommand('copy'); area.remove();
+    }
+    const label = button.textContent; button.textContent = 'Copied'; setTimeout(() => { button.textContent = label; }, 1200);
+  });
+  document.addEventListener('click', (event) => {
+    const anchor = event.target.closest && event.target.closest('a[href^="#"]');
+    if (anchor && anchor.hash === location.hash) setTimeout(reveal, 0);
+  });
+  reveal();
+})();</script></body></html>
