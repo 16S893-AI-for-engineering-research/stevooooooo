@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.8)
+project(three_arm_cell_description)
+find_package(ament_cmake REQUIRED)
+install(DIRECTORY urdf config meshes launch DESTINATION share/${PROJECT_NAME})
+ament_package()

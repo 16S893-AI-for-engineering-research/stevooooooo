@@ -563,6 +563,54 @@ motion_guard:
         z_min_m:  0.10
         z_max_m:  0.20
         unverified: true
+    # AA-40 mesh collision on the owner cell URDF (python-fcl), ADDITIVE to the
+    # keep-out primitives. Checks each moving SO-101 link against the other arm,
+    # both bases, the base mount, the DexArm and the tube (when given), plus
+    # self-collision; allowed pairs = joint-adjacent links + owner SRDF.
+    # The TABLE is not modelled (owner 2026-10-27: arms never go near it).
+    # Fails closed: a missing model, an unknown other-arm pose or (live) an
+    # unstated tube state is a violation.
+    mesh:
+      enabled: true
+      urdf_path: CAD/robot_urdf_new/three_arm_cell.urdf
+      srdf_path: CAD/robot_urdf_new/config/three_arm_cell.srdf
+      # Minimum separation between checked parts. Conservative default,
+      # unverified (owner may choose another value).
+      margin_m: 0.005
+      # Pan/lift/elbow/wrist_flex map 1:1 onto the cell URDF (verified against
+      # the vendored chain, 0.015 mm). Wrist roll: the cell URDF range is
+      # -254..0 deg (0 = gripper against the wrist); ours is centred on 0, so
+      # the offset assumes our 0 = the middle of that travel (-127 deg).
+      # UNVERIFIED assumption; confirm with the owner render comparison.
+      wrist_roll_cell_sign: 1
+      wrist_roll_cell_offset_rad: -2.216568
+      # true blocks LIVE motion until the owner compares renders vs the real
+      # robot (AA-40 #6). Dry-run still checks.
+      unverified: true
+      # Owner 2026-10-27: "go with the real fold". The model reports these
+      # pairs in contact or under the margin at the hand-placed measured fold
+      # (calibration_data/poses_2026-10-25.jsonl, label folded_transit, pan
+      # recomputed from ticks with the landmark zero): the elbow folds about
+      # 6 deg past where the model's lower arm meets its shoulder, and the left
+      # upper/lower arm overlaps the right wrist/gripper by about 9-10 mm. The
+      # real robot sits there, so the model is wrong there. Accepted ONLY while
+      # each arm involved is within the radius (per joint, pan..wrist_flex) of
+      # its measured fold; everywhere else these pairs are checked normally.
+      fold_allowance_pairs:
+        - [baseforreal, left_wrist]
+        - [left_lower_arm, left_shoulder]
+        - [left_lower_arm, right_gripper]
+        - [left_lower_arm, right_wrist]
+        - [left_shoulder, left_wrist]
+        - [left_upper_arm, left_wrist]
+        - [left_upper_arm, right_gripper]
+        - [left_upper_arm, right_wrist]
+        - [right_lower_arm, right_shoulder]
+        - [right_shoulder, right_wrist]
+        - [right_upper_arm, right_wrist]
+      fold_allowance_centre_left_rad: [0.0576, -1.3823, 1.6877, -1.3055, 1.2828]
+      fold_allowance_centre_right_rad: [-0.0035, -1.2828, 1.6790, -1.3195, 1.4434]
+      fold_allowance_radius_rad: 0.05
     # Keep-out capsules in the chassis fixed frame (metres).
     # ALL VALUES ARE UNVERIFIED CONSERVATIVE PLACEHOLDERS.
     keep_out_capsules:

@@ -653,6 +653,44 @@ class NamedPose(_Strict):
         return self
 
 
+class MeshCollisionConfig(_Strict):
+    """AA40 mesh collision model on the owner cell URDF (python-fcl).
+
+    Paths are relative to the repository root. ``margin_m`` is the minimum
+    allowed separation between checked link meshes. Wrist roll mapping into
+    the cell URDF: q_cell = sign * q + offset (pan/lift/elbow/wrist_flex map
+    1:1, verified against the vendored chain). ``unverified: true`` blocks
+    LIVE motion (dry-run still checks) until the owner has compared renders
+    against the real robot (AA40 #6).
+    """
+
+    enabled: bool = True
+    urdf_path: str = "CAD/robot_urdf_new/three_arm_cell.urdf"
+    srdf_path: Optional[str] = "CAD/robot_urdf_new/config/three_arm_cell.srdf"
+    margin_m: float = Field(default=0.005, ge=0.0)
+    wrist_roll_cell_sign: Literal[1, -1] = 1
+    wrist_roll_cell_offset_rad: float = -2.216568
+    unverified: bool = True
+    # Owner 2026-10-27 "go with the real fold": pairs the model reports in
+    # contact at the measured fold, accepted only within fold_allowance_radius_rad
+    # (per joint) of each arm's measured fold pose.
+    fold_allowance_pairs: List[List[str]] = Field(default_factory=list)
+    fold_allowance_centre_left_rad: Optional[List[float]] = None
+    fold_allowance_centre_right_rad: Optional[List[float]] = None
+    fold_allowance_radius_rad: float = Field(default=0.0, ge=0.0, le=0.2)
+
+    @model_validator(mode="after")
+    def _fold_allowance(self) -> "MeshCollisionConfig":
+        for pr in self.fold_allowance_pairs:
+            if len(pr) != 2:
+                raise ValueError(f"fold_allowance_pairs entries must be [link, link], got {pr}")
+        if self.fold_allowance_pairs:
+            for c in (self.fold_allowance_centre_left_rad, self.fold_allowance_centre_right_rad):
+                if c is None or len(c) != 5:
+                    raise ValueError("fold allowance needs 5-value centre poses for both arms")
+        return self
+
+
 class CollisionConfig(_Strict):
     """Collision model configuration for the AA-9 motion guard.
 
@@ -673,6 +711,8 @@ class CollisionConfig(_Strict):
     keep_out_boxes: List[KeepOutBox] = Field(default_factory=list)
     # Keep-out capsules in the chassis fixed frame.
     keep_out_capsules: List[KeepOutCapsule] = Field(default_factory=list)
+    # AA40 mesh collision (owner cell URDF). None = not configured.
+    mesh: Optional[MeshCollisionConfig] = None
 
 
 class JointServoCalibration(_Strict):

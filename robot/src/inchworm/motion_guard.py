@@ -552,6 +552,173 @@ def _rotz_for_guard(theta: float) -> npt.NDArray[np.float64]:
 
 
 # ---------------------------------------------------------------------------
+# AA40 mesh collision layer
+# ---------------------------------------------------------------------------
+
+
+class MeshCollisionGuard:
+    """Part-shape collision check for one arm on the owner cell URDF.
+
+    Wraps :class:`inchworm.system_model.collision.CellCollisionChecker`.
+    Additive to the keep-out primitives (they stay). Fails closed: a model
+    that cannot be loaded, an unknown pose of the OTHER arm, or any
+    evaluation error is a violation.
+
+    The other arm's pose comes from ``other_arm_pose_source`` (a callable
+    returning its 5-vector, rad). The tube comes from ``tube_source``
+    (returns the tube advance in metres along its axis from the cell-URDF
+    placement, or None for "no tube in the cell"). In LIVE mode a missing ``tube_source`` is a
+    violation: "no tube" must be stated explicitly, never assumed.
+    """
+
+    def __init__(
+        self,
+        arm_role: str,
+        mesh_cfg: object,
+        checker: Optional[object] = None,
+        load_error: Optional[str] = None,
+        other_arm_pose_source: Optional[Callable[[], JointVec]] = None,
+        tube_source: Optional[Callable[[], object]] = None,
+        dexarm_pose_source: Optional[Callable[[], dict]] = None,
+        interpolation_samples: int = 50,
+    ) -> None:
+        self.arm_role = arm_role
+        self.cfg = mesh_cfg
+        self.checker = checker
+        self.load_error = load_error
+        self.other_arm_pose_source = other_arm_pose_source
+        self.tube_source = tube_source
+        self.dexarm_pose_source = dexarm_pose_source
+        self.interpolation_samples = int(interpolation_samples)
+
+    def missing_inputs(self, live: bool) -> List[str]:
+        """Cell-state inputs that are not wired. Live needs all three."""
+        missing = []
+        if self.other_arm_pose_source is None:
+            missing.append("other arm pose")
+        if live and self.tube_source is None:
+            missing.append("tube state")
+        if live and self.dexarm_pose_source is None:
+            missing.append("DexArm pose")
+        return missing
+
+    def _state(self, q: JointVec, live: bool):
+        from inchworm.system_model.collision import CellState
+        missing = self.missing_inputs(live)
+        if missing:
+            raise RuntimeError("cell state incomplete: " + ", ".join(missing) + " not given")
+        other = np.asarray(self.other_arm_pose_source(), dtype=np.float64)
+        tube = self.tube_source() if self.tube_source is not None else None
+        if tube is not None:
+            tube = float(tube)
+        dex = dict(self.dexarm_pose_source()) if self.dexarm_pose_source is not None else {}
+        q = np.asarray(q, dtype=np.float64)
+        if self.arm_role == "left":
+            return CellState(left_q=q, right_q=other, dexarm_q=dex, tube_advance_m=tube)
+        return CellState(left_q=other, right_q=q, dexarm_q=dex, tube_advance_m=tube)
+
+    def _check_state(self, q: JointVec, live: bool) -> Optional[str]:
+        if self.checker is None:
+            return f"mesh collision model unavailable: {self.load_error}"
+        if not live and self.missing_inputs(live):
+            # Dry-run only (same convention as the GuardedArm present-pose
+            # fallback): without the other arm's pose there is no cell state
+            # to check. Live never takes this branch; it fails closed below.
+            if not getattr(self, "_warned_skip", False):
+                logger.warning(
+                    "AA40 mesh collision [%s]: DRY-RUN check skipped, %s not given. "
+                    "LIVE motion refuses in this state.",
+                    self.arm_role, ", ".join(self.missing_inputs(live)),
+                )
+                self._warned_skip = True
+            return None
+        try:
+            contacts = self.checker.check(self._state(q, live), arm=self.arm_role)
+        except Exception as exc:  # noqa: BLE001 - fail closed on any model error
+            return f"mesh collision check failed (fail closed): {exc}"
+        if contacts:
+            return f"mesh collision ({self.arm_role}): {contacts[0]}"
+        return None
+
+    def check_pose(self, q: JointVec, live: bool = False) -> Optional[str]:
+        if live and getattr(self.cfg, "unverified", True):
+            raise LiveMotionBlockedError(
+                "mesh collision model is unverified (owner render comparison, AA40 #6)"
+            )
+        return self._check_state(q, live)
+
+    def check_trajectory(self, q_start: JointVec, q_end: JointVec, live: bool = False) -> Optional[str]:
+        if live and getattr(self.cfg, "unverified", True):
+            raise LiveMotionBlockedError(
+                "mesh collision model is unverified (owner render comparison, AA40 #6)"
+            )
+        n = max(2, self.interpolation_samples)
+        qs, qe = np.asarray(q_start, dtype=np.float64), np.asarray(q_end, dtype=np.float64)
+        for i in range(n):
+            t = i / (n - 1)
+            v = self._check_state((1 - t) * qs + t * qe, live)
+            if v is not None:
+                return f"trajectory sample {i}/{n-1} (t={t:.3f}): {v}"
+        return None
+
+
+def build_mesh_collision_guard(
+    cfg: HardwareConfig,
+    arm_role: str,
+    other_arm_pose_source: Optional[Callable[[], JointVec]] = None,
+    tube_source: Optional[Callable[[], object]] = None,
+    dexarm_pose_source: Optional[Callable[[], dict]] = None,
+) -> Optional[MeshCollisionGuard]:
+    """Mesh guard from config, or None when ``motion_guard.collision.mesh`` is absent/disabled.
+
+    A configured model that fails to load does NOT return None: it returns a
+    guard that reports every pose as a violation (fail closed).
+    """
+    from pathlib import Path
+    guard_cfg = cfg.motion_guard
+    mesh_cfg = guard_cfg.collision.mesh if guard_cfg is not None else None
+    if mesh_cfg is None or not mesh_cfg.enabled:
+        return None
+    checker = None
+    err = None
+    try:
+        from inchworm.system_model.collision import (
+            REPO_ROOT, JointMapping, get_cell_checker,
+        )
+        urdf = Path(mesh_cfg.urdf_path)
+        urdf = urdf if urdf.is_absolute() else REPO_ROOT / urdf
+        srdf = None
+        if mesh_cfg.srdf_path is not None:
+            srdf = Path(mesh_cfg.srdf_path)
+            srdf = srdf if srdf.is_absolute() else REPO_ROOT / srdf
+        mapping = JointMapping(
+            sign=(1, 1, 1, 1, mesh_cfg.wrist_roll_cell_sign),
+            offset_rad=(0.0, 0.0, 0.0, 0.0, mesh_cfg.wrist_roll_cell_offset_rad),
+        )
+        from inchworm.system_model.collision import PoseScopedAllowance
+        allowances = []
+        if mesh_cfg.fold_allowance_pairs:
+            allowances.append(PoseScopedAllowance(
+                label="measured_fold (owner 2026-10-27: go with the real fold)",
+                pairs=frozenset(frozenset(p) for p in mesh_cfg.fold_allowance_pairs),
+                centre_rad={"left": mesh_cfg.fold_allowance_centre_left_rad,
+                            "right": mesh_cfg.fold_allowance_centre_right_rad},
+                radius_rad=mesh_cfg.fold_allowance_radius_rad,
+            ))
+        checker = get_cell_checker(urdf, srdf, margin_m=mesh_cfg.margin_m,
+                                   joint_mapping=mapping, allowances=allowances)
+    except Exception as exc:  # noqa: BLE001 - fail closed
+        err = f"{type(exc).__name__}: {exc}"
+        logger.error("AA40 mesh collision model failed to load: %s", err)
+    return MeshCollisionGuard(
+        arm_role=arm_role, mesh_cfg=mesh_cfg, checker=checker, load_error=err,
+        other_arm_pose_source=other_arm_pose_source, tube_source=tube_source,
+        dexarm_pose_source=dexarm_pose_source,
+        interpolation_samples=guard_cfg.collision.interpolation_samples,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Combined motion guard
 # ---------------------------------------------------------------------------
 
@@ -577,6 +744,8 @@ class MotionGuard:
     limit_guard: JointLimitGuard
     collision_model: CollisionModel
     arm_role: str
+    #: AA40 mesh collision layer (owner cell URDF). None = not configured.
+    mesh: Optional["MeshCollisionGuard"] = None
 
     def check_pose(
         self,
@@ -608,7 +777,16 @@ class MotionGuard:
         violation = self.limit_guard.check(q, live=live)
         if violation is not None:
             return violation
-        return self.collision_model.check_pose(q)
+        violation = self.collision_model.check_pose(q)
+        if violation is not None:
+            return violation
+        if self.mesh is not None:
+            return self.mesh.check_pose(q, live=live)
+        if live:
+            raise LiveMotionBlockedError(
+                "mesh collision model not configured (motion_guard.collision.mesh)"
+            )
+        return None
 
     def check_trajectory(
         self,
@@ -652,7 +830,16 @@ class MotionGuard:
             return f"q_end: {v}"
 
         # Dense trajectory collision check (samples endpoints + interior)
-        return self.collision_model.check_trajectory(q_start, q_end)
+        v = self.collision_model.check_trajectory(q_start, q_end)
+        if v is not None:
+            return v
+        if self.mesh is not None:
+            return self.mesh.check_trajectory(q_start, q_end, live=live)
+        if live:
+            raise LiveMotionBlockedError(
+                "mesh collision model not configured (motion_guard.collision.mesh)"
+            )
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -1121,6 +1308,9 @@ def build_collision_model(
 def build_motion_guard(
     cfg: HardwareConfig,
     arm_role: str,
+    other_arm_pose_source: Optional[Callable[[], JointVec]] = None,
+    tube_source: Optional[Callable[[], object]] = None,
+    dexarm_pose_source: Optional[Callable[[], dict]] = None,
 ) -> MotionGuard:
     """Build a :class:`MotionGuard` for one arm from a loaded config.
 
@@ -1130,6 +1320,11 @@ def build_motion_guard(
         Loaded hardware config.
     arm_role:
         ``"left"`` or ``"right"``.
+    other_arm_pose_source, tube_source, dexarm_pose_source:
+        Inputs of the AA40 mesh collision layer (see
+        :class:`MeshCollisionGuard`). Without an other-arm pose source the
+        mesh layer reports every pose as a violation (fail closed); set it
+        later with ``guard.mesh.other_arm_pose_source = ...``.
     """
     limit_guard = build_joint_limit_guard(cfg, arm_role)
     collision_model = build_collision_model(cfg)
@@ -1137,6 +1332,12 @@ def build_motion_guard(
         limit_guard=limit_guard,
         collision_model=collision_model,
         arm_role=arm_role,
+        mesh=build_mesh_collision_guard(
+            cfg, arm_role,
+            other_arm_pose_source=other_arm_pose_source,
+            tube_source=tube_source,
+            dexarm_pose_source=dexarm_pose_source,
+        ),
     )
 
 

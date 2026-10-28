@@ -3,21 +3,21 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-27 21:25'
+updated_date: '2026-10-28 01:49'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-27 at commit `a2e03fe`. Full suite **1580 passed**.
+**Last verified:** 2026-10-27 (session 3), AA-40 stage 2 commit. Full suite **1617 passed**.
 
-**Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place (already the default; AA-10 #4 waits only for the supervised live test). (2) The tube advances to the right, AWAY from the DexArm: `cycle_runner.advance_physical: away_from_dexarm`; the live preflight checks the sign against AA-16 calibration (fail closed); `advance_direction_owner_confirmed` stays false until seen live. (3) Cura = Rotrics' official published settings (AA-34 Done; `robot/docs/cura_dexarm_profile.md`). (4) No tube fixture design: the owner props the tube simply (AA-23 #4 still needs the pose comparison). (5) Owner will help measure the gripper lock torque: human task **AA-41** proposed (awaiting `accept AA-41`), via `scripts/gripper_lock_probe.py`. (6) Keep the one-camera rule (AA-38 unchanged).
+**Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place. (2) The tube advances to the right, AWAY from the DexArm (`cycle_runner.advance_physical: away_from_dexarm`; live preflight checks the sign against AA-16 calibration). (3) Cura = Rotrics' official settings (AA-34 Done). (4) No tube fixture design. (5) Gripper lock torque via human task **AA-41** (`scripts/gripper_lock_probe.py`; in progress with the owner). (6) Keep the one-camera rule. Session 3: (7) the owner cell URDF `CAD/robot_urdf_new/` is THE robot model (arms, grippers, camera mounts, DexArm + laser camera, base mount, tube); adding limits is fine, nothing else to rebuild. (8) The table is NOT a collision object. (9) "Go with the real fold": model contacts at the measured fold are model error, accepted only near that pose. (10) Wrist roll: our 0 = cell URDF -127 deg. (11) Tube = sections with one attachment point each (3 now, +1 per printed section).
 
-**Current focus: AA-40 stage 2** (python-fcl mesh collision in motion_guard, fail closed). WAITING for the owner's simplified gripper STL; owner instruction 2026-10-27: the orchestrator does stage 2 itself, NOT via sub-agents (two workers stalled exploring). Known stage-1 bugs to fix first: DexArm FK (joint origins skipped, links 130-300 mm off), tube 81 mm instead of 185.7 mm, duplicate bases in bases.stl, stale pan q in poses jsonl (see AA-40 notes). Live arm motion stays blocked until it lands and the owner compares renders (AA-40 #6).
-- Done in AA-40: owner STL exports and fits (bases 0.03 mm RMS, wrists 0.05 mm, DexArm community URDF; 71.1 mm check 0.28 mm off); stage 1 model + `scripts/view_pose.py`; python-fcl dependency; wrist_gripper fix (the 32.8 cm3 lock body was mis-pinned to wrist_link, now exactly one wrist body).
-- Then: owner compares rendered rest/fold vs the real robot (AA-40 #6) and confirms the lock body/key in the render; AA-41 gripper probe; first supervised powered jog.
-- Gripper: lock() now waits for the servo to settle before verifying (false-MISS finding fixed); live lock still refused until `lock_torque_limit_raw` and the verification thresholds come from AA-41 data.
-- Session 2 facts still valid: joint servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured folded_transit and pan-zero poses in `robot/calibration_data/poses_2026-10-25.jsonl`.
+**Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
+- Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
+- Why stage 2 took three tries: two sub-agents explored without writing; the third orchestrator attempt crashed on an API error (a tool call without a result). Lesson: do model work directly, in small committed slices.
+- Gripper: lock() waits for settle; live lock refused until AA-41 gives `lock_torque_limit_raw` and thresholds.
+- Session 2 facts still valid: servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured poses in `robot/calibration_data/poses_2026-10-25.jsonl` (the stored pan q is stale; recompute from ticks, as view_pose.py does).
 
 ## 1. Resume in 60 seconds
 
@@ -119,7 +119,7 @@ Order matters: each step unblocks the next. All scripts are in `robot/scripts/`,
 
 None open as of 2026-10-27 (all six were answered; see the top of this doc). Still owed from the owner at the hardware: accept and run AA-41; the AA-40 #6 render comparison; confirm the installed nozzle is the stock 0.4 mm and the filament 1.75 mm PLA (AA-34 doc §10).
 
-Software follow-ups: AA-40 stage 2 (orchestrator, after the owner's gripper STL). Hold the AA-40 #6 render comparison until the DexArm FK fix (current renders misplace the DexArm).
+Software follow-ups: wire cell-state sources into callers; re-derive the fold waypoints from the measured fold. AA-40 #6 render comparison is ready (the old DexArm misplacement is gone: the cell URDF is used directly).
 
 ## 5. Decisions already made (do not silently revisit)
 

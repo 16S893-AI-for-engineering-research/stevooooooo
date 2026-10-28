@@ -48,6 +48,15 @@ from inchworm.config import load_config, HardwareConfig
 _BASE_CFG = load_config()
 
 
+def _wire_mesh_inputs(ga) -> None:
+    """Give the AA-40 mesh layer explicit cell-state inputs (test stand-in for live wiring)."""
+    mesh = ga.guard.mesh
+    assert mesh is not None, "mesh collision layer must be configured"
+    mesh.other_arm_pose_source = lambda: np.array([1.5, 0.0, 0.0, 0.0, 0.0])
+    mesh.tube_source = lambda: None
+    mesh.dexarm_pose_source = lambda: {"bases": 1.2}
+
+
 def _make_verified_config(tmp_path: Path) -> HardwareConfig:
     """Return a HardwareConfig whose motion_guard is fully verified.
 
@@ -90,6 +99,10 @@ def _make_verified_config(tmp_path: Path) -> HardwareConfig:
         "measured_date": "2026-01-01",
     }
     data["motion_guard"]["left_arm_limits"] = wide
+    # AA-40 mesh layer: synthetic "verified" so the live path is reachable;
+    # the spies below wire its cell-state inputs (other arm folded away, no
+    # tube, DexArm at its zero), as a fully wired system would.
+    data["motion_guard"]["collision"]["mesh"]["unverified"] = False
 
     # Patch servo calibration — zero_offset=180, sign=+1 for all joints
     calib = {
@@ -229,6 +242,7 @@ class TestLiveVerifiedWiresGuardedArm:
             ga = original_build(bus, cfg, arm_role, live=live, **kw)
             # Inject present_pose_source so bus reads aren't needed.
             ga._present_pose_source = lambda: np.zeros(5, dtype=np.float64)
+            _wire_mesh_inputs(ga)
             original_write = ga.write_positions_rad
 
             def spy_write(q, bypass_guard=False):
@@ -285,6 +299,7 @@ class TestLiveVerifiedWiresGuardedArm:
         def capturing_build(bus, cfg, arm_role, live=False, **kw):
             ga = original_build(bus, cfg, arm_role, live=live, **kw)
             ga._present_pose_source = lambda: np.zeros(5, dtype=np.float64)
+            _wire_mesh_inputs(ga)
             guarded_arm_instances.append(ga)
             return ga
 

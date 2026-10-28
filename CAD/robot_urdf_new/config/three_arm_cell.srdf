@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!-- Collision pairs MoveIt should ignore. Merge these lines into your MoveIt
+     configuration's SRDF. Every other pair is still checked. -->
+<robot name="three_arm_cell">
+  <!-- Always in contact: both SO-101 bases rest on the base mount. -->
+  <disable_collisions link1="baseforreal" link2="left_base" reason="Always"/>
+  <disable_collisions link1="baseforreal" link2="right_base" reason="Always"/>
+  <!-- Allowed contact: the SO-101 grippers reach inside the tube. -->
+  <disable_collisions link1="tube_1" link2="left_gripper" reason="User"/>
+  <disable_collisions link1="tube_1" link2="right_gripper" reason="User"/>
+</robot>

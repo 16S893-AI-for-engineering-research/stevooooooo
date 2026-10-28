@@ -1,32 +1,26 @@
 #!/usr/bin/env python3
 """
-view_pose.py
-============
-Pose viewer for the inchworm robot.  Uses the calibrated system model to
-render both arms at specified joint configurations.
+view_pose.py: render the cell (owner URDF CAD/robot_urdf_new) at any arm poses.
 
-Usage
------
-# Render preset PNGs (fold, zero, cad_check, measured_fold):
-    uv run --extra model python robot/scripts/view_pose.py --png-dir robot/out/system_model
+AA-40 pose viewer. No hardware, no serial, no cameras. Renders the collision
+meshes the motion guard checks, so what you see is what is checked. Parts in
+contact (or within the guard margin) are drawn RED and listed.
 
-# Render a single pose to PNG:
-    uv run --extra model python robot/scripts/view_pose.py \\
-        --q-left 0 -1.25 1.64 -1.31 1.36 \\
-        --q-right 0 -1.25 1.64 -1.31 1.36 \\
-        --png robot/out/system_model/my_pose.png
+Examples (run from robot/):
+    # presets: measured fold, pan-zero reading, working pose -> PNGs
+    uv run python scripts/view_pose.py --presets --out out/poses
 
-# Load a pose from the log and render:
-    uv run --extra model python robot/scripts/view_pose.py \\
-        --pose-log robot/calibration_data/poses_2026-10-25.jsonl \\
-        --label folded_transit \\
-        --png robot/out/system_model/measured_fold.png
+    # one pose (rad, shoulder_pan..wrist_roll)
+    uv run python scripts/view_pose.py --q-left 0 -1.4 1.4 -1.4 0 --q-right 0 -1.4 1.4 -1.4 0 --png out/p.png
 
-# Interactive meshcat viewer (browser opens at localhost:7000):
-    uv run --extra model python robot/scripts/view_pose.py --meshcat
+    # a logged pose (poses jsonl label; joints recomputed from servo ticks)
+    uv run python scripts/view_pose.py --pose-log calibration_data/poses_2026-10-25.jsonl --label folded_transit --png out/fold.png
 
-Requires: uv sync --extra model
-No hardware access; no serial; no cameras.
+    # a planned trajectory: JSONL with {"left": [5], "right": [5]} per line
+    uv run python scripts/view_pose.py --trajectory plan.jsonl --out out/traj --every 5
+
+    # tube in the cell: advance in attachment pitches (0 = CAD placement)
+    ... --tube-pitches 1
 """
 from __future__ import annotations
 
@@ -35,516 +29,181 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-# Make package importable when run directly
-_REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(_REPO / "robot" / "src"))
+_ROBOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_ROBOT / "src"))
 
-# ---------------------------------------------------------------------------
-# Colour palette
-# ---------------------------------------------------------------------------
+JOINTS = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll")
 
-_COLOURS: Dict[str, List[int]] = {
-    "arm_left":       [51,  153, 255, 230],  # blue
-    "arm_right":      [255, 102,  51, 230],  # orange
-    "static":         [160, 160, 160, 180],  # grey  (bases)
-    "dexarm":         [77,  204,  77, 180],  # green
-    "tube":           [230, 230,  51, 255],  # yellow
-    "custom_wrist":   [255, 200,  50, 220],  # gold
-    "export_raw":     [255,  0x50,  0x50, 180],  # red (raw exports for comparison)
-    "cad_check_arm":  [ 50, 220, 220, 220],  # cyan (CAD-drawn arm)
-    "default":        [180, 180, 180, 120],
+_COLOUR = {
+    "left": (0.20, 0.60, 1.00),
+    "right": (1.00, 0.40, 0.20),
+    "dexarm": (0.30, 0.80, 0.30),
+    "static": (0.60, 0.60, 0.60),
+    "tube": (0.90, 0.85, 0.20),
+    "contact": (0.95, 0.05, 0.05),
 }
 
 
-def _rgba_for_name(name: str, override: Optional[List[int]] = None) -> List[int]:
-    if override:
-        return override
-    if "arm_left" in name:
-        return _COLOURS["arm_left"]
-    if "arm_right" in name:
-        return _COLOURS["arm_right"]
-    if name.startswith("static"):
-        return _COLOURS["static"]
-    if name.startswith("dexarm"):
-        return _COLOURS["dexarm"]
-    if name == "tube":
-        return _COLOURS["tube"]
-    if "custom_wrist" in name:
-        return _COLOURS["custom_wrist"]
-    if "export_raw" in name:
-        return _COLOURS["export_raw"]
-    if "cad_check" in name:
-        return _COLOURS["cad_check_arm"]
-    return _COLOURS["default"]
+def _group(link: str, driver: Dict[str, Optional[str]]) -> str:
+    from inchworm.system_model.collision import TUBE_LINK
+    if link == TUBE_LINK:
+        return "tube"
+    arm = driver.get(link)
+    if arm:
+        return arm
+    if link in ("baseforreal", "left_base", "right_base"):
+        return "static"
+    return "dexarm"
 
 
-# ---------------------------------------------------------------------------
-# Pose log helpers
-# ---------------------------------------------------------------------------
-
-def _load_pose_log(
-    log_path: Path,
-    label: str,
-    pan_override: Optional[float] = None,
-) -> Tuple[Optional[List[float]], Optional[List[float]]]:
-    """Load q_left and q_right for a given label from a JSON-lines pose log.
-
-    Skips SUPERSEDED records.  Returns the SECOND (non-superseded) reading.
-
-    Parameters
-    ----------
-    pan_override : if given, overrides shoulder_pan (index 0) in both arms.
-    """
-    with open(log_path) as f:
-        records = [json.loads(line) for line in f if line.strip()]
-
-    matching = [
-        r for r in records
-        if r.get("label") == label and "q_rad" in r
-    ]
-    # Group by arm
-    left_records  = [r for r in matching if r.get("arm") == "left"]
-    right_records = [r for r in matching if r.get("arm") == "right"]
-
-    q_left = left_records[0]["q_rad"]  if left_records  else None
-    q_right = right_records[0]["q_rad"] if right_records else None
-
-    if pan_override is not None:
-        if q_left  is not None:
-            q_left  = [pan_override] + q_left[1:]
-        if q_right is not None:
-            q_right = [pan_override] + q_right[1:]
-
-    return q_left, q_right
+def pose_from_log(path: Path, label: str, cfg) -> Tuple[np.ndarray, np.ndarray]:
+    """(left_q, right_q) for a pose-log label, recomputed from servo ticks with the current calibration."""
+    sc = cfg.motion_guard.servo_calibration
+    found: Dict[str, np.ndarray] = {}
+    for line in path.read_text().splitlines():
+        d = json.loads(line)
+        if d.get("label") != label:
+            continue
+        ticks = d.get("ticks") or d.get("all_ticks")
+        blk = sc.left_arm if d["arm"] == "left" else sc.right_arm
+        found[d["arm"]] = np.array([
+            math.radians(getattr(blk, f"{n}_sign") * (ticks[i] * 360.0 / 4096.0 - getattr(blk, f"{n}_zero_offset_deg")))
+            for i, n in enumerate(JOINTS)
+        ])
+    if set(found) != {"left", "right"}:
+        raise SystemExit(f"label {label!r}: need both arms in {path}, found {sorted(found)}")
+    return found["left"], found["right"]
 
 
-# ---------------------------------------------------------------------------
-# Renderer
-# ---------------------------------------------------------------------------
-
-def _build_trimesh_scene(
-    entries: List[Tuple[str, "trimesh.Trimesh"]],
-) -> "trimesh.Scene":
-    """Build a trimesh.Scene from (name, mesh) pairs.  Meshes are in metres."""
-    import trimesh
-
-    ts = trimesh.Scene()
-    for name, mesh in entries:
-        rgba = _rgba_for_name(name)
-        m = mesh.copy()
-        m.visual.face_colors = rgba
-        ts.add_geometry(m, geom_name=name)
-    return ts
+def guard_contacts(checker, state):
+    """Exactly what the motion guard checks: pairs involving a moving SO-101 link."""
+    seen, out = set(), []
+    for arm in ("left", "right"):
+        for c in checker.check(state, arm=arm, first_only=False):
+            k = frozenset((c.link_a, c.link_b))
+            if k not in seen:
+                seen.add(k)
+                out.append(c)
+    return out
 
 
-def _set_camera_side(ts: "trimesh.Scene", view: str = "oblique") -> None:
-    """Set camera viewpoint."""
-    import trimesh
-    # Compute scene bounding sphere for camera placement
-    try:
-        centre = ts.centroid
-        radius = float(np.linalg.norm(ts.extents)) * 0.6
-    except Exception:
-        centre = np.array([0.0, 0.3, 0.2])
-        radius = 0.5
+def render(checker, state, out_png: Path, title: str = "", max_faces: int = 2500) -> List[str]:
+    """Render two views (side from -X, oblique) to out_png. Returns contact strings."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-    if view == "side":
-        # Looking along chassis X (camera at negative X, looking toward +X)
-        eye = centre + np.array([-radius * 2, 0, 0])
-        up  = np.array([0, 0, 1])
-    elif view == "top":
-        eye = centre + np.array([0, 0, radius * 2])
-        up  = np.array([0, 1, 0])
-    elif view == "oblique":
-        # Oblique: slightly from above and to the side
-        eye = centre + np.array([-radius * 1.2, -radius * 0.8, radius * 0.9])
-        up  = np.array([0, 0, 1])
-    elif view == "front":
-        # Looking along chassis Y
-        eye = centre + np.array([0, -radius * 2, 0])
-        up  = np.array([0, 0, 1])
-    else:
-        return
+    contacts = guard_contacts(checker, state)
+    hit = {c.link_a for c in contacts} | {c.link_b for c in contacts}
+    meshes = checker.world_meshes(state)
+    rng = np.random.default_rng(0)
+    allv = np.vstack([m.vertices for _, m in meshes])
+    lo, hi = allv.min(0), allv.max(0)
+    centre, half = (lo + hi) / 2, (hi - lo).max() / 2
 
-    try:
-        from trimesh.transformations import look_at
-        T = look_at(eye, centre, up)
-        ts.camera_transform = T
-    except Exception:
-        # Fallback: set camera angles (trimesh < 4.3)
-        try:
-            ts.set_camera(
-                angles=[1.05, 0.0, 0.4 if view == "oblique" else 0.0],
-                distance=radius * 3,
-                center=centre,
-            )
-        except Exception:
-            pass
-
-
-def _render_views(
-    entries: List[Tuple[str, "trimesh.Trimesh"]],
-    out_png: Path,
-    views: List[str] = ("side", "oblique"),
-    resolution: Tuple[int, int] = (960, 540),
-) -> bool:
-    """Render multiple views tiled into a single PNG.
-
-    Returns True on success.
-    """
-    import trimesh
-    import numpy as np
-
-    tiles = []
-    for view in views:
-        ts = _build_trimesh_scene(entries)
-        _set_camera_side(ts, view)
-        try:
-            img_bytes = ts.save_image(resolution=resolution, visible=False)
-        except Exception:
-            try:
-                # Trimesh >= 4.x API
-                img_bytes = ts.save_image(resolution=list(resolution), visible=False)
-            except Exception as exc:
-                print(f"  Warning: render failed for view {view}: {exc}")
-                img_bytes = None
-        if img_bytes is not None:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(img_bytes))
-            tiles.append(np.array(img))
-
-    if not tiles:
-        return _render_matplotlib_fallback(entries, out_png)
-
-    # Tile horizontally
-    from PIL import Image
-    if len(tiles) == 1:
-        combined = Image.fromarray(tiles[0])
-    else:
-        total_w = sum(t.shape[1] for t in tiles)
-        max_h = max(t.shape[0] for t in tiles)
-        canvas = np.zeros((max_h, total_w, 4), dtype=np.uint8)
-        x = 0
-        for t in tiles:
-            h, w = t.shape[:2]
-            if t.shape[2] == 3:
-                t_rgba = np.concatenate([t, np.full((h, w, 1), 255, np.uint8)], axis=2)
-            else:
-                t_rgba = t
-            canvas[:h, x:x+w] = t_rgba
-            x += w
-        combined = Image.fromarray(canvas)
-
+    fig = plt.figure(figsize=(16, 8))
+    for k, (elev, azim, name) in enumerate([(5, 180, "side (from -X)"), (25, 225, "oblique")]):
+        ax = fig.add_subplot(1, 2, k + 1, projection="3d")
+        for link, m in meshes:
+            g = _group(link, checker._driver)
+            col = _COLOUR["contact"] if link in hit else _COLOUR[g]
+            f = m.faces
+            if len(f) > max_faces:
+                f = f[rng.choice(len(f), max_faces, replace=False)]
+            pc = Poly3DCollection(m.vertices[f], linewidth=0, alpha=0.9 if link in hit else 0.55)
+            pc.set_facecolor(col)
+            ax.add_collection3d(pc)
+        for i, setlim in enumerate((ax.set_xlim, ax.set_ylim, ax.set_zlim)):
+            setlim(centre[i] - half, centre[i] + half)
+        ax.set_box_aspect((1, 1, 1))
+        ax.view_init(elev=elev, azim=azim)
+        ax.set_xlabel("X"); ax.set_ylabel("Y (DexArm at -Y)"); ax.set_zlabel("Z")
+        ax.set_title(name)
+    txt = title + ("\nCONTACTS: " + "; ".join(str(c) for c in contacts[:6]) if contacts else "\nno contacts")
+    fig.suptitle(txt, fontsize=10)
     out_png.parent.mkdir(parents=True, exist_ok=True)
-    combined.save(str(out_png))
-    print(f"  Saved: {out_png}")
-    return True
+    fig.savefig(out_png, dpi=90)
+    plt.close(fig)
+    return [str(c) for c in contacts]
 
 
-def _render_matplotlib_fallback(
-    entries: List[Tuple[str, "trimesh.Trimesh"]],
-    out_png: Path,
-) -> bool:
-    """Fallback renderer using matplotlib Poly3DCollection."""
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
-        fig, axes = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"projection": "3d"})
-
-        for ax, (azim, elev) in zip(axes, [(0, 15), (45, 30)]):
-            for name, mesh in entries:
-                rgba_int = _rgba_for_name(name)
-                fc = [c / 255.0 for c in rgba_int[:3]] + [rgba_int[3] / 255.0]
-                # Downsample triangles for speed
-                verts = mesh.vertices
-                faces = mesh.faces
-                if len(faces) > 5000:
-                    idx = np.random.default_rng(0).choice(len(faces), 5000, replace=False)
-                    faces = faces[idx]
-                tris = verts[faces]
-                poly = Poly3DCollection(tris, alpha=fc[3] * 0.8, linewidth=0)
-                poly.set_facecolor(fc[:3])
-                ax.add_collection3d(poly)
-            ax.set_xlabel("X (m)")
-            ax.set_ylabel("Y (m)")
-            ax.set_zlabel("Z (m)")
-            ax.view_init(elev=elev, azim=azim)
-            ax.set_aspect("equal", adjustable="box")
-            # Set axis limits from all meshes
-            all_v = np.vstack([m.vertices for _, m in entries if len(m.vertices) > 0])
-            margin = 0.05
-            ax.set_xlim(all_v[:, 0].min() - margin, all_v[:, 0].max() + margin)
-            ax.set_ylim(all_v[:, 1].min() - margin, all_v[:, 1].max() + margin)
-            ax.set_zlim(all_v[:, 2].min() - margin, all_v[:, 2].max() + margin)
-
-        plt.tight_layout()
-        out_png.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(str(out_png), dpi=120)
-        plt.close()
-        print(f"  Saved (matplotlib): {out_png}")
-        return True
-    except Exception as exc:
-        print(f"  Matplotlib fallback also failed: {exc}")
-        return False
+def _fmt(q: Sequence[float]) -> str:
+    return "[" + ", ".join(f"{math.degrees(v):.1f}" for v in q) + "] deg"
 
 
-# ---------------------------------------------------------------------------
-# Meshcat viewer
-# ---------------------------------------------------------------------------
+def main(argv: Optional[List[str]] = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--q-left", nargs=5, type=float)
+    p.add_argument("--q-right", nargs=5, type=float)
+    p.add_argument("--pose-log", type=Path)
+    p.add_argument("--label")
+    p.add_argument("--trajectory", type=Path, help="JSONL: one {left:[5], right:[5]} per line (rad)")
+    p.add_argument("--every", type=int, default=1, help="render every Nth trajectory sample")
+    p.add_argument("--presets", action="store_true")
+    p.add_argument("--tube-pitches", type=float, default=None, help="tube advance in attachment pitches (omit: no tube)")
+    p.add_argument("--dexarm", default=None, help='DexArm joints as JSON, e.g. \'{"bases": 1.2}\'')
+    p.add_argument("--png", type=Path)
+    p.add_argument("--out", type=Path, default=_ROBOT / "out" / "poses")
+    p.add_argument("--check-only", action="store_true", help="print contacts, no rendering")
+    args = p.parse_args(argv)
 
-def _launch_meshcat(
-    entries: List[Tuple[str, "trimesh.Trimesh"]],
-    port: int = 7000,
-) -> None:
-    """Launch a meshcat server and send all meshes."""
-    try:
-        import meshcat
-        import meshcat.geometry as mg
-        import meshcat.transformations as mt
-    except ImportError:
-        print("meshcat not installed; skipping browser viewer")
-        return
+    from inchworm.config import load_config
+    from inchworm.constants import ATTACHMENT_PITCH_MM
+    from inchworm.motion_guard import build_mesh_collision_guard
+    from inchworm.system_model.collision import CellState
 
-    vis = meshcat.Visualizer().open()
-    print(f"Meshcat URL: {vis.url()}")
+    cfg = load_config()
+    g = build_mesh_collision_guard(cfg, "left")
+    if g is None or g.checker is None:
+        print(f"mesh collision model unavailable: {g and g.load_error}", file=sys.stderr)
+        return 2
+    checker = g.checker
+    tube = None if args.tube_pitches is None else args.tube_pitches * float(ATTACHMENT_PITCH_MM) / 1000.0
+    dex = json.loads(args.dexarm) if args.dexarm else {}
 
-    for name, mesh in entries:
-        rgba_int = _rgba_for_name(name)
-        color = int(rgba_int[0]) << 16 | int(rgba_int[1]) << 8 | int(rgba_int[2])
-        opacity = rgba_int[3] / 255.0
-        mat = mg.MeshLambertMaterial(color=color, opacity=opacity, transparent=(opacity < 1.0))
-        path = name.replace("/", "_")
-        obj = mg.TriangularMeshGeometry(
-            vertices=mesh.vertices,
-            faces=mesh.faces,
-        )
-        vis[path].set_object(obj, mat)
-
-    print("Meshcat viewer running.  Press Ctrl+C to exit.")
-    try:
-        import time
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        pass
-
-
-# ---------------------------------------------------------------------------
-# Preset renders
-# ---------------------------------------------------------------------------
-
-def _run_presets(model: "SystemModel", out_dir: Path, verbose: bool = True) -> Dict[str, Path]:
-    """Render all preset PNGs into out_dir.
-
-    Returns dict of {label: path}.
-    """
-    from inchworm.system_model.model import SystemModel
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    results: Dict[str, Path] = {}
-
-    # Canonical fold pose (task spec)
-    Q_FOLD = [0.0, -1.25, 1.64, -1.31, 1.36]
-    # Zero pose
-    Q_ZERO = [0.0, 0.0, 0.0, 0.0, 0.0]
-    # CAD-drawn fold (from wrist part analysis)
-    Q_CAD = [-0.0506, -1.578, 1.574, -1.561, 0.0]
-
-    # ------------------------------------------------------------------
-    # 1. fold.png
-    # ------------------------------------------------------------------
-    print("Rendering fold.png ...")
-    sc = model.scene(Q_FOLD, Q_FOLD)
-    p = out_dir / "fold.png"
-    _render_views(sc, p)
-    results["fold"] = p
-
-    # ------------------------------------------------------------------
-    # 2. measured_fold.png  (pose log, label=folded_transit, 2nd reading, pan=0)
-    # ------------------------------------------------------------------
-    print("Rendering measured_fold.png ...")
-    pose_log = _REPO / "robot" / "calibration_data" / "poses_2026-10-25.jsonl"
-    if pose_log.exists():
-        q_left_m, q_right_m = _load_pose_log(pose_log, "folded_transit", pan_override=0.0)
-        if q_left_m and q_right_m:
-            sc = model.scene(q_left_m, q_right_m)
-            p = out_dir / "measured_fold.png"
-            _render_views(sc, p)
-            results["measured_fold"] = p
-        else:
-            print("  Warning: folded_transit not found in pose log; skipping.")
-    else:
-        print(f"  Warning: pose log not found at {pose_log}; skipping measured_fold.")
-
-    # ------------------------------------------------------------------
-    # 3. zero.png
-    # ------------------------------------------------------------------
-    print("Rendering zero.png ...")
-    sc = model.scene(Q_ZERO, Q_ZERO)
-    p = out_dir / "zero.png"
-    _render_views(sc, p)
-    results["zero"] = p
-
-    # ------------------------------------------------------------------
-    # 4. cad_check.png – left arm at CAD fold in cyan, with export meshes in red
-    # ------------------------------------------------------------------
-    print("Rendering cad_check.png ...")
-    sc_cad = model.scene(Q_CAD, Q_ZERO, include_custom_wrist=False, include_raw_exports=False)
-    # Override colours: left arm gets cad_check colour
-    sc_cad_colored = [(f"cad_check/{n}", m) for n, m in sc_cad if n.startswith("arm_left")]
-    sc_right = [(n, m) for n, m in sc_cad if n.startswith("arm_right")]
-    sc_static = [(n, m) for n, m in sc_cad if n.startswith("static") or n.startswith("dexarm") or n == "tube"]
-
-    # Raw export meshes (red)
-    from inchworm.system_model.assets import load_raw_export
-    sc_exports: List[Tuple[str, "trimesh.Trimesh"]] = []
-    for fname in ["wrist_camera.stl", "wrist_gripper.stl"]:
-        stl = model._exports_dir / fname
-        if stl.exists():
-            min_v = 0.5e-6 if "gripper" in fname else 0.0
-            raw = load_raw_export(stl, min_vol_m3=min_v)
-            for name, m in raw.items():
-                sc_exports.append((f"export_raw/{fname}/{name}", m))
-
-    combined = sc_cad_colored + sc_right + sc_static + sc_exports
-    p = out_dir / "cad_check.png"
-    _render_views(combined, p)
-    results["cad_check"] = p
-
-    return results
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Inchworm robot pose viewer (no hardware access)"
-    )
-    parser.add_argument(
-        "--q-left", nargs=5, type=float, default=None, metavar="Q",
-        help="Left arm joint angles [rad] (shoulder_pan .. wrist_roll)"
-    )
-    parser.add_argument(
-        "--q-right", nargs=5, type=float, default=None, metavar="Q",
-        help="Right arm joint angles [rad]"
-    )
-    parser.add_argument(
-        "--pose-log", default=None,
-        help="JSON-lines pose log path"
-    )
-    parser.add_argument(
-        "--label", default=None,
-        help="Label to load from pose log (requires --pose-log)"
-    )
-    parser.add_argument(
-        "--pan-zero", action="store_true",
-        help="Force shoulder_pan = 0 in both arms"
-    )
-    parser.add_argument(
-        "--png", default=None,
-        help="Save PNG to this path (headless)"
-    )
-    parser.add_argument(
-        "--png-dir", default=None,
-        help="Render all preset PNGs to this directory"
-    )
-    parser.add_argument(
-        "--meshcat", action="store_true",
-        help="Launch interactive meshcat browser viewer"
-    )
-    parser.add_argument(
-        "--port", type=int, default=7000,
-        help="Meshcat port (default: 7000)"
-    )
-    return parser.parse_args()
-
-
-def main() -> None:
-    args = _parse_args()
-
-    # Check model extra
-    try:
-        import trimesh
-    except ImportError:
-        print(
-            "ERROR: model optional extra not installed.\n"
-            "Run: cd robot && uv sync --extra model"
-        )
-        sys.exit(1)
-
-    from inchworm.system_model.model import SystemModel
-    from inchworm.system_model.assets import load_raw_export
-
-    model = SystemModel()
-
-    # ------------------------------------------------------------------
-    # Preset mode
-    # ------------------------------------------------------------------
-    if args.png_dir:
-        out_dir = Path(args.png_dir)
-        results = _run_presets(model, out_dir)
-        print("\nPreset PNGs:")
-        for label, p in results.items():
-            print(f"  {label}: {p.resolve()}")
-
-        # Self-check
-        Q_CAD = [-0.0506, -1.578, 1.574, -1.561, 0.0]
-        if (model._exports_dir / "wrist_camera.stl").exists():
-            print("\nRunning self-check (wrist frame bookkeeping) ...")
-            check = model.self_check_wrist_frame(Q_CAD)
-            check_path = out_dir / "self_check.json"
-            import json as _json
-            with open(check_path, "w") as f:
-                _json.dump(check, f, indent=2)
-            print(f"  Self-check result saved to: {check_path.resolve()}")
-            status = "PASS" if check.get("max_dist_mm", 999) < 1.0 else "FAIL"
-            print(f"  RESULT: {status}  max={check.get('max_dist_mm', 'nan'):.3f} mm")
-        return
-
-    # ------------------------------------------------------------------
-    # Single pose mode
-    # ------------------------------------------------------------------
-    q_left = args.q_left or [0.0] * 5
-    q_right = args.q_right or [0.0] * 5
-
+    jobs: List[Tuple[str, np.ndarray, np.ndarray]] = []
+    if args.presets:
+        log = _ROBOT / "calibration_data" / "poses_2026-10-25.jsonl"
+        jobs.append(("measured_fold", *pose_from_log(log, "folded_transit", cfg)))
+        jobs.append(("pan_zero_reading", *pose_from_log(log, "pan_zero_pointing_at_dexarm", cfg)))
+        w = np.array([0.0, -1.5708, 1.5708, -1.5708, 0.0])
+        jobs.append(("owner_working_pose", w, w))
+        for np_ in cfg.motion_guard.named_poses:
+            q = np.array(np_.q_rad)
+            jobs.append((f"named_{np_.name}", q, q))
     if args.pose_log and args.label:
-        ql, qr = _load_pose_log(
-            Path(args.pose_log),
-            args.label,
-            pan_override=0.0 if args.pan_zero else None,
-        )
-        if ql:
-            q_left = ql
-        if qr:
-            q_right = qr
+        jobs.append((args.label, *pose_from_log(args.pose_log, args.label, cfg)))
+    if args.q_left is not None or args.q_right is not None:
+        jobs.append(("pose", np.array(args.q_left or [0.0] * 5), np.array(args.q_right or [0.0] * 5)))
+    if args.trajectory:
+        lines = [json.loads(l) for l in args.trajectory.read_text().splitlines() if l.strip()]
+        for i, d in enumerate(lines):
+            if i % max(1, args.every) == 0 or i == len(lines) - 1:
+                jobs.append((f"traj_{i:04d}", np.array(d["left"]), np.array(d["right"])))
+    if not jobs:
+        p.print_help()
+        print("\nnothing to show: give --presets, --q-left/--q-right, --pose-log+--label or --trajectory")
+        return 0
 
-    if args.pan_zero:
-        q_left[0] = 0.0
-        q_right[0] = 0.0
-
-    scene = model.scene(q_left, q_right)
-
-    if args.png:
-        p = Path(args.png)
-        _render_views(scene, p)
-
-    if args.meshcat:
-        _launch_meshcat(scene, args.port)
-
-    if not args.png and not args.meshcat:
-        print("No output requested.  Use --png PATH or --meshcat or --png-dir DIR.")
-        print("Dry-run OK: model loaded, scene built.")
+    worst = 0
+    for name, ql, qr in jobs:
+        st = CellState(ql, qr, dexarm_q=dex, tube_advance_m=tube)
+        title = f"{name}  L {_fmt(ql)}  R {_fmt(qr)}  tube={'none' if tube is None else f'{args.tube_pitches:g} pitch'}"
+        if args.check_only:
+            contacts = [str(c) for c in guard_contacts(checker, st)]
+        else:
+            out = args.png if (args.png and len(jobs) == 1) else args.out / f"{name}.png"
+            contacts = render(checker, st, out, title)
+            print(f"saved {out}")
+        print(f"{name}: L {_fmt(ql)} R {_fmt(qr)} -> {'; '.join(contacts) if contacts else 'no contacts'}")
+        worst = max(worst, len(contacts))
+    return 1 if worst else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

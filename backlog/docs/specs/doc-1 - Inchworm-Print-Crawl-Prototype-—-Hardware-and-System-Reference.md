@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-27 20:28'
+updated_date: '2026-10-28 01:48'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -21,6 +21,8 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - **Both SO-101 arms hold the tube at the start of every cycle and at all times while printing** (owner, 2026-10-24). Only during a regrip does one arm release while the other holds.
 - Arms have a restricted reachable envelope: the picture at `pictures/robot.png` shows the real built configuration and the folded pose. Arms cannot move anywhere in their nominal workspace; joint limits and self/chassis/tube collision envelopes must be derived and enforced in software.
 - Reference imagery and CAD: `pictures/robot.png`, `CAD/Assembly 1.step`, `assets/robot-assembly.glb`.
+- **Tube = printed sections, one attachment point each** (owner, 2026-10-27). The current tube has 3 sections (3 attachment points); every printed segment adds one section and one attachment point. Cell model: owner URDF `CAD/robot_urdf_new/three_arm_cell.urdf` (link `tube_1`, 552.4 mm = 3 x pitch; its URDF placement has the attachment points lined up with the grippers; the tube frame is NOT at an attachment point). The tube axis is about 1.1 deg off the cell +Y axis.
+- **Table is not a collision object** (owner, 2026-10-27): the arms never need to go near it. The SO-101s can physically reach it, so this is an operating rule, not geometry.
 
 ## 3. Arms
 
