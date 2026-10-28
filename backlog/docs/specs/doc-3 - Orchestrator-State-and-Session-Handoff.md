@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-28 03:23'
+updated_date: '2026-10-28 03:33'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -16,7 +16,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 **Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
 - Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
 - Why stage 2 took three tries: two sub-agents explored without writing; the third orchestrator attempt crashed on an API error (a tool call without a result). Lesson: do model work directly, in small committed slices.
-- **BLOCKER (AA-41, 2026-10-27):** servos 4-6 on both arms (firmware 3.10) had zeroed EEPROM drive config. Restored (owner-approved, torque off, backups in calibration_data/eeprom_*2026-10-27T23-01*). They now flag OVERCURRENT (status 0x08) permanently because their current reads a bogus ~1000 at rest (temperature reads 0), and the restored unloading condition (44) includes overcurrent. Reads of IDs 4-6 raise ServoStatusError; powered wrist/gripper motion would be unloaded. Owner decision pending (AA-41 notes: exclude overcurrent/overheat from unloading on 3.10, revert, or investigate).
+- **BLOCKER (AA-41, 2026-10-27):** servos 4-6 on both arms (firmware 3.10): zeroed drive config restored, then (owner decision a) overcurrent/overheat masked from unloading (33/35), all owner-approved, torque off, backups in calibration_data/eeprom_*2026-10-27T23-*. Their current reads a bogus ~1000 at rest. Still open: status 0x08 (overcurrent) persists on every reply, so the driver raises on reads of IDs 4-6. Next: owner power-cycles both arms, read-only check; if it persists, owner decides whether the driver may accept 0x08 on these servos. Then one supervised small move per servo, then AA-41 from step 1.
 - Session 2 facts still valid: servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured poses in `robot/calibration_data/poses_2026-10-25.jsonl` (the stored pan q is stale; recompute from ticks, as view_pose.py does).
 
 ## 1. Resume in 60 seconds

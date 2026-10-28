@@ -84,3 +84,19 @@ def test_plan_refuses_when_references_disagree_or_zeroed():
             b.mem[sid][a] = v
     with pytest.raises(SystemExit):
         rdc.plan(b.read)
+
+
+def test_fw310_mask_values_exclude_overcurrent_and_overheat():
+    m = rdc.FW310_MASK
+    assert m["unloading_condition"] == 33 and m["led_alarm_condition"] == 35
+    for v in m.values():
+        assert not v & 8 and not v & 4      # overcurrent, overheat masked
+        assert v & 1 and v & 32             # voltage, overload kept
+
+
+def test_fw310_mask_apply_only_touches_two_registers():
+    b = FakeBus()
+    bad = rdc.apply(b.read, b.write, {sid: dict(rdc.FW310_MASK) for sid in (4, 5, 6)}, settle_s=0)
+    assert bad == {}
+    assert {w[1] for w in b.writes} == {55, 19, 20}
+    assert b.mem[4][19] == 33 and b.mem[6][20] == 35 and b.mem[3][19] == 44

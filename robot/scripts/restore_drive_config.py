@@ -60,12 +60,60 @@ GRIPPER_CAPS: Dict[str, int] = {  # LeRobot so_follower.configure() gripper valu
     "p_coefficient": 16,
     "d_coefficient": 32,
 }
+# Owner decision (a) 2026-10-27: firmware-3.10 servos (IDs 4-6) report a bogus
+# present_current (~1000 at rest, torque off) and temperature (0 C), so with the
+# overcurrent bit in the unloading condition they flag OverEle permanently and
+# would unload. Mask overcurrent (8) and overheat (4); keep voltage (1),
+# overload (32) and, for the LED, angle sensor (2).
+FW310_MASK: Dict[str, int] = {
+    "unloading_condition": 1 | 32,          # 33
+    "led_alarm_condition": 1 | 2 | 32,      # 35
+}
 TARGET_IDS = (4, 5, 6)
 REFERENCE_IDS = (1, 2, 3)
 GRIPPER_ID = 6
 REG_TORQUE_ENABLE = 40
 REG_LOCK = 55
 DUMP_LEN = 71  # registers 0..70
+
+
+def tolerant_io(sbus, allowed_error_bits: int = 0x08):
+    """read/write that accept a status packet whose error byte has ONLY the allowed bits.
+
+    Needed because firmware-3.10 servos flag OverEle (0x08) on every reply.
+    Checksum, length and any other error bit still raise.
+    """
+    from inchworm.servo_bus import ServoStatusError
+
+    def _accept(fn):
+        def wrapped(*args):
+            try:
+                return fn(*args)
+            except ServoStatusError as exc:
+                if exc.error_byte & ~allowed_error_bits:
+                    raise
+                return None
+        return wrapped
+
+    from inchworm.servo_bus import _INST_READ, _build_request, _checksum
+
+    def read(sid: int, addr: int, n: int) -> bytes:
+        raw = sbus._transact(_build_request(sid, _INST_READ, bytes([addr, n])), sid, f"read {addr}")
+        i = raw.find(b"\xff\xff")
+        pkt = raw[i:]
+        if len(pkt) < 6 or pkt[2] != sid:
+            raise RuntimeError(f"servo {sid}: bad reply {raw!r}")
+        ln, err = pkt[3], pkt[4]
+        payload, chk = pkt[5:4 + ln - 1], pkt[4 + ln - 1]
+        if chk != _checksum(sid, ln, 0x00, bytes([err]) + payload):
+            raise RuntimeError(f"servo {sid}: checksum mismatch")
+        if err & ~allowed_error_bits:
+            raise RuntimeError(f"servo {sid}: status error 0x{err:02X}")
+        if len(payload) < n:
+            raise RuntimeError(f"servo {sid}: short read")
+        return payload[:n]
+
+    return read, _accept(sbus.write_bytes)
 
 
 def _get(read: ReadFn, sid: int, addr: int, n: int) -> int:
@@ -130,8 +178,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--arm", choices=("left", "right"), required=True)
     ap.add_argument("--live", action="store_true")
+    ap.add_argument("--fw310-mask", action="store_true",
+                    help=f"only set {FW310_MASK} on IDs 4-6 (owner decision (a), 2026-10-27)")
     ap.add_argument("--backup-dir", type=Path, default=Path(__file__).resolve().parents[1] / "calibration_data")
     a = ap.parse_args(argv)
+    if not a.live and a.fw310_mask:
+        print(f"DRY-RUN (default): would back up all 6 servos of arm_{a.arm} and set {FW310_MASK} "
+              "on IDs 4-6 only. Add --live (torque must be off; nothing moves).")
+        return 0
     if not a.live:
         print(f"DRY-RUN (default): would back up all 6 servos of arm_{a.arm}, copy the drive registers "
               f"of ID 3 to IDs 4-5, and the same plus gripper caps {GRIPPER_CAPS} to ID 6. "
@@ -151,15 +205,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"REFUSED: expected servo IDs 1-6 in joint order, got {jm}"); return 4
     t = live_backend(cfg).open_serial(role)
     bus = ArmServoBus(t, role=role, joint_id_map=jm)
-    rd, wr = bus._bus.read_bytes, bus._bus.write_bytes
+    rd, wr = tolerant_io(bus._bus)  # tolerate OverEle (0x08) only
     try:
         on = [sid for sid in range(1, 7) if _get(rd, sid, REG_TORQUE_ENABLE, 1) != 0]
         if on:
             print(f"REFUSED: torque is ON for servo(s) {on}; switch it off first"); return 4
-        targets = plan(rd)
+        if a.fw310_mask:
+            fw = {sid: (_get(rd, sid, 0, 1), _get(rd, sid, 1, 1)) for sid in TARGET_IDS}
+            if any(v != (3, 10) for v in fw.values()):
+                print(f"REFUSED: --fw310-mask expects firmware 3.10 on IDs 4-6, got {fw}"); return 4
+            targets = {sid: dict(FW310_MASK) for sid in TARGET_IDS}
+        else:
+            targets = plan(rd)
         before = dump(rd, range(1, 7))
         stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
-        bpath = a.backup_dir / f"eeprom_backup_{a.arm}_{stamp}_pre_drive_restore.json"
+        tag = "fw310_mask" if a.fw310_mask else "drive_restore"
+        bpath = a.backup_dir / f"eeprom_backup_{a.arm}_{stamp}_pre_{tag}.json"
         bpath.write_text(json.dumps({"arm": a.arm, "utc": stamp, "registers_0_70": before,
                                      "targets": targets}, indent=1))
         print(f"backup: {bpath}")
@@ -168,11 +229,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"ID {sid}: " + ", ".join(f"{k} {cur[k]}->{v}" for k, v in vals.items() if cur[k] != v))
         bad = apply(rd, wr, targets)
         after = dump(rd, range(1, 7))
-        (a.backup_dir / f"eeprom_after_{a.arm}_{stamp}_drive_restore.json").write_text(
+        (a.backup_dir / f"eeprom_after_{a.arm}_{stamp}_{tag}.json").write_text(
             json.dumps({"arm": a.arm, "utc": stamp, "registers_0_70": after}, indent=1))
+        regs = {name: (a0, n) for name, a0, n in DRIVE_REGS}
+        written = {sid: {i for k in vals for i in range(regs[k][0], regs[k][0] + regs[k][1])}
+                   for sid, vals in targets.items()}
         untouched = [(sid, i) for sid in range(1, 7) for i in range(DUMP_LEN)
                      if before[sid][i] != after[sid][i]
-                     and not (sid in targets and any(a0 <= i < a0 + n for _, a0, n in DRIVE_REGS))
+                     and i not in written.get(sid, set())
                      and i not in range(56, 71)]  # 56-70 = live feedback (position, load, volt, temp, current)
         if bad:
             print(f"READ-BACK MISMATCH: {bad}"); return 3
