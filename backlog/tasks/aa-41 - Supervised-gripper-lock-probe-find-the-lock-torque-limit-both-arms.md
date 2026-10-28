@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-10-27 20:23'
-updated_date: '2026-10-28 04:06'
+updated_date: '2026-10-28 13:35'
 labels:
   - human-action
   - human-key-0bb0fd9f151c3229
@@ -187,4 +187,6 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 2026-10-27 owner decision (a) applied LIVE, torque off, nothing moved: IDs 4-6 on both arms Unloading_Condition 44->33 (voltage 1 + overload 32; overcurrent 8 and overheat 4 masked), LED_Alarm 47->35 (voltage, angle, overload). (Correction: an earlier note proposed 36/39; those values were wrong bit sums.) Read back OK, nothing else changed; backups calibration_data/eeprom_*2026-10-27T23-32*. restore_drive_config.py --fw310-mask uses a read path that tolerates ONLY error bit 0x08 (checksum and other bits still raise), script-local. RESULT: status register (65) still reads 8 and every reply still carries error 0x08 on IDs 4-6, so the main driver still raises on reads. Either the flag is latched until power-off, or the servo reports it regardless of the unloading mask. Next: owner power-cycles both arms (12 V off/on), then a read-only status check. If the flag persists, owner decision: let the driver accept 0x08 on the firmware-3.10 servos (would weaken a fault check, so not done without approval).
 
 2026-10-27 after the owner's 12 V power cycle of both arms (USB re-attached with attach_usb.py, 7/7): read-only check. IDs 1-3 both arms: error 0, status 0, temp 30-32 C, current 0. IDs 4-6 both arms (fw 3.10): error 0x08 / status 8 PERSISTS, temp 0 C, current 948-953 raw with torque OFF (was ~1000 before the cycle). Restored EEPROM survived the cycle (maxT 1000/500, P/D, prot current, unloading/LED 33/35). Conclusion: the OverEle flag is reported independently of the unloading mask and is driven by the bogus current reading; it is not latched. Also: these servos have Max_Voltage 16.0 V vs 14.0 V on IDs 1-3, so IDs 4-6 are probably a different STS3215 hardware variant. Next needs an owner decision: let the driver accept error bit 0x08 ONLY on firmware-3.10 servos 4-6 (all other bits still raise), so they can be read and a supervised small move can test whether they move under torque at all.
+
+2026-10-27 web research (no definitive answer): (1) firmware 3.10 is the current STS3215 image on Feetech's server (komatachi-robotics/feetech-flash pins SCServo21-GD32-TTL-250306.bin as 3.10 for model key 9.3); 3.9->3.10 updates are common, so IDs 4-6 were probably updated at some point. (2) The 0o8o0-blip clean-room STS3215 firmware computes Present_Current as ADC minus a power-on warm-up baseline; a bad baseline gives a constant false idle current and false overcurrent, matching our ~950 at rest. In that firmware the OverEle flag is cleared only when Protection_Current is 0 and it also limits PWM output when measured current exceeds Protection_Current, so the false reading could block torque. Not confirmed for factory 3.10. Owner decision: take the official Feetech route: re-flash 3.10 on IDs 4-6 of both arms with FD (Windows). Proposed human task AA-42; the owner declined a servo-1 test move for now.
 <!-- SECTION:NOTES:END -->
