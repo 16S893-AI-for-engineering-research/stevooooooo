@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-28 01:49'
+updated_date: '2026-10-28 02:26'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -16,7 +16,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 **Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
 - Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
 - Why stage 2 took three tries: two sub-agents explored without writing; the third orchestrator attempt crashed on an API error (a tool call without a result). Lesson: do model work directly, in small committed slices.
-- Gripper: lock() waits for settle; live lock refused until AA-41 gives `lock_torque_limit_raw` and thresholds.
+- **BLOCKER (AA-41 diagnosis 2026-10-27):** on BOTH arms, servos 4-6 (wrist_flex, wrist_roll, gripper; firmware 3.10) have zeroed EEPROM drive config (Max_Torque_Limit, P/D, Protection_Current, Overload_Torque, Max_Temp all 0). They cannot produce torque, which explains the zero-motion lock probe and the old '0 C / ~1000 current' readings. IDs 1-3 are normal. Owner decision pending: restore the values (proposal in AA-41 notes). `gripper_lock_probe.py` now refuses while zeroed. Any powered wrist or gripper motion is blocked by this.
 - Session 2 facts still valid: servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured poses in `robot/calibration_data/poses_2026-10-25.jsonl` (the stored pan q is stale; recompute from ticks, as view_pose.py does).
 
 ## 1. Resume in 60 seconds

@@ -82,3 +82,15 @@ def test_cli_dry_run_touches_nothing(capsys):
 @pytest.mark.parametrize("t", [0, 49, 601, 1000])
 def test_cli_refuses_out_of_range_torque(t):
     assert probe.main(["--arm", "left", "--torque", str(t), "--key"]) == 2
+
+
+def test_drive_config_faults_flags_zeroed_eeprom():
+    """AA-41 finding: Max_Torque/P/Protection_Current = 0 means no torque; the probe must refuse."""
+    import importlib.util, pathlib
+    p = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "gripper_lock_probe.py"
+    spec = importlib.util.spec_from_file_location("glp_drive", p)
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    zeroed = lambda sid, addr, n: bytes(n)                      # as read live on IDs 4-6
+    healthy = {16: b"\xe8\x03", 21: b"\x20", 28: b"\x36\x01", 48: b"\xe8\x03"}  # as read on IDs 1-3
+    assert set(x.split("(")[0] for x in m.drive_config_faults(zeroed, 6)) == set(m.DRIVE_REGS)
+    assert m.drive_config_faults(lambda sid, addr, n: healthy[addr], 6) == []

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-27 20:25'
+updated_date: '2026-10-28 02:26'
 labels: []
 milestone: m-2
 dependencies:
@@ -61,4 +61,6 @@ DESIGN ISSUE FOUND (needs owner decision, AC not changed): GripperLockSM._goal_p
 Overtravel lock merged 2026-10-25 (orchestrator-reviewed). Lock commands lock_overtravel_goal_deg after applying lock_torque_limit_raw; MISS_NO_KEY_OVERTRAVEL verdict; band-based hold (slip toward closed => HoldSlipFault). Bands filled from the measured samples, still unverified; lock_torque_limit_raw null => live lock refused. REVIEW FINDING, to fix before the powered test: lock() reads back the position immediately after commanding, without waiting for motion or a stall to settle. With a ~600-tick overtravel move the readback would be the pre-move position => false MISS. It needs a bounded settle wait (until velocity is ~0 or a timeout) before verification.
 
 2026-10-27 orchestrator: settle-wait fix for the review finding (lock() read back immediately after commanding the overtravel move -> false MISS). lock() now polls read_joint_state until two consecutive reads have |speed_raw| <= settle_speed_max_raw and a position change <= settle_position_tol_deg, bounded by lock_settle_timeout_s; timeout -> new LockVerdict.NOT_SETTLED -> FAULT (fail closed); read errors propagate and never leave LOCKED. New GripperLockConfig fields (defaults 2.0 s / 0.02 s / 5 raw / 0.3 deg, unverified). Tests: TestLockSettleWait (5): moving servo waited out and LATCHED, never-settles faults, settled no-key overtravel still detected, speed-0-but-jumping not trusted, read error never locks. tests/test_gripper_lock.py 114 passed. Owner (2026-10-27) offered to help with the torque-limit measurement: scripts/gripper_lock_probe.py (dry-run default; gripper commanded only via GripperLockSM; refuses if any arm joint has torque on; restores torque limit 1000 and torque off on exit; tests/test_gripper_lock_probe.py) and human task AA-41 proposed for the supervised run.
+
+AA-41 finding 2026-10-27: gripper servo (and wrist_flex/wrist_roll) EEPROM drive config is zeroed on both arms (see AA-41 notes); powered lock testing is blocked until it is restored. gripper_lock_probe.py refuses in this state.
 <!-- SECTION:NOTES:END -->
