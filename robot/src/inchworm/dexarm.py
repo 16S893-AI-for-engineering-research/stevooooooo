@@ -233,6 +233,8 @@ _PARK_X: float = 0.0
 _PARK_Y: float = 300.0
 _PARK_Z: float = 200.0
 _PARK_FEEDRATE: float = 3000.0
+#: Where firmware G28 moves the tool (Marlin_For_DexArm gcode/calibrate/G28.cpp).
+HOME_XYZ_MM = (0.0, 300.0, 0.0)
 
 
 # Rotrics M888 module IDs (firmware source: Rotrics-Dev/Marlin_For_DexArm,
@@ -272,9 +274,15 @@ class DexArmDriver:
         workspace: Optional[DexArmWorkspace] = None,
         ack_timeout_s: float = DEFAULT_ACK_TIMEOUT_S,
         logger: object = None,
+        cell_guard: object = None,
     ) -> None:
         self._transport = transport
         self.workspace = workspace
+        #: Optional AA40 cell-model collision guard
+        #: (:class:`inchworm.system_model.dexarm_guard.DexArmCellGuard`). When
+        #: set, every motion target is checked along the firmware's joint path
+        #: from the live joint angles before any byte is sent.
+        self.cell_guard = cell_guard
         self._ack_timeout_s = ack_timeout_s
         self._log = logger
         # Serialises all wire access from concurrent threads.
@@ -366,10 +374,17 @@ class DexArmDriver:
         """
         self._require_open()
         cmd = "G28"
+        # Firmware G28 (Marlin_For_DexArm G28.cpp) goes to X0 Y300 Z0 via its
+        # joint path, so it is checked like any other move when a cell guard is set.
         if dry_run:
+            if self.cell_guard is not None:
+                with self._lock:
+                    self._check_cell_locked(*HOME_XYZ_MM)
             self._emit("INFO", "dexarm_dry_run", {"cmd": cmd, "reason": "home"})
             return
-        self._send_receive(cmd)
+        with self._lock:
+            self._check_cell_locked(*HOME_XYZ_MM)
+            self._send_receive_locked(cmd)
         self._emit("INFO", "dexarm_homed", {})
 
     def move_absolute(
@@ -408,6 +423,9 @@ class DexArmDriver:
         self._check_bounds(x, y, z)
         cmd = self._g0_cmd(x, y, z, feedrate)
         if dry_run:
+            if self.cell_guard is not None:
+                with self._lock:
+                    self._check_cell_locked(x, y, z)
             self._emit(
                 "INFO", "dexarm_dry_run",
                 {"cmd": cmd, "x": x, "y": y, "z": z, "feedrate": feedrate},
@@ -415,6 +433,7 @@ class DexArmDriver:
             return
         # G90 = absolute positioning mode; G0/G1 = rapid/linear move.
         with self._lock:
+            self._check_cell_locked(x, y, z)
             self._send_cmd("G90")
             self._recv_ack("G90")
             self._send_cmd(cmd)
@@ -466,6 +485,7 @@ class DexArmDriver:
                 )
             tx, ty, tz = cur.x + dx, cur.y + dy, cur.z + dz
             self._check_bounds(tx, ty, tz)
+            self._check_cell_locked(tx, ty, tz)
             cmd = self._g0_cmd(tx, ty, tz, feedrate)
             if dry_run:
                 self._emit(
@@ -586,12 +606,16 @@ class DexArmDriver:
         if f is not None:
             cmd += f" F{f:.3f}"
         if dry_run:
+            if self.cell_guard is not None:
+                with self._lock:
+                    self._check_cell_locked(x, y, z)
             self._emit(
                 "INFO", "dexarm_dry_run",
                 {"cmd": cmd, "x": x, "y": y, "z": z, "e": e, "feedrate": f},
             )
             return
         with self._lock:
+            self._check_cell_locked(x, y, z)
             self._send_cmd("G90")   # ensure absolute XYZ mode
             self._recv_ack("G90")
             self._send_cmd(cmd)
@@ -714,6 +738,18 @@ class DexArmDriver:
             or z < ws.z_min_mm or z > ws.z_max_mm
         ):
             raise DexArmBoundsError(x, y, z, ws)
+
+    def _check_cell_locked(self, x: float, y: float, z: float) -> None:
+        """Cell-model check of the move from the present joint angles. **Caller holds the lock.**"""
+        if self.cell_guard is None:
+            return
+        from inchworm.system_model.dexarm_kinematics import parse_m114_angles
+        lines = self._send_receive_locked("M114")
+        start = parse_m114_angles(lines)
+        if start is None:
+            from inchworm.system_model.dexarm_guard import DexArmGuardRefused
+            raise DexArmGuardRefused("M114 returned no joint angles; cannot check the move (fail closed)")
+        self.cell_guard.check_move(start, x, y, z)
 
     @staticmethod
     def _g0_cmd(
@@ -905,3 +941,27 @@ class MockDexArmSerial:
             m = re.search(rf"{axis}(-?[\d.]+)", cmd)
             if m:
                 setattr(self, attr, float(m.group(1)))
+
+
+# --- AA-40 DexArm cell guard ---
+def open_live_dexarm(cfg, transport, *, so101_pose_source=None, tube_source=None, logger=None) -> "DexArmDriver":
+    """Live DexArm driver with workspace bounds AND the cell-model guard (AA40).
+
+    Fails closed: if ``dexarm.cell_guard.required_live`` is set, the guard must
+    build and its SO-101 pose and tube sources must be given (``tube_source``
+    returning None means a stated "no tube"). Use this for every live DexArm
+    motion path instead of constructing :class:`DexArmDriver` directly.
+    """
+    from inchworm.system_model.dexarm_guard import DexArmGuardRefused, build_dexarm_cell_guard
+    gcfg = getattr(cfg.dexarm, "cell_guard", None)
+    guard = build_dexarm_cell_guard(cfg, so101_pose_source=so101_pose_source, tube_source=tube_source)
+    if gcfg is not None and gcfg.required_live:
+        if guard is None:
+            raise DexArmGuardRefused("dexarm.cell_guard is required for live motion but disabled")
+        missing = [n for n, v in (("SO-101 poses", so101_pose_source), ("tube state", tube_source)) if v is None]
+        if missing:
+            raise DexArmGuardRefused("live DexArm needs " + " and ".join(missing) + " for the cell check")
+        if guard.leveling_slopes is None:
+            raise DexArmGuardRefused("dexarm.cell_guard leveling slopes not configured (read M892)")
+    return DexArmDriver(transport, workspace=cfg.dexarm.workspace, logger=logger, cell_guard=guard)
+# --- AA-40 end ---

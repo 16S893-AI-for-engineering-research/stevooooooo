@@ -186,11 +186,27 @@ class DexArmWorkspace(_Strict):
 # --- AA-12 end ---
 
 
+class DexArmCellGuardConfig(_Strict):
+    """AA40 cell-model collision check for DexArm moves (dexarm_guard.py).
+
+    ``leveling_slopes``: the firmware's M891 slopes (read live with M892),
+    needed to reproduce its IK. ``required_live``: live DexArm motion refuses
+    unless the guard is wired (fail closed).
+    """
+
+    enabled: bool = True
+    required_live: bool = True
+    leveling_slope_x: Optional[float] = None
+    leveling_slope_y: Optional[float] = None
+    step_deg: float = Field(default=1.0, gt=0.0, le=5.0)
+
+
 class DexArmConfig(_Strict):
     identity: DeviceIdentity
     # --- AA-12 ---
     workspace: Optional[DexArmWorkspace] = None
     # --- AA-12 end ---
+    cell_guard: Optional[DexArmCellGuardConfig] = None
     # --- serial-transport ---
     # Per-device serial settings (baudrate, timeout_s).  None → use role defaults.
     serial: Optional[SerialDeviceSettings] = None

@@ -68,6 +68,14 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 parser.add_argument(
+    "--tube",
+    default=None,
+    metavar="none|PITCHES",
+    help="REQUIRED with --live when the DexArm moves: tube state for the cell collision "
+         "check. 'none' = no tube in the cell; a number = tube advance in attachment "
+         "pitches from the cell-URDF placement (0 = as modelled).",
+)
+parser.add_argument(
     "--live",
     action="store_true",
     default=False,
@@ -131,6 +139,17 @@ def _make_synthetic_capture_and_extract(x_arm: float, y_arm: float, z_arm: float
 # Main
 # ---------------------------------------------------------------------------
 
+def _tube_advance_from_arg(value):
+    """--tube -> metres (None = no tube). Raises SystemExit if missing."""
+    if value is None:
+        raise SystemExit("REFUSED: --tube is required for live DexArm motion (cell collision check). "
+                         "Use --tube none if there is no tube in the cell.")
+    if str(value).lower() == "none":
+        return None
+    from inchworm.constants import ATTACHMENT_PITCH_MM
+    return float(value) * float(ATTACHMENT_PITCH_MM) / 1000.0
+
+
 def main() -> int:
     args = parser.parse_args()
     config = load_config(args.config)
@@ -172,9 +191,14 @@ def main() -> int:
     # Open DexArm.
     if args.live:
         dex_transport = backend.open_serial("dexarm")
-        arm = DexArmDriver(
-            dex_transport,
-            workspace=config.dexarm.workspace,
+        # AA-40: cell-model check of every move (SO-101s read live; tube as stated).
+        from inchworm.dexarm import open_live_dexarm
+        from inchworm.so101_pose_reader import live_so101_pose_source
+        tube_m = _tube_advance_from_arg(args.tube)
+        arm = open_live_dexarm(
+            config, dex_transport,
+            so101_pose_source=live_so101_pose_source(config, backend),
+            tube_source=lambda: tube_m,
         )
         arm.connect()
     else:

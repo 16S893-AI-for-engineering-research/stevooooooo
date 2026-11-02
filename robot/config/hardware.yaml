@@ -121,6 +121,17 @@ dexarm:
     # then set unverified to false.
     unverified: true
   # --- AA-12 end ---
+  # AA-40: cell-model (owner URDF) collision check of every DexArm move along
+  # the firmware's joint path, against the parked SO-101s, bases, base mount
+  # and tube. Slopes = this DexArm's stored M891 leveling, read live 2026-10-28
+  # with M892 (X 0.00400, Y 0.14700). The firmware applies them inside its IK,
+  # so the check needs them to place the arm correctly.
+  cell_guard:
+    enabled: true
+    required_live: true
+    leveling_slope_x: 0.004
+    leveling_slope_y: 0.147
+    step_deg: 1.0
   # --- serial-transport ---
   # Serial port settings for the DexArm (Rotrics STM32 CDC).
   # baudrate: 115200 — UNVERIFIED: taken from Rotrics firmware docs;

@@ -210,11 +210,15 @@ def _run_live(device: str) -> None:
         from inchworm.backends import live_backend  # --live always real hardware
         backend = live_backend(cfg)
         transport = backend.open_serial("dexarm")
-        arm_driver = DexArmDriver(transport=transport, config=cfg.dexarm, dry_run=False)
+        # Read-only here (position queries, no motion), so no cell guard is needed.
+        # Orchestrator fix 2026-10-28: the old call passed config=/dry_run= that
+        # DexArmDriver does not accept and used a non-existent get_position_mm().
+        arm_driver = DexArmDriver(transport, workspace=cfg.dexarm.workspace)
+        arm_driver.connect()
 
         def read_tcp_base() -> np.ndarray:
-            pos = arm_driver.get_position_mm()
-            return np.array([pos["x"] / 1000.0, pos["y"] / 1000.0, pos["z"] / 1000.0])
+            pos = arm_driver.get_position()
+            return np.array([pos.x / 1000.0, pos.y / 1000.0, pos.z / 1000.0])
 
         get_tcp = read_tcp_base
         transport_to_close = transport

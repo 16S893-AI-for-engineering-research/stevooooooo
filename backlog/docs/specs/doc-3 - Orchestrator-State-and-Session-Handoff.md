@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-28 22:46'
+updated_date: '2026-10-29 14:40'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -12,6 +12,8 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 **Last verified:** 2026-10-27 (session 3), AA-40 stage 2 commit. Full suite **1617 passed**.
 
 **Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place. (2) The tube advances to the right, AWAY from the DexArm (`cycle_runner.advance_physical: away_from_dexarm`; live preflight checks the sign against AA-16 calibration). (3) Cura = Rotrics' official settings (AA-34 Done). (4) No tube fixture design. (5) Gripper lock torque via human task **AA-41** (`scripts/gripper_lock_probe.py`; in progress with the owner). (6) Keep the one-camera rule. Session 3: (7) the owner cell URDF `CAD/robot_urdf_new/` is THE robot model (arms, grippers, camera mounts, DexArm + laser camera, base mount, tube); adding limits is fine, nothing else to rebuild. (8) The table is NOT a collision object. (9) "Go with the real fold": model contacts at the measured fold are model error, accepted only near that pose. (10) Wrist roll: our 0 = cell URDF -127 deg. (11) Tube = sections with one attachment point each (3 now, +1 per printed section).
+
+**DexArm cell check (2026-10-28, software done, NOT yet run on hardware):** `system_model/dexarm_kinematics.py` (firmware IK/FK + URDF mapping), `system_model/dexarm_guard.py` (mesh check of every DexArm move along its joint path vs SO-101s, bases, base mount, tube), wired into `DexArmDriver.move_absolute/move_relative/print_move/home`; `dexarm.open_live_dexarm()` fails closed without SO-101 poses and tube state. `so101_pose_reader.py` reads both arms read-only (tolerates 0x08 only on encoder servos 4-6). `level_scan.py`/`calibrate_scanner.py --live` require `--tube`. Owner asked about a simple box instead; rejected with numbers (fold reaches Y 67 mm, DexArm base extends to Y 99 mm; tube crosses any box). Next: supervised check (read real poses, dry-run queries incl. one refusal, one 5 mm move, compare reported vs model), then AA-13 by camera + calipers (owner has digital calipers; method approved in principle, AA-13 first).
 
 **Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
 - Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).

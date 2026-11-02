@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-10-28 22:45'
+updated_date: '2026-10-29 14:40'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -44,6 +44,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 ## 4. Cameras
 
 - SO-101 arms (x2): Waveshare **OV9281** 1 MP mono USB camera (A), global shutter, up to 120 FPS, UVC.
+- **DexArm firmware facts (live read 2026-10-28, source Rotrics-Dev/Marlin_For_DexArm):** Marlin 2.0.5.4, module "3D" (FRONT_MODULE_OFFSET 92.60 mm). Kinematics: two 150 mm links, START angles B 105.24 / C 99.60 deg, OFFSET_ROT 12.5 mm, firmware Z range -127..167 mm, Y < 0 refused. M114 also reports joint angles ("DEXARM Theta A/B/C"). Stored leveling slopes (M892): X 0.00400, Y 0.14700; the firmware adds `sx*x + sy*(y-300)` to Z inside its IK. G0 in the default fast mode is a JOINT-space move, not a straight line. G28 goes to X0 Y300 Z0. Mapping to the cell URDF: `bases = -A`, `B_Rot->In_1 = B - 19.497 deg`, `Join->In_2 = -C - 32.378 deg` (0.31 mm max error over the workspace). Unexplained: reported Z changed 31.05 -> 9.35 mm between two reads 2026-10-28 with nothing commanded; to check at the first supervised DexArm session.
 - DexArm scanner: Arducam **OV9281** mono global-shutter USB camera, 720p, 100 FPS, UVC, low-distortion M12 lens, no microphone.
 - All are mono (Y8/greyscale) global-shutter UVC devices. Global shutter matters: laser-line and insertion imagery must not be rolling-shutter skewed during motion.
 - **Measured 2026-10-24 (`lsusb -v` in WSL), correcting the line above:** none of the three cameras advertises a Y8/GREY format. The two arm cameras enumerate as `32e6:9251` "openaicam" and offer **MJPEG only** (640x480, 800x600, 1280x720). The Arducam `0c45:6366` offers MJPEG and uncompressed YUY2 (up to 1280x800). All three are **USB 2.0 High-Speed devices** (`bcdUSB 2.00`, link at 480M). Mono output must therefore come from decoding and converting to greyscale in software. The sensors may still be mono, but the USB format is not.

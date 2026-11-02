@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-10-28 13:35'
-updated_date: '2026-10-28 22:46'
+updated_date: '2026-10-28 22:49'
 labels:
   - human-action
   - human-key-8d8f686b9ed669e1
@@ -158,7 +158,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "8d8f686b9ed669e1e8cdc5b0ee8e97d3c7e0b6b08c8c35a337431bcc64d03189",
-  "phase": "active",
+  "phase": "paused",
   "createdAt": "2026-10-28T13:35:30.642Z",
   "origin": "01a17fcd-ad6a-7474-9ab6-a7b139b28469",
   "step": 3,
