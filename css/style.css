@@ -489,3 +489,38 @@ model-viewer {
   model-viewer { min-height: 280px; }
   .panel { padding: 1.25rem; }
 }
+
+/* ---------- Dev log entries: Work Done | Notes ---------- */
+.log-entry { padding: 1.75rem 2rem; }
+.log-entry .log-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 0.75rem; margin-bottom: 1.25rem;
+}
+.log-entry .log-title {
+  margin: 0; color: var(--accent-2); font-family: var(--font-head); font-size: 1.15rem;
+}
+.log-entry .log-date {
+  color: var(--text-dim); font-size: 0.95rem; letter-spacing: 0.04em; white-space: nowrap;
+}
+.log-cols {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+}
+.log-col { padding: 0 1.5rem; }
+.log-col:first-child { padding-left: 0; border-right: 1px solid var(--panel-border); }
+.log-col:last-child { padding-right: 0; }
+.log-col h4 {
+  margin: 0 0 0.75rem; font-family: var(--font-head); font-size: 0.85rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim);
+}
+.log-col ul { margin: 0; padding-left: 1.1rem; }
+.log-col li + li { margin-top: 0.45rem; }
+.log-col p { margin-top: 0; }
+.log-col .no-notes { color: var(--text-dim); font-style: italic; }
+.log-entry .log-full { margin-top: 1.5rem; }
+@media (max-width: 760px) {
+  .log-cols { grid-template-columns: 1fr; }
+  .log-col { padding: 0; }
+  .log-col:first-child { border-right: none; border-bottom: 1px solid var(--panel-border); padding-bottom: 1.25rem; margin-bottom: 1.25rem; }
+}

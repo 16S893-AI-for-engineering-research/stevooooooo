@@ -40,33 +40,89 @@
       <img src="assets/session-activity.svg" alt="Charts showing daily totals from all persisted pi sessions in this repository: user messages, agent tool calls, and recorded model cost in US dollars" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
     </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/27/26 &mdash; Core contribution</h3>
-      <p>
-        My core contribution to this project is the systems levels thinking about how things must work and building the descriptions and models of the what the physical system looks like and how it moves. I don't exactly know how to check that the code truly understands the system correctly and may only discover that in the process of trial and error. Right now I have that trial and error written in as a step where I'll compare actual robot movements with what it thought happened.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Core contribution</h3>
+        <time class="log-date">Oct 27, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Wrote a pose-comparison step into the plan: rendered and commanded robot motion is checked against the real robot (AA-40 render comparison, first supervised moves).</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p>My core contribution to this project is the systems levels thinking about how things must work and building the descriptions and models of the what the physical system looks like and how it moves. I don't exactly know how to check that the code truly understands the system correctly and may only discover that in the process of trial and error. Right now I have that trial and error written in as a step where I'll compare actual robot movements with what it thought happened.</p>
+        </section>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/27/26 &mdash; Teaching AI the physical robot</h3>
-      <p>
-        Big lesson this week was that making AI understand something physical in real life is not easy. Especially when a model is as complicated as this is with 3 different robotic arms with many many parts, it has a hard time distinguishing things. I did not make it easier since alot of the parts in my model are named the same thing. Burned quite a bit of money on that mistake. Instead of just giving it the CAD, I ended up creating a urdf myself to give the agents. This made things much more understandable for it. I also realized I need more of one kind of the servo before I can complete everything and will need to rebuild the arms so that's fun. Went on a goose chase trying to figure that out, as well. Thought I had fried something but turned out they were dummy servos with just encoders so you could use them as a leader arm.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Teaching AI the physical robot</h3>
+        <time class="log-date">Oct 27, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Built a complete URDF of the cell (two SO-101s with the custom gripper and camera mounts, the DexArm with the laser camera, the base mount and the tube) to replace raw CAD for the agents.</li>
+            <li>Agent turned the URDF into the robot model: mesh collision checking (python-fcl) wired into the motion safety layer, a pose viewer, and a DexArm collision check using the DexArm firmware&rsquo;s own kinematics.</li>
+            <li>Diagnosed the non-moving wrist and gripper servos: servos 4&ndash;6 on both arms are encoder-only leader-arm servos. Replacement and recalibration tracked as task AA-43.</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p>Big lesson this week was that making AI understand something physical in real life is not easy. Especially when a model is as complicated as this is with 3 different robotic arms with many many parts, it has a hard time distinguishing things. I did not make it easier since alot of the parts in my model are named the same thing. Burned quite a bit of money on that mistake. Instead of just giving it the CAD, I ended up creating a urdf myself to give the agents. This made things much more understandable for it. I also realized I need more of one kind of the servo before I can complete everything and will need to rebuild the arms so that's fun. Went on a goose chase trying to figure that out, as well. Thought I had fried something but turned out they were dummy servos with just encoders so you could use them as a leader arm.</p>
+        </section>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/20/26 &mdash; Planning the robot software</h3>
-      <p>
-        Starting the software side now that the robot is assembled. I described the system to Pi &mdash; two SO-101 arms gripping attachment points 183.676&nbsp;mm apart, a DexArm carrying the print head and a line laser, all on a fixed chassis with the tube being the part that moves &mdash; and had it break the work into tasks small enough for sub-agents. It produced 33 tasks across 7 milestones with 227 acceptance criteria. Two of my constraints reordered things: the crawl cycle can't be tested until the learned insertion works, and the DexArm's repeatability has to be measured before the laser calibration so its positioning error doesn't get mistaken for optical error later. I also asked how we keep sub-agents from quietly rewriting requirements to match whatever they built; the project had no Definition of Done at all, so every task now inherits rules requiring evidence instead of code inspection. Getting the walkthrough tab to open took four separate fixes.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Planning the robot software</h3>
+        <time class="log-date">Oct 20, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Described the system to Pi: two SO-101 arms gripping attachment points 183.676&nbsp;mm apart, a DexArm carrying the print head and a line laser, a fixed chassis with the tube as the moving part.</li>
+            <li>Pi broke the work into 33 tasks across 7 milestones with 227 acceptance criteria.</li>
+            <li>Two constraints reordered the plan: the crawl cycle cannot be tested until learned insertion works, and DexArm repeatability is measured before laser calibration so its error is not mistaken for optical error.</li>
+            <li>Added a project-wide Definition of Done requiring evidence rather than code inspection, so sub-agents cannot quietly rewrite requirements to match what they built.</li>
+            <li>Getting the walkthrough tab to open took four separate fixes.</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p class="no-notes">No notes for this entry.</p>
+        </section>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry &mdash; 10/19/26 &mdash; Human-only task handoffs</h3>
-      <p>
-        I added a workflow for assigning me tasks that only I can complete. The agent now has to justify why a task genuinely needs physical access, identity, authorization, or personal judgment, and it is supposed to minimize those requests rather than offload routine work. When a task is necessary, I explicitly accept a clear Backlog procedure with step-by-step actions, expected results, verification, and stop conditions. A single dedicated walkthrough tab can then guide me through accepted tasks one at a time, answer questions, record evidence, and return the result to the main agent for verification before work continues.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Human-only task handoffs</h3>
+        <time class="log-date">Oct 19, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Added a workflow for assigning tasks that only I can complete; the agent must justify why a task needs physical access, identity, authorization or personal judgment, and minimize such requests.</li>
+            <li>Each necessary task is an explicit Backlog procedure I accept, with step-by-step actions, expected results, verification and stop conditions.</li>
+            <li>A single dedicated walkthrough tab guides accepted tasks one at a time, records evidence, and returns the result to the main agent for verification.</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p class="no-notes">No notes for this entry.</p>
+        </section>
+      </div>
+    </article>
 
     <div class="panel">
       <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Project structure map</h3>
@@ -76,132 +132,96 @@
       <img src="assets/project-structure.svg" alt="Map of the 893 repository structure and Pi workflow, with human-only handoff components highlighted in red" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
     </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — 10/15/26 — Robot hardware development</h3>
-      <p>
-        Thus far, I've been using my own personal AI to do a lot of the component selection, tradeoff management, and planning for my robot. I have now chosen parts, designed, ordered, and assembled the entire robot. Part of the reason for using my own personal AI was to prevent muddying up Pi context and because a lot of my descriptions of the idea were already in Claude. I understand this means you can't monitor my AI use which makes it look like I haven't been doing much. At this point, it is about the time when I will be switching from hardware development to software development and plan to integrate AI much more heavily outside of just component selection, tradeoff management, and planning using parley. I have included the CAD of the current system in the repo.
-      </p>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Robot hardware development</h3>
+        <time class="log-date">Oct 15, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Chose parts, designed, ordered and assembled the entire robot (component selection and trade-offs done with my own AI).</li>
+            <li>Added the CAD of the current system to the repository, with an interactive 3D viewer below.</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p>Thus far, I've been using my own personal AI to do a lot of the component selection, tradeoff management, and planning for my robot. I have now chosen parts, designed, ordered, and assembled the entire robot. Part of the reason for using my own personal AI was to prevent muddying up Pi context and because a lot of my descriptions of the idea were already in Claude. I understand this means you can't monitor my AI use which makes it look like I haven't been doing much. At this point, it is about the time when I will be switching from hardware development to software development and plan to integrate AI much more heavily outside of just component selection, tradeoff management, and planning using parley. I have included the CAD of the current system in the repo.</p>
+        </section>
+      </div>
+      <div class="log-full">
       <figure class="cad-viewer">
         <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
         <figcaption>Current robot CAD &mdash; drag to rotate, scroll or pinch to zoom.</figcaption>
       </figure>
       <p class="cad-download"><a href="CAD/Assembly%201.step" download>Download the original STEP assembly</a></p>
-    </div>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — Recreating a paper's simulation from scratch</h3>
-      <p>
-        This project was super interesting. I don't believe the AI actually ever
-        finished its thinking. It ran out of space twice. After that, I checked 
-        what it had written up to that point and it seemed complete but I think 
-        there is a good chance it would have continued working. I ulitmately 
-        decided not to try and let it finish because this project broke the $20 
-        dollar mark in terms of tokens already. I think such stringent requirements 
-        in my prompt forced the AI to do alot more iterations than might have been 
-        totally necessary. Besides the AI, I noticed some of my own bias creeping in 
-        as a manager. This session most definitely ended in a cost overrun and 
-        technically the session wasn't even finished yet. This is partially because 
-        I found myself in a sunk cost fallacy. Since I couldn't actually know how 
-        much more progress there was to complete, I kept assuming that it was only 
-        a little bit more until eventaully I had spent $20. 
-      </p>
-      <p>
-        AI's Take on What I Should Be Writing:
-      </p> 
-      <p> 
-        Asked the agent to rebuild the simulation from Jonckers et al. (2022),
-        <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying
-        Satellites&rdquo;</em> &mdash; a free-flying satellite that 3D-prints
-        trusses longer than itself. Full write-up and plots on the
-        <a href="simulation.html">Simulation</a> page. It reproduces 16 of 16
-        published quantities within tolerance.
-      </p>
-      <p>
-        The clarify-before-build skill earned its keep immediately. Before
-        writing anything the agent asked six questions, and two of them changed
-        the build: whether to model the robotic arm's full inverse kinematics
-        (no &mdash; the paper treats it as an ideal follower) and how to handle
-        the nozzle friction the paper never quantifies. I said "just use what
-        they used" for friction, and it came back and told me plainly that the
-        paper contains no friction number at all &mdash; only
-        <code>&mu; &lt; 10<sup>-5</sup></code> for the air bearing, which is a
-        different thing entirely. So it calibrated against their reported
-        8.42&nbsp;mm outcome instead and labelled it as calibrated rather than
-        quietly presenting an invented number as a paper value. That is the
-        behaviour I wanted: pushing back instead of fabricating.
-      </p>
-      <p>
-        It also pushed back on my 6-DoF question. I said if the paper used
-        6&nbsp;DoF and it was needed for the plot, we had to do it. The agent
-        checked and said no &mdash; ELISSA is a planar air-bearing table, the
-        paper is explicitly 3&nbsp;DoF, and 6&nbsp;DoF appears only as future
-        work. Saved a large amount of pointless effort.
-      </p>
-      <p>
-        Two things it found that I would have missed entirely. First, the
-        paper's Figure 5 never dimensions which way the robotic arm is mounted,
-        but the reported error split (0.68&nbsp;mm in x versus 0.28&nbsp;mm in
-        y) only works if the arm points along the body y axis, because yaw error
-        displaces the nozzle <em>perpendicular</em> to the mounting offset. It
-        had the geometry backwards at first, got a symmetric error split, and
-        used that mismatch to diagnose the orientation. Second, it thinks
-        Equation 3 in the paper has a transposition &mdash; the matrix inverse
-        is on the wrong side to compose correctly &mdash; and implemented the
-        version that actually works while documenting the discrepancy rather
-        than silently "fixing" it.
-      </p>
-      <p>
-        The hypothesis property tests paid off in a way example-based tests
-        would not have. One test asserted that nozzle friction always produces a
-        torque; hypothesis found a counterexample where travel is parallel to
-        the lever arm and the torque is genuinely zero &mdash; correct physics,
-        wrong test. Another exposed a real bug: the print was accidentally
-        centred on the free-flyer's own centre of rotation, which cancelled the
-        400&nbsp;mm lever arm to exactly zero and silently deleted the entire
-        effect the paper is about. The simulation had been quietly reporting
-        errors that were far too good.
-      </p>
-      <p>
-        Friction point worth recording: the sandbox had no PyPI access, so
-        <code>uv add pytest hypothesis</code> failed outright. Rather than hand
-        me an unrunnable test suite, the agent wrote a small vendored shim
-        implementing just enough of both APIs to execute the real tests
-        unmodified, plus a runner that uses the genuine libraries when the
-        network allows. Same reason the figures are hand-emitted SVG instead of
-        matplotlib &mdash; which ended up better for the site anyway, at
-        5&ndash;33&nbsp;KB each and perfectly scalable.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Recreating a paper&rsquo;s simulation from scratch</h3>
+        <time class="log-date">Sep 22, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Rebuilt the simulation from Jonckers et al. (2022), <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying Satellites&rdquo;</em>; it reproduces 16 of 16 published quantities within tolerance (full write-up on the <a href="simulation.html">Simulation</a> page).</li>
+            <li>Clarify-before-build questions changed the build: no full arm inverse kinematics (the paper treats the arm as an ideal follower), and nozzle friction calibrated against the reported 8.42&nbsp;mm result and labelled as calibrated, since the paper gives no friction value.</li>
+            <li>Kept the model 3&nbsp;DoF: ELISSA is a planar air-bearing table and the paper is explicitly 3&nbsp;DoF.</li>
+            <li>Found that the arm must point along the body y axis to reproduce the reported error split (0.68&nbsp;mm x vs 0.28&nbsp;mm y), and that Equation 3 appears transposed; documented the working version rather than silently fixing it.</li>
+            <li>Hypothesis property tests found a wrong test (zero torque is correct when travel is parallel to the lever arm) and a real bug (the print was centred on the free-flyer&rsquo;s centre of rotation, cancelling the 400&nbsp;mm lever arm).</li>
+            <li>With no PyPI access in the sandbox, the agent wrote a small shim to run the real tests unmodified, and emitted figures as hand-written SVG (5&ndash;33&nbsp;KB each).</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p>This project was super interesting. I don't believe the AI actually ever finished its thinking. It ran out of space twice. After that, I checked what it had written up to that point and it seemed complete but I think there is a good chance it would have continued working. I ulitmately decided not to try and let it finish because this project broke the $20 dollar mark in terms of tokens already. I think such stringent requirements in my prompt forced the AI to do alot more iterations than might have been totally necessary. Besides the AI, I noticed some of my own bias creeping in as a manager. This session most definitely ended in a cost overrun and technically the session wasn't even finished yet. This is partially because I found myself in a sunk cost fallacy. Since I couldn't actually know how much more progress there was to complete, I kept assuming that it was only a little bit more until eventaully I had spent $20.</p>
+        </section>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — Added a "clarify before build" skill</h3>
-      <p>
-        Directly in response to the animation-coaching problem below, I wrote
-        a custom agent skill: <code>.pi/skills/clarify-before-build/SKILL.md</code>.
-        It tells the agent that any time I ask it to build something with a
-        physical or visible form &mdash; a website, an animation, a simulation,
-        a diagram, anything where "it works" isn't the same as "it looks/moves
-        right" &mdash; it must stop and ask clarifying questions about style,
-        layout, motion, scope, and success criteria <em>before</em> writing any
-        code, then restate the plan and get my go-ahead. The goal is to catch
-        mismatches in what I imagined versus what gets built at the cheapest
-        possible point (a question) instead of the most expensive point (a
-        finished but wrong animation I have to debug in words).
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Added a &ldquo;clarify before build&rdquo; skill</h3>
+        <time class="log-date">Sep 17, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Wrote a custom agent skill, <code>.pi/skills/clarify-before-build/SKILL.md</code>: for anything with a physical or visible form, the agent must ask clarifying questions about style, layout, motion, scope and success criteria before writing code, then restate the plan and get a go-ahead.</li>
+            <li>Goal: catch mismatches at the cheapest point (a question) rather than the most expensive (a finished but wrong build).</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p class="no-notes">No notes for this entry.</p>
+        </section>
+      </div>
+    </article>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Entry — Getting the animation right</h3>
-      <p>
-        Found that Claude struggled taking the prompt and making something
-        physical (the animation) using just words. It clearly understood
-        what I wanted but need extra coaching about what was wrong to
-        recognize and fix the mistakes. Either that or it was simply taking
-        shortcuts. I also feel as though I'm not using the terminal in the
-        best way. I'd like an easier way to add files and share information
-        with the model.
-      </p>
-    </div>
+    <article class="panel log-entry">
+      <header class="log-head">
+        <h3 class="log-title">Getting the animation right</h3>
+        <time class="log-date">Sep 15, 2026</time>
+      </header>
+      <div class="log-cols">
+        <section class="log-col">
+          <h4>Work Done</h4>
+          <ul>
+            <li>Built the site&rsquo;s first animation with Claude from a written prompt.</li>
+            <li>Added the dev log page with the session activity graph.</li>
+          </ul>
+        </section>
+        <section class="log-col">
+          <h4>Notes</h4>
+          <p>Found that Claude struggled taking the prompt and making something physical (the animation) using just words. It clearly understood what I wanted but need extra coaching about what was wrong to recognize and fix the mistakes. Either that or it was simply taking shortcuts. I also feel as though I'm not using the terminal in the best way. I'd like an easier way to add files and share information with the model.</p>
+        </section>
+      </div>
+    </article>
 
     <div class="btn-row">
       <a href="simulation.html" class="btn btn-secondary">&larr; Simulation</a>
