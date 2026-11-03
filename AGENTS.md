@@ -43,4 +43,11 @@ Non-negotiable without explicit owner approval:
 6. **Keep doc-3 current.** When you finish a task, clear a blocker, or make a decision, update `doc-3` via `backlog doc update doc-3` in the same session. A stale doc-3 invites confident action on wrong information.
 7. **Commit regularly, without asking (owner standing instruction, 2026-10-24).** The orchestrator commits to the local branch after each verified unit of work (a task finalized or reviewed, a doc correction, a fix). Before every commit: tests pass (`cd robot && uv run pytest`), and the staged files contain no `.parley.env`, secrets, `.venv`, caches, session artifacts, frames, datasets or checkpoints. Sub-agents do not commit; the orchestrator reviews and commits their work. **Push to `origin` automatically after each commit** (owner standing instruction, 2026-10-24). Never force-push or rewrite published history; if a push is rejected, stop and report instead of forcing.
 
+8. **Session and cost discipline (owner, 2026-11-03).** Long sessions re-read their whole context on every call; that drove most of the project's cost.
+   - **Orchestrator:** restart with a fresh session (`/new`) after each finished unit of work, on a change of topic, or when context passes about 150k tokens. Do not rely on compaction as the record: before restarting, update doc-3 (state, blockers, next action), append task notes, run the tests, commit and push, then tell the owner "resume with: ...". Use `/compact` only to finish one unfinished piece of work.
+   - **Fresh start:** read doc-3's START HERE section and only the task being picked up. Do not read old session transcripts.
+   - **Sub-agents:** one task per sub-agent, with a written brief (files, tests to run, acceptance criterion targeted), an early required deliverable and a time cap of about 15-30 minutes, in an isolated worktree. No open-ended "explore and build" briefs. The orchestrator reviews and commits.
+   - **Hardware anomalies:** after two probes that do not explain a hardware reading, ask the owner before continuing.
+   - Prefer one diagnostic script that collects everything over many small probes.
+
 </CRITICAL_INSTRUCTION>

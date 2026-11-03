@@ -3,30 +3,57 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-10-29 14:40'
+updated_date: '2026-11-03 15:45'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-10-27 (session 3), AA-40 stage 2 commit. Full suite **1617 passed**.
+**Last verified:** 2026-11-03, pre-restart handoff commit (after `b852a3d`). Full suite **1640 passed** (re-run at handoff).
 
-**Owner decisions 2026-10-27 (recorded, do not revisit):** (1) e-stop HOLDS in place. (2) The tube advances to the right, AWAY from the DexArm (`cycle_runner.advance_physical: away_from_dexarm`; live preflight checks the sign against AA-16 calibration). (3) Cura = Rotrics' official settings (AA-34 Done). (4) No tube fixture design. (5) Gripper lock torque via human task **AA-41** (`scripts/gripper_lock_probe.py`; in progress with the owner). (6) Keep the one-camera rule. Session 3: (7) the owner cell URDF `CAD/robot_urdf_new/` is THE robot model (arms, grippers, camera mounts, DexArm + laser camera, base mount, tube); adding limits is fine, nothing else to rebuild. (8) The table is NOT a collision object. (9) "Go with the real fold": model contacts at the measured fold are model error, accepted only near that pose. (10) Wrist roll: our 0 = cell URDF -127 deg. (11) Tube = sections with one attachment point each (3 now, +1 per printed section).
+**START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
-**DexArm cell check (2026-10-28, software done, NOT yet run on hardware):** `system_model/dexarm_kinematics.py` (firmware IK/FK + URDF mapping), `system_model/dexarm_guard.py` (mesh check of every DexArm move along its joint path vs SO-101s, bases, base mount, tube), wired into `DexArmDriver.move_absolute/move_relative/print_move/home`; `dexarm.open_live_dexarm()` fails closed without SO-101 poses and tube state. `so101_pose_reader.py` reads both arms read-only (tolerates 0x08 only on encoder servos 4-6). `level_scan.py`/`calibrate_scanner.py --live` require `--tube`. Owner asked about a simple box instead; rejected with numbers (fold reaches Y 67 mm, DexArm base extends to Y 99 mm; tube crosses any box). Next: supervised check (read real poses, dry-run queries incl. one refusal, one 5 mm move, compare reported vs model), then AA-13 by camera + calipers (owner has digital calipers; method approved in principle, AA-13 first).
+### Owner decisions (recorded, do not revisit)
+1. E-stop HOLDS in place.
+2. The tube advances AWAY from the DexArm (`cycle_runner.advance_physical: away_from_dexarm`; live preflight checks the sign against AA-16 calibration).
+3. Cura uses Rotrics' official settings (AA-34 Done). No tube fixture design. Keep the one-camera rule.
+4. **The owner cell URDF `CAD/robot_urdf_new/` is THE robot model** (both SO-101s with custom gripper and camera mounts, DexArm + laser camera, base mount `baseforreal`, tube `tube_1`). Adding limits is fine; nothing else to rebuild.
+5. The table is NOT a collision object. "Go with the real fold": model contacts at the measured fold are accepted only within 0.05 rad of it. Wrist roll: our 0 = cell URDF -127 deg. Tube = sections with one attachment point each (3 now, +1 per printed section).
+6. Owner prefers the official Feetech route for servo firmware; servo diagnosis is closed (see blocker).
+7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 
-**Current focus: AA-40 #6 (owner render comparison), then wiring cell state into callers.** AA-40 stage 2 is in: `system_model/urdf.py` + `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live motion stays blocked: `motion_guard.collision.mesh.unverified: true` until the owner compares renders (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in robot/out/poses).
-- Next software: wire `other_arm_pose_source`, `tube_source` (advance in m) and `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
-- Why stage 2 took three tries: two sub-agents explored without writing; the third orchestrator attempt crashed on an API error (a tool call without a result). Lesson: do model work directly, in small committed slices.
-- **BLOCKER, ROOT CAUSE FOUND (owner 2026-10-27):** servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are **encoder-only leader-arm servos with no motor drive** (doc-1 s3). They read position but cannot move; that explains the zeroed drive EEPROM, 0 C, ~950 current and 0x08 flag. Owner will buy 6 powered servos and rebuild both arms: **AA-43** (swap + recalibrate joints 4-6; AA-17 and AA-41 depend on it). Until then, no powered wrist/gripper motion; joints 1-3 are powered and fine. AA-42 (FD re-flash) is moot; the owner closes it in the walkthrough tab. AA-41 is deferred and gets a fresh procedure after AA-43. EEPROM writes made to IDs 4-6 on 2026-10-27 are harmless (backups in calibration_data/eeprom_*2026-10-27T23-*). Lesson: the 2026-10-24 observation '0 C, ~930 current on some servos' was this hardware difference and should have been chased then.
-- Session 2 facts still valid: servo_calibration verified; EEPROM limits widened; left pan unobstructed (240 deg); measured poses in `robot/calibration_data/poses_2026-10-25.jsonl` (the stored pan q is stale; recompute from ticks, as view_pose.py does).
+### Blocker
+- **Servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are encoder-only leader-arm servos with no motor drive** (owner, 2026-10-27; doc-1 s3). They read position but cannot move; that explained the zeroed drive EEPROM, 0 C, ~950 current and status 0x08. Owner is buying 6 powered servos and rebuilding both arms: **AA-43** (swap + recalibrate joints 4-6). AA-17 and AA-41 depend on it. Until then: no powered wrist/gripper motion; joints 1-3 are powered and fine; the arms work torque-off as pose readers. EEPROM writes to IDs 4-6 on 2026-10-27 are harmless (backups `robot/calibration_data/eeprom_*2026-10-27T23-*`).
+
+### What is built (software, tested, not yet run live)
+- **Cell model + SO-101 mesh collision (AA-40, 5/6 AC):** `system_model/urdf.py`, `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live SO-101 motion stays blocked (`motion_guard.collision.mesh.unverified: true`) until **AA-40 #6**: the owner compares renders vs the real robot (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in `robot/out/poses`).
+- **DexArm cell check (2026-10-28):** `system_model/dexarm_kinematics.py` (firmware IK/FK from Rotrics' Marlin_For_DexArm source, URDF mapping 0.31 mm max), `system_model/dexarm_guard.py`, wired into `DexArmDriver.move_absolute/move_relative/print_move/home`; `dexarm.open_live_dexarm()` fails closed without SO-101 poses and tube state; `so101_pose_reader.py` (read-only, tolerates 0x08 only on IDs 4-6); `level_scan.py` / `calibrate_scanner.py --live` require `--tube`.
+
+### Next actions (pick one per session)
+1. **Supervised DexArm check** (owner at the robot): attach arm ports, read real SO-101 poses, dry-run queries including one expected refusal, one 5 mm move, compare reported vs model. Also explain the unexplained Z drop (31.05 -> 9.35 mm between two reads 2026-10-28, nothing commanded).
+2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
+3. **AA-14 #3**: detect truncated MJPEG frames on hardware (software only).
+4. **Software follow-ups:** wire `other_arm_pose_source` / `tube_source` / `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
+5. **AA-43** when the new servos arrive (owner to give the model, gearing and firmware for doc-1).
+
+### Human-handoff queue
+- AA-41 (gripper lock probe): deferred; needs a fresh procedure after AA-43.
+- AA-42 (FD re-flash): moot after the root cause; paused in the walkthrough tab. The owner should close it there (`/human decline AA-42`); do not mark it verified. The left arm's IDs 4-6 were re-flashed (3.10 over 3.10) and still answer.
+
+### Not committed on purpose
+- `CAD/exports/wrist_gripper.stl` deleted and `CAD/exports/gripper_update.stl` added by the owner (superseded by `CAD/robot_urdf_new`). Ask before committing either.
+
+### Lessons (keep applying)
+- Ask the owner after two failed probes of a hardware anomaly (the 2026-10-24 "0 C, ~930 current" reading was the encoder-only servos and cost several sessions).
+- Sub-agents get ONE narrow task, an early deliverable and a time cap; the AA-40 stage-2 workers explored for 30-45 min each and wrote nothing.
+- Cost to date about $428 (2026-11-03); most of it was long sessions re-reading 300k+ token contexts. Restart instead of continuing.
 
 ## 1. Resume in 60 seconds
 
 ```bash
 cd /home/stevotimp/893
-pi -c                      # continue the most recent session for this folder
-# or: pi -r                # browse past sessions for this folder
+pi                         # then /new, and: "Read doc-3 and continue with next action N"
+# pi -r                    # browse past sessions only if you must recover something
 ```
 
 Session transcripts live in `~/.pi/agent/sessions/--home-stevotimp-893--/` and are **machine-local, not in git**. They are not a system of record: compaction summarizes and discards older turns, and sub-agents cannot read them. Everything that matters is in the repository instead:
