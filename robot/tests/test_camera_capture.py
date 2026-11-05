@@ -663,3 +663,114 @@ def test_truncated_jpeg_is_reported_corrupt():
     # Truncated bitstream (no EOI) decodes in libjpeg but must be flagged.
     _, corrupt = _decode_to_gray(full[: len(full) * 2 // 3])
     assert corrupt
+
+
+# --- AA-14 AC#3 (2026-11-05): libjpeg warning detection on the V4L2 path ---
+class _FakeCap:
+    """Stands in for cv2.VideoCapture. Like libjpeg inside OpenCV, it writes
+    its warning straight to OS fd 2 (not sys.stderr) and still returns a frame."""
+
+    def __init__(self, warnings):
+        import numpy as np
+
+        self._warnings = list(warnings)
+        self.frame = np.full((48, 64, 3), 128, dtype=np.uint8)
+
+    def read(self):
+        import os
+
+        msg = self._warnings.pop(0)
+        if msg:
+            os.write(2, msg.encode())
+        return True, self.frame.copy()
+
+    def release(self):
+        pass
+
+
+def _v4l2_with(warnings):
+    from inchworm.backends import V4L2CameraTransport
+
+    # Direct construction bypasses open() (and its lock check) for unit testing only.
+    return V4L2CameraTransport("camera_left_arm", _FakeCap(warnings))
+
+
+def test_jpeg_corruption_warning_parser():
+    from inchworm.backends import jpeg_corruption_warning
+
+    assert jpeg_corruption_warning("") is None
+    assert jpeg_corruption_warning("[ WARN] something unrelated\n") is None
+    line = "Corrupt JPEG data: premature end of data segment"
+    assert jpeg_corruption_warning(f"noise\n{line}\n") == line
+    assert jpeg_corruption_warning("Corrupt JPEG data: 3 extraneous bytes before marker 0xd9")
+
+
+def test_v4l2_truncated_frame_warning_flags_corrupt(capfd):
+    warn = "Corrupt JPEG data: premature end of data segment\n"
+    transport = _v4l2_with(["", warn, ""])
+    capture = open_capture(transport, role="camera_left_arm")
+
+    first = capture.grab()
+    assert not first.corrupt and first.data.shape == (48, 64)
+
+    second = capture.grab()
+    assert second.corrupt
+    assert second.data.shape == (0, 0)  # damaged image is never delivered
+    assert transport.last_integrity_error == warn.strip()
+    assert transport.last_rejected_frame is not None  # kept for evidence only
+
+    third = capture.grab()
+    assert not third.corrupt and third.data.shape == (48, 64)
+    assert transport.last_integrity_error is None
+
+    # The captured warning is re-emitted to the real stderr, not swallowed.
+    assert "premature end of data segment" in capfd.readouterr().err
+
+
+def test_v4l2_unrelated_stderr_does_not_flag_corrupt():
+    transport = _v4l2_with(["[ WARN:0] global cap_v4l.cpp: some unrelated notice\n"])
+    capture = open_capture(transport, role="camera_left_arm")
+    assert not capture.grab().corrupt
+
+
+def test_v4l2_corrupt_frame_is_logged_with_reason():
+    events = []
+
+    class _Logger:
+        def emit(self, **kw):
+            events.append(kw)
+
+    warn = "Corrupt JPEG data: premature end of data segment"
+    capture = open_capture(_v4l2_with([warn + "\n"]), role="camera_left_arm", logger=_Logger())
+    assert capture.grab().corrupt
+    corrupt_events = [e for e in events if e["event_type"] == "camera_frame_corrupt"]
+    assert corrupt_events and corrupt_events[0]["payload"]["reason"] == warn
+
+
+def test_stderr_capture_restores_fd2():
+    import os
+
+    from inchworm.backends import _StderrCapture
+
+    before = os.fstat(2)
+    with _StderrCapture() as err:
+        os.write(2, b"inside\n")
+    after = os.fstat(2)
+    assert err.text == "inside\n"
+    assert (before.st_dev, before.st_ino) == (after.st_dev, after.st_ino)
+
+
+def test_camera_probe_dry_run_with_samples(tmp_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "camera_probe", Path(__file__).resolve().parents[1] / "scripts" / "camera_probe.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rc = mod.main(
+        ["--role", "camera_left_arm", "--frames", "30", "--save-samples", "2",
+         "--session-root", str(tmp_path)]
+    )
+    assert rc == 0
+    assert list(tmp_path.rglob("camera_left_arm_clean_*.png"))

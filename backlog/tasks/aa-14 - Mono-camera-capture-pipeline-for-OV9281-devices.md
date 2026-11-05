@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-10-25 19:36'
+updated_date: '2026-11-05 19:47'
 labels: []
 milestone: m-1
 dependencies:
@@ -60,6 +60,8 @@ See doc-1 sections 4 and 6.
 8. Session artifact dir: robot/sessions/ (already gitignored).
 9. CLI snapshot/record commands in scripts/camera_probe.py (also AC#5).
 10. Leave AC#4 unchecked with hardware comment.
+
+AC#3 fix (owner chose option 2, 2026-11-05): detect libjpeg corruption warnings ('Corrupt JPEG data: premature end of data segment') by capturing OS fd 2 around cap.read() in V4L2CameraTransport; flag the frame corrupt, deliver an empty array, log the reason; probe --save-samples writes flagged/clean PNGs for owner visual confirmation. Live re-run required before checking AC#3.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -88,6 +90,8 @@ DATA-QUALITY FINDING (follow-up, not hidden): libjpeg printed 'Corrupt JPEG data
 AC#3 UNCHECKED 2026-10-25 by the orchestrator. Live evidence contradicts it: truncated MJPEG frames ('premature end of data segment') decode without error and are NOT counted as corrupt (left arm 36/300, scanner 1280x800 203/300). AC#3 was previously checked on mock evidence only. Fix needed: detect truncated JPEG (missing EOI marker 0xFFD9 / libjpeg warning) and report it as corrupt; then re-measure.
 
 Truncated-frame detection attempt 2026-10-25: added an SOI/EOI check in _decode_to_gray (kept, with a unit test; it catches truncated JPEG bytes when the transport supplies raw JPEG). The raw passthrough via CAP_PROP_CONVERT_RGB=0 was REVERTED: on the openaicam arm cameras OpenCV then returns misaligned buffers (no SOI/EOI, every frame unreadable). So hardware truncated frames are still undetected and AC#3 stays unchecked. Next options: read V4L2 directly (v4l2 mmap buffer bytesused), or detect them via the libjpeg warning or the grey-tail pattern. Live probe after the revert: L 59.4 fps, R 53.3, scanner 99.7, reported corrupt 0 (as before).
+
+AC#3 option 2 implemented 2026-11-05 (software, mock-tested; NOT yet live): backends.py _StderrCapture (dup2 fd 2 to a temp file around cap.read(), restores fd 2, re-emits captured text so nothing is swallowed) + jpeg_corruption_warning(); V4L2CameraTransport sets last_integrity_error / last_rejected_frame and returns b'' -> CameraCapture.grab() reports corrupt=True, data 0x0, camera_frame_corrupt event with payload.reason. camera_probe.py: per-reason corrupt counts in the report, --save-samples N writes <role>_corrupt_*.png (rejected frame, evidence only) and <role>_clean_*.png. Tests: 6 new in test_camera_capture.py (fake cap writes the warning to fd 2 like libjpeg), full suite passes. Note: the opencv 5.0.0.93 wheel contains the libjpeg string 'Corrupt JPEG data: premature end of data segment'; imdecode on truncated bytes in this build returns None silently, so the warning path can only be proven on hardware. AC#3 stays UNCHECKED until: cameras attached via usbipd, then for each role: cd robot && uv run python scripts/camera_probe.py --live --role <role> --frames 300 --save-samples 5 (scanner also --width 1280 --height 800). Pass = corrupt count roughly matches the libjpeg lines printed (expected L ~36/300, scanner 1280x800 ~203/300), flagged PNGs show the grey tail and clean PNGs do not (owner visual check).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

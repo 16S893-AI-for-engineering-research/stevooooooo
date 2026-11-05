@@ -105,6 +105,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override session root directory.",
     )
+    parser.add_argument(
+        "--save-samples",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Save up to N corrupt-flagged frames and N clean frames as PNG "
+        "in the session artifact dir (AA-14 AC#3 evidence: flagged frames "
+        "should show the grey tail of a truncated JPEG).",
+    )
     return parser
 
 
@@ -160,6 +169,9 @@ def _probe(args: argparse.Namespace) -> int:
             frame_ts: list[float] = []
             dropped_total = 0
             corrupt_total = 0
+            reasons: dict[str, int] = {}
+            bad_samples: list = []
+            good_samples: list = []
 
             for i in range(args.frames):
                 t0 = time.monotonic()
@@ -171,6 +183,14 @@ def _probe(args: argparse.Namespace) -> int:
                     dropped_total += 1
                 if result.corrupt:
                     corrupt_total += 1
+                    reason = getattr(transport, "last_integrity_error", None)
+                    if reason:
+                        reasons[reason] = reasons.get(reason, 0) + 1
+                    rejected = getattr(transport, "last_rejected_frame", None)
+                    if rejected is not None and len(bad_samples) < args.save_samples:
+                        bad_samples.append((result.counter, rejected))
+                elif len(good_samples) < args.save_samples and i % 10 == 0:
+                    good_samples.append((result.counter, result.data))
 
         # Compute statistics.
         total_wall = frame_ts[-1] - frame_ts[0] if len(frame_ts) > 1 else 0.0
@@ -192,6 +212,8 @@ def _probe(args: argparse.Namespace) -> int:
             f"  dropped        : {dropped_total}",
             f"  corrupt        : {corrupt_total}",
         ]
+        for reason, n in sorted(reasons.items()):
+            lines.append(f"    {n:4d} x {reason}")
         report = "\n".join(lines)
         print(report)
 
@@ -199,6 +221,18 @@ def _probe(args: argparse.Namespace) -> int:
         report_path = ctx.artifact_dir / f"probe_{args.role}.txt"
         report_path.write_text(report + "\n", encoding="utf-8")
         print(f"[camera_probe] Report saved to {report_path}")
+
+        if bad_samples or good_samples:
+            import cv2
+
+            for tag, samples in (("corrupt", bad_samples), ("clean", good_samples)):
+                for counter, img in samples:
+                    out = ctx.artifact_dir / f"{args.role}_{tag}_{counter:05d}.png"
+                    cv2.imwrite(str(out), img)
+            print(
+                f"[camera_probe] Saved {len(bad_samples)} corrupt and "
+                f"{len(good_samples)} clean sample frames to {ctx.artifact_dir}"
+            )
 
         ctx.logger.info(
             role=args.role,
@@ -213,6 +247,7 @@ def _probe(args: argparse.Namespace) -> int:
                 "max_lat_ms": max_lat_ms,
                 "dropped": dropped_total,
                 "corrupt": corrupt_total,
+                "corrupt_reasons": reasons,
             },
         )
 

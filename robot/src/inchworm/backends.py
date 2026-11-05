@@ -611,6 +611,54 @@ def _make_synthetic_mjpeg(width: int, height: int) -> bytes:
     return b"\xff\xd8\xff\xd9"
 
 
+#: libjpeg messages that mean the frame data is damaged (premature end = truncated).
+_JPEG_CORRUPTION_MARKERS = ("Corrupt JPEG data", "Premature end of JPEG file")
+
+
+def jpeg_corruption_warning(text: str) -> Optional[str]:
+    """Return the first libjpeg corruption line in *text*, or None."""
+    for line in text.splitlines():
+        if any(m in line for m in _JPEG_CORRUPTION_MARKERS):
+            return line.strip()
+    return None
+
+
+class _StderrCapture:
+    """Redirect OS-level fd 2 into a temp file for the duration of the block.
+
+    libjpeg (inside OpenCV) writes warnings with C stdio, so sys.stderr
+    redirection would not see them. Captured text is re-emitted to the real
+    stderr after restore, so no message is swallowed. fd 2 is process-global:
+    output from other threads inside the window is captured too (and also
+    re-emitted); only one camera streams at a time (doc-1 s6).
+    """
+
+    def __init__(self) -> None:
+        self.text = ""
+
+    def __enter__(self) -> "_StderrCapture":
+        import sys
+        import tempfile
+
+        sys.stderr.flush()
+        self._tmp = tempfile.TemporaryFile()
+        self._saved = os.dup(2)
+        os.dup2(self._tmp.fileno(), 2)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        try:
+            os.dup2(self._saved, 2)
+        finally:
+            os.close(self._saved)
+        self._tmp.seek(0)
+        data = self._tmp.read()
+        self._tmp.close()
+        self.text = data.decode("utf-8", "replace")
+        if data:
+            os.write(2, data)
+
+
 class V4L2CameraTransport(CameraTransport):
     """Hardware camera transport via OpenCV V4L2 backend (AA-14).
 
@@ -630,6 +678,10 @@ class V4L2CameraTransport(CameraTransport):
         self._cap = cap  # cv2.VideoCapture
         self._transport_counter = 0
         self._open = True
+        #: libjpeg warning for the last read, if the frame was rejected (AA-14 AC#3).
+        self.last_integrity_error: Optional[str] = None
+        #: Decoded image of the last rejected frame, kept for evidence only.
+        self.last_rejected_frame = None
 
     @classmethod
     def open(cls, device: str, identity: "DeviceIdentity") -> "V4L2CameraTransport":
@@ -672,7 +724,7 @@ class V4L2CameraTransport(CameraTransport):
         # NOTE 2026-10-25: raw MJPEG passthrough (CAP_PROP_CONVERT_RGB=0) was tried
         # for truncated-frame detection; on the openaicam arm cameras OpenCV returns
         # misaligned buffers in that mode (no SOI/EOI), so it is NOT used. Truncated
-        # frames therefore remain undetected here (AA-14 AC#3 open).
+        # frames are detected from libjpeg's warning in read_frame_with_counter.
         if not cap.isOpened():
             raise BackendError(
                 f"Failed to open camera {device!r} at {dev_node!r} (V4L2 backend). "
@@ -691,11 +743,23 @@ class V4L2CameraTransport(CameraTransport):
         if not self._open:
             raise BackendError(f"V4L2 camera {self.device!r} is closed")
 
-        ret, frame = self._cap.read()
+        # AA-14 AC#3 (2026-11-05): OpenCV decodes MJPEG inside cap.read(); a
+        # truncated frame still decodes (grey tail) and libjpeg only prints a
+        # warning to fd 2. Capture fd 2 around the read and flag the frame.
+        self.last_integrity_error = None
+        self.last_rejected_frame = None
+        with _StderrCapture() as err:
+            ret, frame = self._cap.read()
         self._transport_counter += 1
+        warning = jpeg_corruption_warning(err.text)
 
         if not ret or frame is None or frame.size == 0:
             # Return empty bytes; CameraCapture will flag as corrupt.
+            return b"", self._transport_counter
+
+        if warning is not None:
+            self.last_integrity_error = warning
+            self.last_rejected_frame = frame
             return b"", self._transport_counter
 
 

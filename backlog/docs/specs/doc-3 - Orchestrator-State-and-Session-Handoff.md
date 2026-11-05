@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-03 15:45'
+updated_date: '2026-11-05 19:57'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-03, pre-restart handoff commit (after `b852a3d`). Full suite **1640 passed** (re-run at handoff).
+**Last verified:** 2026-11-05, after the website restyle and the AA-14 #3 software fix. Full suite **1646 passed**.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -32,7 +32,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### Next actions (pick one per session)
 1. **Supervised DexArm check** (owner at the robot): attach arm ports, read real SO-101 poses, dry-run queries including one expected refusal, one 5 mm move, compare reported vs model. Also explain the unexplained Z drop (31.05 -> 9.35 mm between two reads 2026-10-28, nothing commanded).
 2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
-3. **AA-14 #3**: detect truncated MJPEG frames on hardware (software only).
+3. **AA-14 #3** (software done 2026-11-05, owner chose libjpeg-warning detection): needs ONE live camera run to check the AC. Attach cameras, then per role `cd robot && uv run python scripts/camera_probe.py --live --role <role> --frames 300 --save-samples 5` (scanner also `--width 1280 --height 800`); owner confirms flagged PNGs show the grey tail. Commands in the AA-14 notes.
 4. **Software follow-ups:** wire `other_arm_pose_source` / `tube_source` / `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
 5. **AA-43** when the new servos arrive (owner to give the model, gearing and firmware for doc-1).
 

@@ -130,7 +130,9 @@ class FrameResult:
         detected relative to the previous successful frame).
     corrupt:
         True if the raw bytes could not be decoded (JPEG decode failure or
-        zero-size output from imdecode).  The data field contains an empty
+        zero-size output from imdecode), or the transport reported an
+        integrity error for the frame (libjpeg corruption warning, e.g. a
+        truncated MJPEG frame that still decoded).  The data field contains an empty
         array (shape 0×0) when corrupt is True.
     """
 
@@ -288,8 +290,16 @@ class CameraCapture:
         # Decode MJPEG/YUY2 → grayscale numpy array.
         data, corrupt = _decode_to_gray(raw_bytes)
 
+        # Transport-level integrity error (e.g. libjpeg "premature end of data
+        # segment" on a truncated MJPEG frame that OpenCV still decoded).
+        integrity_error = getattr(self._transport, "last_integrity_error", None)
+        if integrity_error:
+            corrupt = True
+            import numpy as _np
+            data = _np.empty((0, 0), dtype=_np.uint8)
+
         if corrupt:
-            self._emit_corrupt(local_counter)
+            self._emit_corrupt(local_counter, integrity_error)
 
         return FrameResult(
             data=data,
@@ -382,11 +392,14 @@ class CameraCapture:
             },
         )
 
-    def _emit_corrupt(self, local_counter: int) -> None:
+    def _emit_corrupt(self, local_counter: int, reason: Optional[str] = None) -> None:
+        payload: dict = {"local_counter": local_counter}
+        if reason:
+            payload["reason"] = reason
         self._emit(
             "camera_frame_corrupt",
             severity="WARNING",
-            payload={"local_counter": local_counter},
+            payload=payload,
         )
 
 
