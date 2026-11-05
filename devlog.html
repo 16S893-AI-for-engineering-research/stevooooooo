@@ -1,243 +1,391 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dev Log | Stephen</title>
-<meta name="description" content="Development log for Stephen's portfolio site, including agent session activity and notes." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dev Log — Stephen</title>
+  <meta name="description" content="Progress of the inchworm print-crawl robot at a glance, completed work in plain English, and dated notes on building it with AI agents." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div id="stars"></div>
+  <div id="stars"></div>
+  <div class="nebula-drift"></div>
 
-<nav class="site-nav">
-  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
-  <ul class="nav-links">
-    <li><a href="index.html">Home</a></li>
-    <li><a href="project.html">Project</a></li>
-    <li><a href="simulation.html">Simulation</a></li>
-    <li><a href="devlog.html" class="active">Dev Log</a></li>
-  </ul>
-</nav>
+  <nav class="site-nav">
+    <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="project.html">Project</a></li>
+      <li><a href="simulation.html">Simulation</a></li>
+      <li><a href="devlog.html" class="active">Dev Log</a></li>
+    </ul>
+  </nav>
 
-<main>
-  <div class="container">
-    <h1 class="page-title">Dev Log</h1>
-    <p class="subtitle">
-      Notes on building this site with the <code>pi</code> coding agent —
-      what worked, what didn't, and how the session activity broke down.
-    </p>
-
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Agent session activity</h3>
-      <p>
-        Across every persisted pi session for this repository through today,
-        here are the user messages, agent tool calls, and recorded model cost.
-        Activity counts and cost use separate scales so the comparison remains readable.
+  <main>
+    <div class="container page-head">
+      <p class="eyebrow">Progress &middot; updated Nov 5, 2026</p>
+      <h1 class="page-title">Dev Log</h1>
+      <p class="subtitle">
+        Where the inchworm robot stands, what is finished, and dated notes on
+        building it with AI agents. New here? Read the
+        <a href="project.html">Project</a> page first.
       </p>
-      <img src="assets/session-activity.svg" alt="Charts showing daily totals from all persisted pi sessions in this repository: user messages, agent tool calls, and recorded model cost in US dollars" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
     </div>
 
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Core contribution</h3>
-        <time class="log-date">Oct 27, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Wrote a pose-comparison step into the plan: rendered and commanded robot motion is checked against the real robot (AA-40 render comparison, first supervised moves).</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p>My core contribution to this project is the systems levels thinking about how things must work and building the descriptions and models of the what the physical system looks like and how it moves. I don't exactly know how to check that the code truly understands the system correctly and may only discover that in the process of trial and error. Right now I have that trial and error written in as a step where I'll compare actual robot movements with what it thought happened.</p>
-        </section>
-      </div>
-    </article>
+    <div class="container" style="padding-top:0">
+      <!-- 01 At a glance -->
+      <section class="section" id="glance" style="margin-top:0">
+        <div class="section-head"><span class="num">01</span><h2>Project at a glance</h2></div>
 
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Teaching AI the physical robot</h3>
-        <time class="log-date">Oct 27, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Built a complete URDF of the cell (two SO-101s with the custom gripper and camera mounts, the DexArm with the laser camera, the base mount and the tube) to replace raw CAD for the agents.</li>
-            <li>Agent turned the URDF into the robot model: mesh collision checking (python-fcl) wired into the motion safety layer, a pose viewer, and a DexArm collision check using the DexArm firmware&rsquo;s own kinematics.</li>
-            <li>Diagnosed the non-moving wrist and gripper servos: servos 4&ndash;6 on both arms are encoder-only leader-arm servos. Replacement and recalibration tracked as task AA-43.</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p>Big lesson this week was that making AI understand something physical in real life is not easy. Especially when a model is as complicated as this is with 3 different robotic arms with many many parts, it has a hard time distinguishing things. I did not make it easier since alot of the parts in my model are named the same thing. Burned quite a bit of money on that mistake. Instead of just giving it the CAD, I ended up creating a urdf myself to give the agents. This made things much more understandable for it. I also realized I need more of one kind of the servo before I can complete everything and will need to rebuild the arms so that's fun. Went on a goose chase trying to figure that out, as well. Thought I had fried something but turned out they were dummy servos with just encoders so you could use them as a leader arm.</p>
-        </section>
-      </div>
-    </article>
+        <div class="glance-top">
+          <div class="panel overall">
+            <h3>Overall progress</h3>
+            <div class="pct">67%<small>of 239 milestone acceptance criteria met</small></div>
+            <div class="progress lg" role="img" aria-label="12 of 35 milestone tasks done, 16 in progress, 7 to do">
+              <span class="done" style="width:34.3%"></span>
+              <span class="doing" style="width:45.7%"></span>
+              <span class="todo" style="width:20%"></span>
+            </div>
+            <ul class="legend">
+              <li><i class="key-done"></i>12 tasks done</li>
+              <li><i class="key-doing"></i>16 in progress</li>
+              <li><i class="key-todo"></i>7 to do</li>
+            </ul>
+            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by 1,640 passing tests. Most remaining criteria need measurements on the real robot.</p>
+          </div>
+          <div class="panel">
+            <h3>Phases</h3>
+            <ul class="lesson-list">
+              <li><strong>Sep</strong> &mdash; Website, agent skills, paper simulation</li>
+              <li><strong>Mid Oct</strong> &mdash; Robot designed, ordered and built</li>
+              <li><strong>Late Oct</strong> &mdash; Robot software planned and written by agents</li>
+              <li><strong>Now</strong> &mdash; Bringing the hardware to life, safely</li>
+              <li><strong>Next</strong> &mdash; Learned insertion, then full autonomous print-crawl</li>
+            </ul>
+          </div>
+        </div>
 
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Planning the robot software</h3>
-        <time class="log-date">Oct 20, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Described the system to Pi: two SO-101 arms gripping attachment points 183.676&nbsp;mm apart, a DexArm carrying the print head and a line laser, a fixed chassis with the tube as the moving part.</li>
-            <li>Pi broke the work into 33 tasks across 7 milestones with 227 acceptance criteria.</li>
-            <li>Two constraints reordered the plan: the crawl cycle cannot be tested until learned insertion works, and DexArm repeatability is measured before laser calibration so its error is not mistaken for optical error.</li>
-            <li>Added a project-wide Definition of Done requiring evidence rather than code inspection, so sub-agents cannot quietly rewrite requirements to match what they built.</li>
-            <li>Getting the walkthrough tab to open took four separate fixes.</li>
+        <div class="panel" style="margin-top:1.25rem">
+          <h3>Milestones</h3>
+          <ul class="milestones">
+            <li><span class="ms-name"><span class="ms-id">M0</span>Foundations <span class="ms-check">&#10003;</span><span class="ms-desc">Package, device naming, camera bandwidth rule, logging</span></span>
+              <div class="progress"><span class="done" style="width:100%"></span></div>
+              <span class="ms-count"><b>4/4</b> tasks<br>25/25 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M1</span>Hardware bring-up<span class="ms-desc">Drive the arms, DexArm and cameras from code</span></span>
+              <div class="progress"><span class="done" style="width:25%"></span><span class="doing" style="width:50%"></span></div>
+              <span class="ms-count"><b>2/8</b> tasks<br>32/48 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M2</span>Geometry &amp; coarse motion<span class="ms-desc">Frames, gripper lock, approach, fold, dry crawl</span></span>
+              <div class="progress"><span class="done" style="width:28.6%"></span><span class="doing" style="width:71.4%"></span></div>
+              <span class="ms-count"><b>2/7</b> tasks<br>38/48 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M3</span>Learned insertion<span class="ms-desc">Demonstrations, training, seating detection</span></span>
+              <div class="progress"><span class="done" style="width:16.7%"></span><span class="doing" style="width:50%"></span></div>
+              <span class="ms-count"><b>1/6</b> tasks<br>27/46 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M4</span>Crawl cycle<span class="ms-desc">Move the real tube; recover from faults</span></span>
+              <div class="progress"><span class="done" style="width:50%"></span></div>
+              <span class="ms-count"><b>1/2</b> tasks<br>7/14 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M5</span>Laser auto-leveling<span class="ms-desc">Scan the part and correct the print frame</span></span>
+              <div class="progress"><span class="done" style="width:20%"></span><span class="doing" style="width:80%"></span></div>
+              <span class="ms-count"><b>1/5</b> tasks<br>24/36 criteria</span></li>
+            <li><span class="ms-name"><span class="ms-id">M6</span>Autonomy &amp; validation<span class="ms-desc">Multi-cycle print-crawl loop and acceptance test</span></span>
+              <div class="progress"><span class="done" style="width:33.3%"></span></div>
+              <span class="ms-count"><b>1/3</b> tasks<br>7/22 criteria</span></li>
           </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p class="no-notes">No notes for this entry.</p>
-        </section>
-      </div>
-    </article>
-
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Human-only task handoffs</h3>
-        <time class="log-date">Oct 19, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Added a workflow for assigning tasks that only I can complete; the agent must justify why a task needs physical access, identity, authorization or personal judgment, and minimize such requests.</li>
-            <li>Each necessary task is an explicit Backlog procedure I accept, with step-by-step actions, expected results, verification and stop conditions.</li>
-            <li>A single dedicated walkthrough tab guides accepted tasks one at a time, records evidence, and returns the result to the main agent for verification.</li>
+          <ul class="legend" style="margin-top:0.9rem">
+            <li><i class="key-done"></i>Done</li>
+            <li><i class="key-doing"></i>In progress</li>
+            <li><i class="key-todo"></i>To do</li>
           </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p class="no-notes">No notes for this entry.</p>
-        </section>
-      </div>
-    </article>
+        </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Project structure map</h3>
-      <p>
+        <div class="status-cards">
+          <div class="card blocker">
+            <h3>Current blocker</h3>
+            <p>The wrist and gripper servos (4&ndash;6) on both arms are encoder-only &ldquo;leader&rdquo; servos: they read position but have no motor. New powered servos are on order, then both arms get rebuilt and recalibrated. <span class="task-id">AA-43</span></p>
+          </div>
+          <div class="card">
+            <h3>Up next</h3>
+            <ul>
+              <li>Supervised first DexArm move against the robot model</li>
+              <li>DexArm repeatability measured with the scanner camera</li>
+              <li>Servo swap and recalibration when parts arrive</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Already safe in software</h3>
+            <ul>
+              <li>Collision checks against the full robot model before every move</li>
+              <li>Laser forced off on every exit path</li>
+              <li>Only one camera streams at a time</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 Completed work -->
+      <section class="section" id="done">
+        <div class="section-head"><span class="num">02</span><h2>What's finished, in plain English</h2></div>
+        <p class="section-lead">Every completed task, with what it does and why it matters. The small grey tags are the task IDs used in the repository.</p>
+        <div class="done-groups">
+          <div class="panel done-group">
+            <h3>M0 Foundations <small>4 of 4</small></h3>
+            <ul class="done-list">
+              <li><b>One home for all robot code</b>: a single package and one config file describing the hardware, so no task invents its own numbers. <span class="task-id">AA-4</span></li>
+              <li><b>Each device always has the same name</b>: the two arms can never be mixed up after a reboot, which could drive one into the chassis. <span class="task-id">AA-5</span> <span class="task-id">AA-37</span></li>
+              <li><b>One camera at a time</b>: all cameras share one USB 2.0 link, so code enforces that only one streams. <span class="task-id">AA-6</span></li>
+              <li><b>A flight recorder</b>: every run leaves a log, so an unattended failure can be diagnosed afterwards. <span class="task-id">AA-7</span></li>
+            </ul>
+          </div>
+          <div class="panel done-group">
+            <h3>M1 Hardware bring-up <small>2 of 8</small></h3>
+            <ul class="done-list">
+              <li><b>Talking to the arm servos</b>: a driver for the SO-101 servo bus and a map of which servo is which joint. <span class="task-id">AA-8</span></li>
+              <li><b>Talking to the DexArm</b>: a driver for its G-code dialect that handles its quirks and reconnects safely. <span class="task-id">AA-12</span></li>
+            </ul>
+          </div>
+          <div class="panel done-group">
+            <h3>M2 Geometry &amp; coarse motion <small>2 of 7</small></h3>
+            <ul class="done-list">
+              <li><b>A map of where everything is</b>: the chassis stays still and the tube moves, so every attachment point is tracked as the tube advances. <span class="task-id">AA-15</span></li>
+              <li><b>Safe handover between code and AI</b>: scripted motion hands control to the learned policy only inside strict limits, and always takes it back. <span class="task-id">AA-20</span></li>
+            </ul>
+          </div>
+          <div class="panel done-group">
+            <h3>M3&ndash;M6 Insertion, crawl, leveling, autonomy <small>4 of 16</small></h3>
+            <ul class="done-list">
+              <li><b>Robot-learning toolkit installed</b>: LeRobot set up and connected to the SO-101 arms for recording demonstrations and training. <span class="task-id">AA-22</span></li>
+              <li><b>Recovering from bad cycles</b>: detects a missed insertion, a latch that won't hold or a shifted tube, and gets back to a safe state. <span class="task-id">AA-28</span></li>
+              <li><b>Applying the leveling correction</b>: the measured tilt and height of the part shift the DexArm's print frame before every section. <span class="task-id">AA-33</span></li>
+              <li><b>From slicer to printer</b>: a DexArm profile in Cura, and checks that every sliced file stays inside the safe workspace. <span class="task-id">AA-34</span></li>
+            </ul>
+          </div>
+          <div class="panel done-group" style="grid-column:1 / -1">
+            <h3>Website &amp; agent workflow <small>3 of 3</small></h3>
+            <ul class="done-list">
+              <li><b>Interactive 3D CAD viewer</b> of the real robot on this site, self-hosted so it works offline. <span class="task-id">AA-1</span> <span class="task-id">AA-3</span></li>
+              <li><b>Human-only task handoffs</b>: when a step needs my hands or judgment, the agent writes a checked procedure and a separate tab guides me through it. <span class="task-id">AA-2</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 Activity -->
+      <section class="section" id="activity">
+        <div class="section-head"><span class="num">03</span><h2>Agent activity &amp; cost</h2></div>
+        <div class="panel">
+          <p class="muted" style="margin-top:0">Daily totals from every saved pi session for this project: my messages, agent tool calls and model cost, split into main sessions, sub-agent workers and the walkthrough guide. How the agents were organised is on the <a href="project.html#agents">Project</a> page.</p>
+          <img class="wide-img" src="assets/session-activity.svg" alt="Charts of daily totals from all pi sessions for this project: owner messages, agent tool calls, and model cost in US dollars split by session type" />
+        </div>
+      </section>
+
+      <!-- 04 Entries -->
+      <section class="section" id="log">
+        <div class="section-head"><span class="num">04</span><h2>Dated entries</h2></div>
+        <p class="section-lead">Newest first. &ldquo;Work done&rdquo; is a plain summary; &ldquo;Notes&rdquo; are my own words, unedited.</p>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase hw">Hardware</span>
+            <time class="log-date">Oct 27, 2026</time>
+          </header>
+          <h3 class="log-title">Core contribution</h3>
+          <p class="log-tldr">My part is the systems thinking and the physical model; the plan now checks the robot against that model.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Real vs. modelled motion check</b> added to the plan: on the first supervised moves, where the robot actually goes is compared with where the model predicted.<span class="task-id">AA-40</span></li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">My core contribution to this project is the systems levels thinking about how things must work and building the descriptions and models of the what the physical system looks like and how it moves. I don't exactly know how to check that the code truly understands the system correctly and may only discover that in the process of trial and error. Right now I have that trial and error written in as a step where I'll compare actual robot movements with what it thought happened.</p>
+            </section>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase hw">Hardware</span>
+            <time class="log-date">Oct 27, 2026</time>
+          </header>
+          <h3 class="log-title">Teaching AI the physical robot</h3>
+          <p class="log-tldr">Agents only understood the robot once I hand-built a clean robot model; the &ldquo;broken&rdquo; servos turned out to have no motors.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Hand-built URDF</b> (a robot description file) of the whole cell: both arms with custom grippers and cameras, the DexArm with its laser camera, the base and the tube. It replaces raw CAD, whose duplicate part names confused the agents.</li>
+              <li><b>Collision checking</b>: before any move, code checks the planned pose against this model and refuses if parts would touch. The DexArm check uses the arm's own firmware maths.<span class="task-id">AA-40</span></li>
+              <li><b>Servo mystery solved</b>: wrist and gripper servos on both arms are encoder-only leader servos. Swap and recalibration planned.<span class="task-id">AA-43</span></li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Big lesson this week was that making AI understand something physical in real life is not easy. Especially when a model is as complicated as this is with 3 different robotic arms with many many parts, it has a hard time distinguishing things. I did not make it easier since alot of the parts in my model are named the same thing. Burned quite a bit of money on that mistake. Instead of just giving it the CAD, I ended up creating a urdf myself to give the agents. This made things much more understandable for it. I also realized I need more of one kind of the servo before I can complete everything and will need to rebuild the arms so that's fun. Went on a goose chase trying to figure that out, as well. Thought I had fried something but turned out they were dummy servos with just encoders so you could use them as a leader arm.</p>
+            </section>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase plan">Planning</span>
+            <time class="log-date">Oct 20, 2026</time>
+          </header>
+          <h3 class="log-title">Planning the robot software</h3>
+          <p class="log-tldr">The whole robot was broken into 33 tasks with measurable pass/fail criteria before any code was written.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Described the system to the agent</b>: two SO-101 arms gripping attachment points 183.7&nbsp;mm apart, a DexArm with print head and laser, a fixed chassis and a moving tube.</li>
+              <li><b>33 tasks, 7 milestones, 227 acceptance criteria.</b></li>
+              <li><b>Order matters</b>: the crawl cycle can't be tested until learned insertion works, and DexArm repeatability is measured before laser calibration so arm error isn't mistaken for optical error.</li>
+              <li><b>Evidence rule</b>: a criterion counts as done only with test output or a measurement, so agents can't quietly rewrite requirements to match what they built.</li>
+              <li>Getting the walkthrough tab to open took four separate fixes.</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="no-notes">No notes for this entry.</p>
+            </section>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase agents">Agent workflow</span>
+            <time class="log-date">Oct 19, 2026</time>
+          </header>
+          <h3 class="log-title">Human-only task handoffs</h3>
+          <p class="log-tldr">When only I can do a step, the agent must justify it and hand me a checklist with checks and stop points.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Justify or automate</b>: the agent may only ask me for things needing physical access, my identity, permission or judgment, and keeps those to a minimum.</li>
+              <li><b>Checklists I accept</b>: each request is a Backlog procedure with actions, expected results, how to verify, and when to stop.</li>
+              <li><b>One guide tab</b> walks me through accepted tasks one at a time and reports the evidence back to the main agent.</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="no-notes">No notes for this entry.</p>
+            </section>
+          </div>
+        </article>
+        <div class="panel log-entry">
+          <h3>Project structure map</h3>
+      <p class="muted">
         This map shows the repository systems that support the robot project. Components that create, accept, or guide human-only tasks are highlighted in red; general repository and agent components are blue.
       </p>
-      <img src="assets/project-structure.svg" alt="Map of the 893 repository structure and Pi workflow, with human-only handoff components highlighted in red" style="max-width:100%; border-radius:8px; border:1px solid var(--panel-border); margin-top:0.5rem;" />
+      <img class="wide-img" src="assets/project-structure.svg" alt="Map of the 893 repository structure and Pi workflow, with human-only handoff components highlighted in red" />
     </div>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase hw">Hardware</span>
+            <time class="log-date">Oct 15, 2026</time>
+          </header>
+          <h3 class="log-title">Robot hardware development</h3>
+          <p class="log-tldr">The physical robot was designed, ordered and assembled; work now moves from hardware to software.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Built the robot</b>: chose parts, designed, ordered and assembled it, using my own Claude for component selection and trade-offs.</li>
+              <li><b>Added the CAD</b> to the repository, with the interactive viewer below.</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Thus far, I've been using my own personal AI to do a lot of the component selection, tradeoff management, and planning for my robot. I have now chosen parts, designed, ordered, and assembled the entire robot. Part of the reason for using my own personal AI was to prevent muddying up Pi context and because a lot of my descriptions of the idea were already in Claude. I understand this means you can't monitor my AI use which makes it look like I haven't been doing much. At this point, it is about the time when I will be switching from hardware development to software development and plan to integrate AI much more heavily outside of just component selection, tradeoff management, and planning using parley. I have included the CAD of the current system in the repo.</p>
+            </section>
+          </div>
+          <div class="log-full">
+            <figure class="viewer-frame" style="margin:0">
+              <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
+              <figcaption><span>Current robot CAD: drag to rotate, scroll or pinch to zoom.</span><a href="CAD/Assembly%201.step" download>Download STEP</a></figcaption>
+            </figure>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase sim">Simulation</span>
+            <time class="log-date">Sep 22, 2026</time>
+          </header>
+          <h3 class="log-title">Recreating a paper&rsquo;s simulation from scratch</h3>
+          <p class="log-tldr">A published free-flying 3D-printer simulation rebuilt in Python matches 16 of 16 reported numbers.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Rebuilt the simulation</b> from Jonckers et al. (2022), <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying Satellites&rdquo;</em>. Full write-up on the <a href="simulation.html">Simulation</a> page.</li>
+              <li><b>Questions first</b>: asking before building kept the scope right: no full arm kinematics, a planar 3&nbsp;DoF model like the paper's, and nozzle friction clearly labelled as calibrated.</li>
+              <li><b>Found issues in the paper</b>: the arm direction needed to match the reported error split, and one equation appears transposed. Both documented, not silently fixed.</li>
+              <li><b>Property-based tests</b> caught one wrong test and one real bug (the print was centred on the wrong point, cancelling a 400&nbsp;mm lever arm).</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">This project was super interesting. I don't believe the AI actually ever finished its thinking. It ran out of space twice. After that, I checked what it had written up to that point and it seemed complete but I think there is a good chance it would have continued working. I ulitmately decided not to try and let it finish because this project broke the $20 dollar mark in terms of tokens already. I think such stringent requirements in my prompt forced the AI to do alot more iterations than might have been totally necessary. Besides the AI, I noticed some of my own bias creeping in as a manager. This session most definitely ended in a cost overrun and technically the session wasn't even finished yet. This is partially because I found myself in a sunk cost fallacy. Since I couldn't actually know how much more progress there was to complete, I kept assuming that it was only a little bit more until eventaully I had spent $20.</p>
+            </section>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase agents">Agent workflow</span>
+            <time class="log-date">Sep 17, 2026</time>
+          </header>
+          <h3 class="log-title">Added a &ldquo;clarify before build&rdquo; skill</h3>
+          <p class="log-tldr">The agent must ask about style, scope and success criteria before building anything visual or physical.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Custom skill</b> <code>.pi/skills/clarify-before-build</code>: ask clarifying questions, restate the plan, and wait for a go-ahead before writing code.</li>
+              <li><b>Why</b>: a question is the cheapest place to catch a mismatch; a finished but wrong build is the most expensive.</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="no-notes">No notes for this entry.</p>
+            </section>
+          </div>
+        </article>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase site">Website</span>
+            <time class="log-date">Sep 15, 2026</time>
+          </header>
+          <h3 class="log-title">Getting the animation right</h3>
+          <p class="log-tldr">First site and animation built from a written prompt; the AI needed coaching to fix physical motion.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Built the site</b> and its truss-crawling robot animation (the one on the home page) from a written prompt.</li>
+              <li><b>Added this dev log</b> with the session activity chart.</li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Found that Claude struggled taking the prompt and making something physical (the animation) using just words. It clearly understood what I wanted but need extra coaching about what was wrong to recognize and fix the mistakes. Either that or it was simply taking shortcuts. I also feel as though I'm not using the terminal in the best way. I'd like an easier way to add files and share information with the model.</p>
+            </section>
+          </div>
+        </article>
+      </section>
 
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Robot hardware development</h3>
-        <time class="log-date">Oct 15, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Chose parts, designed, ordered and assembled the entire robot (component selection and trade-offs done with my own AI).</li>
-            <li>Added the CAD of the current system to the repository, with an interactive 3D viewer below.</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p>Thus far, I've been using my own personal AI to do a lot of the component selection, tradeoff management, and planning for my robot. I have now chosen parts, designed, ordered, and assembled the entire robot. Part of the reason for using my own personal AI was to prevent muddying up Pi context and because a lot of my descriptions of the idea were already in Claude. I understand this means you can't monitor my AI use which makes it look like I haven't been doing much. At this point, it is about the time when I will be switching from hardware development to software development and plan to integrate AI much more heavily outside of just component selection, tradeoff management, and planning using parley. I have included the CAD of the current system in the repo.</p>
-        </section>
+      <div class="btn-row">
+        <a href="simulation.html" class="btn btn-secondary">&larr; Simulation</a>
+        <a href="project.html" class="btn btn-primary">Project &rarr;</a>
       </div>
-      <div class="log-full">
-      <figure class="cad-viewer">
-        <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
-        <figcaption>Current robot CAD &mdash; drag to rotate, scroll or pinch to zoom.</figcaption>
-      </figure>
-      <p class="cad-download"><a href="CAD/Assembly%201.step" download>Download the original STEP assembly</a></p>
-      </div>
-    </article>
-
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Recreating a paper&rsquo;s simulation from scratch</h3>
-        <time class="log-date">Sep 22, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Rebuilt the simulation from Jonckers et al. (2022), <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying Satellites&rdquo;</em>; it reproduces 16 of 16 published quantities within tolerance (full write-up on the <a href="simulation.html">Simulation</a> page).</li>
-            <li>Clarify-before-build questions changed the build: no full arm inverse kinematics (the paper treats the arm as an ideal follower), and nozzle friction calibrated against the reported 8.42&nbsp;mm result and labelled as calibrated, since the paper gives no friction value.</li>
-            <li>Kept the model 3&nbsp;DoF: ELISSA is a planar air-bearing table and the paper is explicitly 3&nbsp;DoF.</li>
-            <li>Found that the arm must point along the body y axis to reproduce the reported error split (0.68&nbsp;mm x vs 0.28&nbsp;mm y), and that Equation 3 appears transposed; documented the working version rather than silently fixing it.</li>
-            <li>Hypothesis property tests found a wrong test (zero torque is correct when travel is parallel to the lever arm) and a real bug (the print was centred on the free-flyer&rsquo;s centre of rotation, cancelling the 400&nbsp;mm lever arm).</li>
-            <li>With no PyPI access in the sandbox, the agent wrote a small shim to run the real tests unmodified, and emitted figures as hand-written SVG (5&ndash;33&nbsp;KB each).</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p>This project was super interesting. I don't believe the AI actually ever finished its thinking. It ran out of space twice. After that, I checked what it had written up to that point and it seemed complete but I think there is a good chance it would have continued working. I ulitmately decided not to try and let it finish because this project broke the $20 dollar mark in terms of tokens already. I think such stringent requirements in my prompt forced the AI to do alot more iterations than might have been totally necessary. Besides the AI, I noticed some of my own bias creeping in as a manager. This session most definitely ended in a cost overrun and technically the session wasn't even finished yet. This is partially because I found myself in a sunk cost fallacy. Since I couldn't actually know how much more progress there was to complete, I kept assuming that it was only a little bit more until eventaully I had spent $20.</p>
-        </section>
-      </div>
-    </article>
-
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Added a &ldquo;clarify before build&rdquo; skill</h3>
-        <time class="log-date">Sep 17, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Wrote a custom agent skill, <code>.pi/skills/clarify-before-build/SKILL.md</code>: for anything with a physical or visible form, the agent must ask clarifying questions about style, layout, motion, scope and success criteria before writing code, then restate the plan and get a go-ahead.</li>
-            <li>Goal: catch mismatches at the cheapest point (a question) rather than the most expensive (a finished but wrong build).</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p class="no-notes">No notes for this entry.</p>
-        </section>
-      </div>
-    </article>
-
-    <article class="panel log-entry">
-      <header class="log-head">
-        <h3 class="log-title">Getting the animation right</h3>
-        <time class="log-date">Sep 15, 2026</time>
-      </header>
-      <div class="log-cols">
-        <section class="log-col">
-          <h4>Work Done</h4>
-          <ul>
-            <li>Built the site&rsquo;s first animation with Claude from a written prompt.</li>
-            <li>Added the dev log page with the session activity graph.</li>
-          </ul>
-        </section>
-        <section class="log-col">
-          <h4>Notes</h4>
-          <p>Found that Claude struggled taking the prompt and making something physical (the animation) using just words. It clearly understood what I wanted but need extra coaching about what was wrong to recognize and fix the mistakes. Either that or it was simply taking shortcuts. I also feel as though I'm not using the terminal in the best way. I'd like an easier way to add files and share information with the model.</p>
-        </section>
-      </div>
-    </article>
-
-    <div class="btn-row">
-      <a href="simulation.html" class="btn btn-secondary">&larr; Simulation</a>
-      <a href="index.html" class="btn btn-primary">Home</a>
     </div>
-  </div>
-</main>
+  </main>
 
-<footer class="site-footer">
-  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
-  <div class="egg-note">every bug is a lesson, every lesson is a log entry.</div>
-</footer>
+  <footer class="site-footer">
+    <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+    <div class="egg-note">every bug is a lesson, every lesson is a log entry.</div>
+  </footer>
 
-<script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
-<script type="module" src="js/model-viewer.min.js"></script>
-<script src="js/stars.js"></script>
-<script src="js/truss.js"></script>
+  <script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
+  <script type="module" src="js/model-viewer.min.js"></script>
+  <script src="js/stars.js"></script>
 </body>
 </html>

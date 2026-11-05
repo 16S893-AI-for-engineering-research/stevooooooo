@@ -1,178 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Project — 3D-Printing Spider Bot | Stephen</title>
-<meta name="description" content="Concept for a truss-climbing 3D printer robot for building megastructures in space." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project — 3D-Printing Spider Bot | Stephen</title>
+  <meta name="description" content="A truss-climbing 3D printer robot for building megastructures in space, the inchworm prototype, and how AI agents were used to build its software." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div id="stars"></div>
+  <div id="stars"></div>
+  <div class="nebula-drift"></div>
 
-<nav class="site-nav">
-  <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
-  <ul class="nav-links">
-    <li><a href="index.html">Home</a></li>
-    <li><a href="project.html" class="active">Project</a></li>
-    <li><a href="simulation.html">Simulation</a></li>
-    <li><a href="devlog.html">Dev Log</a></li>
-  </ul>
-</nav>
+  <nav class="site-nav">
+    <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="project.html" class="active">Project</a></li>
+      <li><a href="simulation.html">Simulation</a></li>
+      <li><a href="devlog.html">Dev Log</a></li>
+    </ul>
+  </nav>
 
-<main>
-  <div class="container">
-    <p class="eyebrow" style="color:var(--accent-2); letter-spacing:0.2em; text-transform:uppercase; font-size:0.8rem;">Concept &middot; In Progress</p>
-    <h1 class="page-title">The 3D-Printing Spider Bot</h1>
-    <p class="subtitle">
-      A concept for a 3D printer that moves along the very structure it prints,
-      using robotic arms to climb, anchor, and extrude &mdash; enabling a small
-      satellite to build megastructures far larger than itself.
-    </p>
-
-    <section class="panel cad-feature" aria-labelledby="cad-feature-title">
-      <p class="eyebrow">Current system</p>
-      <h2 id="cad-feature-title">Robot CAD</h2>
-      <p>Explore the current assembled robot in 3D. Drag to rotate, and scroll or pinch to zoom.</p>
-      <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
-      <div class="btn-row cad-feature-links">
-        <a href="CAD/Assembly%201.step" class="btn btn-primary" download>Download STEP</a>
-      </div>
-    </section>
-
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The problem</h3>
-      <p>
-        Traditional space structures are limited by the size of a rocket's payload
-        fairing. Anything big &mdash; solar arrays, antennas, habitats, truss backbones
-        for space stations &mdash; has to be folded, packed, launched, and unfolded, or
-        assembled piece-by-piece by astronauts or teleoperated arms. That caps how
-        large and how cheap "big" can be.
+  <main>
+    <div class="container page-head">
+      <p class="eyebrow">Concept &middot; Prototype in progress</p>
+      <h1 class="page-title">The 3D-Printing Spider Bot</h1>
+      <p class="subtitle">
+        A 3D printer that moves along the structure it prints. Robotic arms
+        climb, anchor and extrude, so a small satellite could build
+        structures far larger than itself.
       </p>
-      <p>
-        More broadly, what's needed is a manufacturing system for space and the
-        Moon that is <strong>autonomous</strong>, <strong>universal</strong> (capable
-        of making any structure, irrespective of complexity or size), and still
-        small and efficient enough to launch affordably.
-      </p>
-    </div>
-
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The idea</h3>
-      <p>
-        Instead of launching the whole structure, launch a small robot that
-        <em>prints</em> the structure in orbit, then walks along what it just
-        printed to keep printing more. Picture an inchworm: it anchors its rear
-        feet, extends a printhead-tipped arm forward to extrude the next segment
-        of truss, then grips that new segment and pulls the rest of its body
-        forward &mdash; repeating indefinitely.
-      </p>
-      <p>
-        Because the robot never needs to be bigger than a single truss bay,
-        a satellite far smaller than the final structure could, in principle,
-        print a truss kilometers long &mdash; solar farms, telescope backbones,
-        habitat frames &mdash; using local or launched feedstock.
-      </p>
-      <p>
-        By integrating attachment points directly into the printed structure,
-        the same cycle of <em>print, then move</em> repeats indefinitely, which
-        effectively makes the printer's build volume infinite. Anchoring to
-        features it just printed also avoids the much harder problem of gripping
-        a structure with a free-floating robot.
-      </p>
-    </div>
-
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Concept media</h3>
-      <p>
-        Early concept diagram and crawl-cycle animations from the initial
-        proposal write-up.
-      </p>
-      <div class="media-row">
-        <figure class="figure">
-          <img src="assets/megastructure-concept-diagram.png" alt="Diagram of the 3D-printing inchworm robot concept, showing the robot printing and anchoring to truss structure as it advances" />
-          <figcaption>Concept diagram: the inchworm robot prints truss segments and anchors to the attachment points it just printed, advancing one bay at a time.</figcaption>
-        </figure>
-        <figure class="figure">
-          <img src="assets/inchworm-crawl-cycle.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, first pass" />
-          <figcaption>Crawl-cycle animation, pass 1: anchor &rarr; extrude &rarr; advance.</figcaption>
-        </figure>
-        <figure class="figure">
-          <img src="assets/inchworm-crawl-cycle-2.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, second pass" />
-          <figcaption>Crawl-cycle animation, pass 2: the same cycle repeating to grow the truss further.</figcaption>
-        </figure>
+      <div class="stat-row">
+        <div class="stat"><b>3 arms</b><span>two SO-101 grippers and a DexArm print head</span></div>
+        <div class="stat"><b>67%</b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
+        <div class="stat"><b>1,640</b><span>automated software tests passing</span></div>
+        <div class="stat"><b>~$421</b><span>total AI agent cost so far</span></div>
       </div>
     </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">How it would work</h3>
-      <ol class="step-list">
-        <li><strong>Anchor.</strong> Rear gripper locks onto the last printed truss node.</li>
-        <li><strong>Extrude.</strong> A forward arm, tipped with an extrusion head, lays down the next truss segment &mdash; beams, nodes, and diagonals.</li>
-        <li><strong>Cure.</strong> The freshly printed segment sets (thermally, chemically, or via UV) enough to bear the robot's own weight.</li>
-        <li><strong>Advance.</strong> The front gripper clamps the new segment; the rear releases and the body arches forward, inchworm-style.</li>
-        <li><strong>Repeat.</strong> The cycle continues, growing the truss one bay at a time, in any direction the mission needs.</li>
-      </ol>
-    </div>
+    <!-- 01 Idea -->
+    <div class="container" style="padding-top:0">
+      <section class="section">
+        <div class="section-head"><span class="num">01</span><h2>The idea</h2></div>
+        <div class="grid-2">
+          <div class="card card-accent pink">
+            <h3>The problem</h3>
+            <p>Space structures are limited by the size of a rocket's payload fairing. Anything big, such as solar arrays, antennas, habitats or station trusses, must be folded and unfolded, or assembled piece by piece by astronauts or teleoperated arms.</p>
+            <p>What's needed is a manufacturing system that is <strong>autonomous</strong>, <strong>universal</strong> (any structure, any size) and still small enough to launch affordably.</p>
+          </div>
+          <div class="card card-accent teal">
+            <h3>The answer: print, then move</h3>
+            <p>Launch a small robot that <em>prints</em> the structure in orbit, then walks along what it just printed. Like an inchworm, it anchors, extrudes the next segment, grips it and pulls itself forward.</p>
+            <p>Attachment points are printed into the structure itself, so the cycle repeats indefinitely. In effect the printer's build volume is infinite, and it never has to grip a structure while floating free.</p>
+          </div>
+        </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Why it matters</h3>
-      <p>
-        This approach decouples structure size from launch vehicle size. A single
-        small, reusable printer-robot could, over time, build structures orders
-        of magnitude larger than itself &mdash; the same way a spider spins a web far
-        bigger than its own body. That could make space-based solar power,
-        large-aperture telescopes, and orbital habitats dramatically more
-        feasible.
-      </p>
-      <p>
-        Pushed further, the same principle underpins a lot of the more
-        science-fiction-flavored goals that motivate this work:
-      </p>
-      <div class="tag-list">
-        <span class="tag">Space sustainability &amp; a circular space economy</span>
-        <span class="tag">Moving manufacturing off-planet to protect Earth's environment</span>
-        <span class="tag">Mega-structures &mdash; Dyson-sphere elements, habitats, spaceships</span>
-        <span class="tag">Self-replicating robots (the "replicator")</span>
+        <div class="panel" style="margin-top:1.25rem">
+          <h3>How one cycle works</h3>
+          <ol class="step-list">
+            <li><strong>Anchor.</strong> The rear gripper locks onto the last printed attachment point.</li>
+            <li><strong>Extrude.</strong> The print-head arm lays down the next segment of structure.</li>
+            <li><strong>Cure.</strong> The new segment sets enough to carry the robot's weight.</li>
+            <li><strong>Advance.</strong> The front gripper clamps the new segment, the rear releases, and the robot steps forward.</li>
+            <li><strong>Repeat.</strong> The structure grows one section at a time, in any direction the mission needs.</li>
+          </ol>
+        </div>
+
+        <div class="media-row">
+          <figure class="figure">
+            <img src="assets/megastructure-concept-diagram.png" alt="Diagram of the 3D-printing inchworm robot concept, showing the robot printing and anchoring to truss structure as it advances" />
+            <figcaption>Concept: the robot prints truss segments and anchors to the attachment points it just printed.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="assets/inchworm-crawl-cycle.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, first pass" />
+            <figcaption>Crawl cycle, pass 1: anchor &rarr; extrude &rarr; advance.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="assets/inchworm-crawl-cycle-2.gif" alt="Animation of the inchworm robot's anchor-extrude-advance crawl cycle, second pass" />
+            <figcaption>Crawl cycle, pass 2: the same cycle grows the truss further.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 02 Prototype -->
+      <section class="section">
+        <div class="section-head"><span class="num">02</span><h2>The Earth prototype</h2></div>
+        <p class="section-lead">
+          To test the cycle on the ground, the robot is inverted: the chassis is
+          bolted down and the printed tube is what moves. Two arms pass the tube
+          along, and a third arm prints the next section onto its end.
+        </p>
+        <div class="grid-2">
+          <figure class="viewer-frame" style="margin:0">
+            <model-viewer src="assets/robot-assembly.glb" alt="Interactive 3D model of the current robot assembly" orientation="180deg 0deg 0deg" camera-controls auto-rotate shadow-intensity="1" interaction-prompt="auto"></model-viewer>
+            <figcaption><span>Current robot CAD: drag to rotate, scroll or pinch to zoom.</span><a href="CAD/Assembly%201.step" download>Download STEP</a></figcaption>
+          </figure>
+          <div class="panel">
+            <h3>What's on the bench</h3>
+            <ul class="spec-list">
+              <li><span class="k">Grippers</span><span>Two SO-101 arms with a custom gripper. One servo drives both the jaw and the latch that locks onto an attachment point.</span></li>
+              <li><span class="k">Printer</span><span>Rotrics DexArm carrying the print head and a line laser for measuring the part.</span></li>
+              <li><span class="k">Cameras</span><span>Three mono global-shutter cameras: one on each gripper wrist and one for the laser scanner.</span></li>
+              <li><span class="k">The part</span><span>A printed tube with attachment points 183.7&nbsp;mm apart. A new point is added with every printed section.</span></li>
+              <li><span class="k">Brains</span><span>Scripted motion for coarse moves; a learned policy for the final insertion of the gripper into an attachment point.</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout teal">
+          <strong>The autonomous loop:</strong> grip &rarr; unlock the rear gripper &rarr; advance the tube &rarr; insert (learned) &rarr; lock &rarr; fold arms &rarr; laser-scan and level &rarr; print the next section &rarr; repeat.
+          The live status of every step is on the <a href="devlog.html#glance">Dev Log</a>.
+        </div>
+      </section>
+
+      <!-- 03 Agents -->
+      <section class="section" id="agents">
+        <div class="section-head"><span class="num">03</span><h2>How AI agents were used</h2></div>
+        <p class="section-lead">
+          I did the systems design, hardware and robot model. The software, more
+          than 1,600 tests' worth, was written by AI coding agents running in
+          <code>pi</code>. My job was to manage them like a small team.
+        </p>
+
+        <ol class="flow">
+          <li><span class="who me">Me</span><b>Design &amp; describe</b>Systems design, parts, CAD, and a hand-built URDF robot model so agents understand the physical cell.</li>
+          <li><span class="who ai">Orchestrator</span><b>Plan</b>The main agent turns the goal into tasks with acceptance criteria in Backlog.md, grouped into milestones.</li>
+          <li><span class="who ai">Sub-agents</span><b>Build</b>Narrow tasks go to worker agents, each in its own isolated git worktree so they can't overwrite each other.</li>
+          <li><span class="who both">Both</span><b>Prove it</b>The orchestrator checks evidence: tests run, logged measurements, walkthrough pages. Code reading alone doesn't count.</li>
+          <li><span class="who ai">Orchestrator</span><b>Commit</b>Tests pass, then it commits and pushes, and updates the shared state document.</li>
+        </ol>
+        <p class="loop-note">&#8634; When a step needs hands on the robot, the agent writes a step-by-step procedure that I accept, and a separate guide tab walks me through it.</p>
+
+        <div class="panel" style="margin-top:1.25rem">
+          <h3>The toolkit</h3>
+          <table class="role-table">
+            <thead><tr><th>Piece</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td>Backlog.md tasks</td><td>43 tasks and about 250 acceptance criteria. A criterion is only checked with evidence, and agents may not rewrite one to match what they built.</td></tr>
+              <tr><td>Shared memory docs</td><td>Three documents every agent reads first: the hardware facts, the change-control rules, and a live "where are we" state with the next action.</td></tr>
+              <tr><td>Safety rules</td><td>Hard limits agents can't relax: one camera streaming at a time, never both grippers open while holding the tube, laser off on every exit, dry-run before any first live move.</td></tr>
+              <tr><td>Clarify-before-build skill</td><td>For anything visual or physical, the agent must ask questions and restate the plan before writing code.</td></tr>
+              <tr><td>Human handoff + walkthrough tab</td><td>Keeps work that only I can do to a minimum, and makes each item a verifiable checklist.</td></tr>
+              <tr><td>My own Claude</td><td>Component selection, trade-offs and early planning, kept outside pi to keep its context clean.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid-2" style="margin-top:1.25rem">
+          <div class="panel">
+            <h3>Where the money went</h3>
+            <div class="big-number">$421</div>
+            <p class="muted small">Recorded model cost across 130 sessions, 9/15 to 11/5/26.</p>
+            <div class="cost-bar" aria-hidden="true">
+              <span style="width:65%; background:var(--orange)"></span>
+              <span style="width:32%; background:var(--teal)"></span>
+              <span style="width:3%; background:var(--mustard)"></span>
+            </div>
+            <ul class="legend">
+              <li><i style="background:var(--orange)"></i>Main sessions $274</li>
+              <li><i style="background:var(--teal)"></i>Sub-agents $135</li>
+              <li><i style="background:var(--mustard)"></i>Walkthrough guide $12</li>
+            </ul>
+            <p class="small muted" style="margin-top:0.9rem">Most of the cost came from long sessions that re-read a huge context on every call. Daily breakdown on the <a href="devlog.html#activity">Dev Log</a>.</p>
+          </div>
+          <div class="panel">
+            <h3>What I learned</h3>
+            <ul class="lesson-list good">
+              <li><strong>Written acceptance criteria</strong> stopped agents from declaring victory early.</li>
+              <li><strong>A hand-made URDF</strong> worked far better than raw CAD, where many parts shared the same name.</li>
+              <li><strong>Asking before building</strong> caught wrong assumptions at the cheapest point.</li>
+            </ul>
+            <ul class="lesson-list bad">
+              <li><strong>Hardware goose chase:</strong> several sessions went into "broken" servos that turned out to be encoder-only leader servos. Now: ask me after two failed probes.</li>
+              <li><strong>Open-ended sub-agents</strong> explored for 30&ndash;45 minutes and wrote nothing. Now: one narrow task, an early deliverable, a time cap.</li>
+              <li><strong>Long sessions</strong> are expensive. Now: save state, commit, and start fresh.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 Why -->
+      <section class="section">
+        <div class="section-head"><span class="num">04</span><h2>Why it matters</h2></div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Decouple size from launch</h3>
+            <p>One small, reusable printer-robot could build structures orders of magnitude larger than itself, the way a spider spins a web far bigger than its body. That makes space solar power, large telescopes and orbital habitats far more feasible.</p>
+            <div class="tag-list">
+              <span class="tag">Circular space economy</span>
+              <span class="tag">Off-planet manufacturing</span>
+              <span class="tag">Megastructures &amp; habitats</span>
+              <span class="tag">Self-replicating robots</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Open questions I'm chasing</h3>
+            <div class="tag-list">
+              <span class="tag">Feedstock in vacuum &amp; microgravity</span>
+              <span class="tag">Cure time vs. crawl speed</span>
+              <span class="tag">Gripper reliability over 1000s of cycles</span>
+              <span class="tag">Accuracy without a gravity datum</span>
+              <span class="tag">Power &amp; thermal budget</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="btn-row">
+        <a href="index.html" class="btn btn-secondary">&larr; Home</a>
+        <a href="devlog.html" class="btn btn-primary">Progress &amp; dev log &rarr;</a>
       </div>
     </div>
+  </main>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Open questions I'm chasing</h3>
-      <div class="tag-list">
-        <span class="tag">Feedstock in vacuum &amp; microgravity</span>
-        <span class="tag">Cure time vs. crawl speed</span>
-        <span class="tag">Gripper reliability over 1000s of cycles</span>
-        <span class="tag">Structural accuracy without gravity datum</span>
-        <span class="tag">Power &amp; thermal budget for a small bot</span>
-      </div>
-    </div>
+  <footer class="site-footer">
+    <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
+    <div class="egg-note">the bot remembers where it stopped, even after a wave.</div>
+  </footer>
 
-    <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Next step</h3>
-      <p>
-        From here, the plan is to either build a simulation of the robot or a
-        working terrestrial prototype &mdash; whichever lets me validate the
-        anchor/extrude/advance cycle fastest. See the Dev Log for how that's going.
-      </p>
-    </div>
-
-    <div class="btn-row">
-      <a href="index.html" class="btn btn-secondary">&larr; Back home</a>
-      <a href="devlog.html" class="btn btn-primary">Dev log &rarr;</a>
-    </div>
-  </div>
-</main>
-
-<footer class="site-footer">
-  <div>Stephen &middot; Aero Astro, MIT Media Lab &middot; Professor Wood's group</div>
-  <div class="egg-note">the bot remembers where it stopped, even after a wave.</div>
-</footer>
-
-<script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
-<script type="module" src="js/model-viewer.min.js"></script>
-<script src="js/stars.js"></script>
+  <script>window.ModelViewerElement = { meshoptDecoderLocation: "js/meshopt-ready.js" };</script>
+  <script type="module" src="js/model-viewer.min.js"></script>
+  <script src="js/stars.js"></script>
 </body>
 </html>

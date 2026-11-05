@@ -6,42 +6,12 @@
 <title>Simulation Recreation — Free-Flying Satellite 3D Printing | Stephen</title>
 <meta name="description" content="Recreating the free-flying satellite additive manufacturing simulation from Jonckers et al. (2022) in Python, and validating it against the paper's published error statistics." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css" />
-<style>
-  .sim-fig { margin: 0 0 1.5rem; background: rgba(10,10,28,0.45);
-    border: 1px solid var(--panel-border); border-radius: 12px; padding: 0.85rem; }
-  .sim-fig img { display: block; width: 100%; border-radius: 8px; }
-  .sim-fig figcaption { margin-top: 0.7rem; font-size: 0.85rem;
-    color: var(--text-dim); line-height: 1.5; }
-  table.sim-table { width: 100%; border-collapse: collapse; margin-top: 1rem;
-    font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-  table.sim-table th, table.sim-table td { text-align: right;
-    padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(124,92,255,0.15); }
-  table.sim-table th { color: var(--accent-2); font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; }
-  table.sim-table td:first-child, table.sim-table th:first-child { text-align: left; }
-  table.sim-table tr.is-key td { color: var(--text); font-weight: 500; }
-  .tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.08em;
-    text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 4px;
-    border: 1px solid currentColor; margin-right: 0.35rem; }
-  .tag-paper { color: #57e3a0; }
-  .tag-inferred { color: #ffc857; }
-  .tag-derived { color: var(--accent-2); }
-  .callout { border-left: 3px solid var(--accent); padding: 0.85rem 1.1rem;
-    background: rgba(124,92,255,0.07); border-radius: 0 8px 8px 0;
-    margin: 1.25rem 0; font-size: 0.92rem; }
-  code.inline { background: rgba(76,201,240,0.1); padding: 0.1rem 0.35rem;
-    border-radius: 4px; font-size: 0.88em; color: var(--accent-2); }
-  pre.sim-pre { background: rgba(5,5,15,0.7); border: 1px solid var(--panel-border);
-    border-radius: 10px; padding: 1rem; overflow-x: auto; font-size: 0.78rem;
-    line-height: 1.5; color: var(--text-dim); }
-  .eq { text-align: center; padding: 0.6rem 0; color: var(--text);
-    font-size: 0.95rem; letter-spacing: 0.02em; }
-</style>
 </head>
 <body>
 <div id="stars"></div>
+<div class="nebula-drift"></div>
 
 <nav class="site-nav">
   <a href="index.html" class="brand">STEPHEN<span>.SPACE</span></a>
@@ -55,7 +25,7 @@
 
 <main>
   <div class="container">
-    <p class="eyebrow" style="color:var(--accent-2); letter-spacing:0.2em; text-transform:uppercase; font-size:0.8rem;">Paper Recreation &middot; Python</p>
+    <p class="eyebrow">Paper Recreation &middot; Python</p>
     <h1 class="page-title">Rebuilding a Free-Flying 3D Printer</h1>
     <p class="subtitle">
       I took a 2022 paper on satellites that 3D-print structures larger than
@@ -65,7 +35,7 @@
     </p>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">The paper</h3>
+      <h3>The paper</h3>
       <p>
         Jonckers, Tauscher, Thakur &amp; Maywald (2022),
         <em>&ldquo;Additive Manufacturing of Large Structures Using Free-Flying
@@ -102,7 +72,7 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">What the model contains</h3>
+      <h3>What the model contains</h3>
       <p>
         Roughly 1,500 lines of Python across nine modules, <code class="inline">numpy</code>
         only. The physics runs on a 2&nbsp;ms step, the pose controller at
@@ -134,7 +104,7 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Results</h3>
+      <h3>Results</h3>
       <p>
         The paper's key experiment is a 2&times;2: dry run versus real printing,
         each with and without arm compensation. Here is my recreation against
@@ -215,7 +185,7 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Where the numbers came from</h3>
+      <h3>Where the numbers came from</h3>
       <p>
         This is the part I care most about being honest regarding. A paper is
         never a complete specification, and the gaps are where a recreation
@@ -223,19 +193,19 @@
         provenance tag:
       </p>
       <p>
-        <span class="tag tag-paper">paper</span> stated explicitly &mdash; mass
+        <span class="ptag tag-paper">paper</span> stated explicitly &mdash; mass
         20.2&nbsp;kg, eight thrusters, 400&nbsp;mm TCP offset, 3.33&nbsp;mm/s
         print speed, 60&nbsp;ms command period, 1.2&nbsp;mm nozzle, 0.8&nbsp;mm
         layer height, 180&nbsp;&deg;C, 9.6&nbsp;mm/s&sup2; residual gravity,
         110&nbsp;mm segment, 7 segments, 775&nbsp;mm total.
       </p>
       <p>
-        <span class="tag tag-derived">derived</span> computed from those &mdash;
+        <span class="ptag tag-derived">derived</span> computed from those &mdash;
         e.g. the 0.1998&nbsp;mm interpolation step is just speed &times; period,
         and the 110.71&nbsp;mm segment advance is 775&nbsp;/&nbsp;7.
       </p>
       <p>
-        <span class="tag tag-inferred">inferred</span> not in the paper at all:
+        <span class="ptag tag-inferred">inferred</span> not in the paper at all:
         PID gains, yaw inertia, thruster saturation and time constant, tracking
         noise, and &mdash; most significantly &mdash; the nozzle friction force.
       </p>
@@ -289,7 +259,7 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Testing</h3>
+      <h3>Testing</h3>
       <p>
         122 tests, built around <code class="inline">hypothesis</code> for
         property-based testing. The distinction that mattered: rather than
@@ -328,7 +298,7 @@ multi-segment truss        total length         775mm -&gt; 775.0mm    0.0%</pre
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Honest limitations</h3>
+      <h3>Honest limitations</h3>
       <ul>
         <li>
           <strong>3 DoF, not 6.</strong> This matches the paper &mdash; ELISSA is
@@ -372,7 +342,7 @@ multi-segment truss        total length         775mm -&gt; 775.0mm    0.0%</pre
     </div>
 
     <div class="panel">
-      <h3 style="margin-top:0; color:var(--accent-2); font-family:var(--font-head);">Running it</h3>
+      <h3>Running it</h3>
       <pre class="sim-pre">cd sim
 uv sync --extra dev        # or: python3 tools/run_tests.py
 uv run pytest              # 122 tests

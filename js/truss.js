@@ -30,8 +30,8 @@
   // ---- defs (gradients) ----
   const defs = el("defs", {});
   const grad = el("linearGradient", { id: "wormGradient", x1: "0%", y1: "0%", x2: "0%", y2: "100%" });
-  grad.appendChild(el("stop", { offset: "0%", "stop-color": "#8fe9ff" }));
-  grad.appendChild(el("stop", { offset: "100%", "stop-color": "#2c8fb0" }));
+  grad.appendChild(el("stop", { offset: "0%", "stop-color": "#ffc857" }));
+  grad.appendChild(el("stop", { offset: "100%", "stop-color": "#ff7a45" }));
   defs.appendChild(grad);
   svg.appendChild(defs);
 
