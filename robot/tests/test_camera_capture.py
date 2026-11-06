@@ -776,8 +776,17 @@ def test_camera_probe_dry_run_with_samples(tmp_path):
     assert list(tmp_path.rglob("camera_left_arm_clean_*.png"))
 
 
-# --- AA-14 AC#3 owner decision 2026-11-06: only the scanner withholds warned frames ---
-def test_arm_camera_keeps_frame_on_libjpeg_warning():
+# --- AA-14 AC#3 owner decisions 2026-11-06: all cameras withhold warned frames ---
+def test_all_cameras_reject_warned_frames():
+    warn = "Corrupt JPEG data: premature end of data segment"
+    for device in ("camera_scanner", "camera_left_arm", "camera_right_arm"):
+        transport = _v4l2_with([warn + "\n"], device=device)
+        assert transport.reject_corrupt is True
+        result = open_capture(transport, role=device).grab()
+        assert result.corrupt and result.data.size == 0
+
+
+def test_keep_mode_still_reports_warning():
     events = []
 
     class _Logger:
@@ -785,21 +794,18 @@ def test_arm_camera_keeps_frame_on_libjpeg_warning():
             events.append(kw)
 
     warn = "Corrupt JPEG data: premature end of data segment"
-    for device in ("camera_left_arm", "camera_right_arm"):
-        events.clear()
-        transport = _v4l2_with([warn + "\n"], device=device)
-        assert transport.reject_corrupt is False
-        result = open_capture(transport, role=device, logger=_Logger()).grab()
-        assert not result.corrupt
-        assert result.data.shape == (48, 64)  # frame delivered, not discarded
-        assert transport.last_integrity_error == warn  # still reported
-        kinds = [e["event_type"] for e in events]
-        assert "camera_frame_integrity_warning" in kinds
-        assert "camera_frame_corrupt" not in kinds
+    transport = _v4l2_with([warn + "\n"], device="camera_left_arm")
+    transport.reject_corrupt = False
+    result = open_capture(transport, role="camera_left_arm", logger=_Logger()).grab()
+    assert not result.corrupt and result.data.shape == (48, 64)
+    assert "camera_frame_integrity_warning" in [e["event_type"] for e in events]
 
 
-def test_scanner_rejects_warned_frames():
-    assert _v4l2_with([""]).reject_corrupt is True
+def test_grab_valid_skips_damaged_arm_frames():
+    warn = "Corrupt JPEG data: premature end of data segment\n"
+    capture = open_capture(_v4l2_with([warn, "", ""], device="camera_left_arm"), role="camera_left_arm")
+    result = capture.grab_valid()
+    assert not result.corrupt and result.counter == 2
 
 
 def test_grab_valid_skips_damaged_scanner_frames():

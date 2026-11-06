@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-11-06 03:45'
+updated_date: '2026-11-06 03:56'
 labels: []
 milestone: m-1
 dependencies:
@@ -102,6 +102,8 @@ Owner 2026-11-06: viewed both arm cameras in the Windows Camera app; they 'look 
 Live cross-check 2026-11-06 (owner: all three cameras look good in the Windows Camera app). Per-frame comparison of the libjpeg flag against the decoded image: scanner 1280x800 flagged 64/300, every flagged frame almost entirely flat grey (784-792 of 800 rows), clean frames 0 flat rows: real damage, detection correct. Scanner 640x480: 0 flagged. Arm cameras 640x480: flagged 25/300 (L) and 40/300 (R), but flagged frames show only the normal 8-row band (a real object in view per the owner): the warning fires on frames that look fine, so rejecting them discards good frames (false positives for the arm cameras). Arm 'clean' frames sometimes show large flat areas (dark room, flat-row measure unreliable; not investigated). Asked the owner whether to keep rejecting on the arm cameras. AC#3 not checked.
 
 Owner decision 2026-11-06: withhold damaged frames for the DexArm (scanner) camera only; do not throw an error or stop. Implemented: backends._REJECT_CORRUPT_DEVICES={'camera_scanner'}, V4L2CameraTransport.reject_corrupt; arm cameras deliver warned frames (corrupt=False) and emit camera_frame_integrity_warning (INFO); CameraCapture.grab_valid(max_attempts=10) skips damaged frames and never raises; scripts/level_scan.py live capture_fn now uses grab_valid (returns None, scan continues, instead of the old raw imdecode, which raised cv2.error on empty bytes). camera_probe reports 'withheld' and 'warned, kept'. 4 new tests; full suite 1650 passed. LIVE 2026-11-06 (dark room, auto exposure), per-frame check of flag against the decoded image: scanner 1280x800 clean 263 (0 flat rows), withheld 37 (all 792/800 rows flat grey); left arm clean 249, warned-kept 51 (normal 8-row band only); right arm clean 271, warned-kept 29. Scanner grab_valid x100 live: 0 corrupt returned, 116 frames read, shape 800x1280, no exception.
+
+Owner decision 2026-11-06 (revision): arm cameras must also exclude bad frames. _REJECT_CORRUPT_DEVICES now covers camera_scanner, camera_left_arm, camera_right_arm. lerobot_adapter frame source and teleop_capture wrist frame now use grab_valid() (teleop previously did raw imdecode of empty bytes). Live 2026-11-06 (dark room, auto exposure, 640x480): left arm grab x200: 15 corrupt, 20.0 fps; grab_valid x200: 0 corrupt returned, 236 reads, 16.7 good fps. Right arm: 33 corrupt, 18.8 fps; grab_valid: 0 corrupt, 226 reads, 16.9 good fps. Overhead = only the skipped frames (~8-17 %), detection itself 0.07 ms/frame. Full suite 1651 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

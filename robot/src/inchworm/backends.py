@@ -611,8 +611,10 @@ def _make_synthetic_mjpeg(width: int, height: int) -> bytes:
     return b"\xff\xd8\xff\xd9"
 
 
-#: Cameras whose warned frames are withheld (AA-14 AC#3, owner 2026-11-06).
-_REJECT_CORRUPT_DEVICES = frozenset({"camera_scanner"})
+#: Cameras whose warned frames are withheld (AA-14 AC#3). Owner 2026-11-06:
+#: first the scanner only, then all cameras ("if the arms have a bad frame, we
+#: shouldn't include it either").
+_REJECT_CORRUPT_DEVICES = frozenset({"camera_scanner", "camera_left_arm", "camera_right_arm"})
 
 #: libjpeg messages that mean the frame data is damaged (premature end = truncated).
 _JPEG_CORRUPTION_MARKERS = ("Corrupt JPEG data", "Premature end of JPEG file")
@@ -685,8 +687,8 @@ class V4L2CameraTransport(CameraTransport):
         self.last_integrity_error: Optional[str] = None
         #: Decoded image of the last rejected frame, kept for evidence only.
         self.last_rejected_frame = None
-        #: Withhold frames that carry a libjpeg corruption warning. Only the
-        #: scanner (owner decision 2026-11-06); arm cameras keep the frame.
+        #: Withhold frames that carry a libjpeg corruption warning (all
+        #: configured cameras, owner decision 2026-11-06).
         self.reject_corrupt: bool = device in _REJECT_CORRUPT_DEVICES
 
     @classmethod
@@ -751,8 +753,7 @@ class V4L2CameraTransport(CameraTransport):
 
         # AA-14 AC#3 (2026-11-05): OpenCV decodes MJPEG inside cap.read(); a
         # truncated frame still decodes (grey tail) and libjpeg only prints a
-        # warning to fd 2. Capture fd 2 around the read; the scanner withholds
-        # warned frames, the arm cameras deliver them and record the warning.
+        # warning to fd 2. Capture fd 2 around the read and withhold warned frames.
         self.last_integrity_error = None
         self.last_rejected_frame = None
         with _StderrCapture() as err:
@@ -767,14 +768,13 @@ class V4L2CameraTransport(CameraTransport):
         if warning is not None:
             self.last_integrity_error = warning
             if self.reject_corrupt:
-                # Scanner: the frame is really damaged (measured 2026-11-06: flagged
-                # 1280x800 frames are ~99 % flat grey). Withhold it; keep a copy
-                # for evidence only.
+                # Withhold the frame; keep a copy for evidence only. Measured
+                # 2026-11-06: flagged scanner 1280x800 frames are ~99 % flat grey;
+                # flagged arm frames look intact but are excluded too (owner).
                 self.last_rejected_frame = frame
                 return b"", self._transport_counter
-            # Arm cameras: libjpeg warns on frames that look fine (owner visual
-            # check 2026-11-06), so the frame is delivered and only the warning
-            # is recorded.
+            # reject_corrupt False (not used by any configured camera): deliver
+            # the frame and only record the warning.
 
 
         # Encode the decoded frame back to JPEG for uniform handling in

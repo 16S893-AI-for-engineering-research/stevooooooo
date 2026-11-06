@@ -3,18 +3,18 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-06 03:46'
+updated_date: '2026-11-06 03:56'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-06, AA-14 Done (live camera runs). Full suite **1650 passed**.
+**Last verified:** 2026-11-06, AA-14 Done (live camera runs). Full suite **1651 passed**.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
 ### Owner decisions (recorded, do not revisit)
-0. Cameras (2026-11-06): only the scanner (DexArm) camera withholds frames with a libjpeg corruption warning (they are really ~99% grey at 1280x800); the arm cameras keep them and only log. Damaged frames never raise or stop a run (`CameraCapture.grab_valid()`).
+0. Cameras (2026-11-06): all three cameras withhold frames with a libjpeg corruption warning (scanner 1280x800 flagged frames are ~99% grey; the owner chose to exclude flagged arm frames too). Damaged frames never raise or stop a run: `CameraCapture.grab_valid()` skips them (used by level_scan, the LeRobot frame source and teleop capture). Cost: only the skipped frames (~8-17% on the arms).
 1. E-stop HOLDS in place.
 2. The tube advances AWAY from the DexArm (`cycle_runner.advance_physical: away_from_dexarm`; live preflight checks the sign against AA-16 calibration).
 3. Cura uses Rotrics' official settings (AA-34 Done). No tube fixture design. Keep the one-camera rule.

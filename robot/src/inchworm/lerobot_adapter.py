@@ -556,8 +556,9 @@ def make_arbiter_frame_source(
             capture.apply_settings(settings)
 
         def _grab() -> "np.ndarray":
-            result = capture.grab()
-            frame = result.data  # shape (H, W), uint8
+            # AA-14 AC#3: damaged frames are skipped (reported, never raised).
+            result = capture.grab_valid()
+            frame = result.data  # shape (H, W), uint8; (0, 0) only if all retries failed
             return frame
 
         yield _grab

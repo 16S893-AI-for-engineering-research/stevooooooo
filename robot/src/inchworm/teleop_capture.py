@@ -656,14 +656,10 @@ class EpisodeRecorder:
         if self._arbiter is not None:
             try:
                 with self._arbiter.acquire(self._camera_role) as transport:
-                    raw = transport.read_frame()
-                    try:
-                        import cv2 as _cv2
-                        import numpy as _np
-                        buf = _np.frombuffer(raw, dtype=_np.uint8)
-                        wrist_frame = _cv2.imdecode(buf, _cv2.IMREAD_GRAYSCALE)
-                    except (ImportError, Exception):
-                        wrist_frame = None
+                    # AA-14 AC#3: damaged frames are skipped, never raised.
+                    from inchworm.camera_capture import open_capture
+                    result = open_capture(transport, role=self._camera_role).grab_valid()
+                    wrist_frame = None if result.corrupt or result.data.size == 0 else result.data
             except Exception as exc:
                 log.warning("AA-23: wrist frame capture failed: %s", exc)
 

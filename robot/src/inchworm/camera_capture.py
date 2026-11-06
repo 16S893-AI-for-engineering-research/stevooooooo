@@ -131,9 +131,8 @@ class FrameResult:
     corrupt:
         True if the raw bytes could not be decoded (JPEG decode failure or
         zero-size output from imdecode), or the transport reported an
-        integrity error for a camera that withholds such frames (the scanner:
-        libjpeg corruption warning on a truncated MJPEG frame that still
-        decoded). Arm cameras deliver warned frames with corrupt False.  The data field contains an empty
+        integrity error (libjpeg corruption warning, e.g. a truncated MJPEG
+        frame that still decoded); such frames are withheld on all cameras.  The data field contains an empty
         array (shape 0×0) when corrupt is True.
     """
 
@@ -299,7 +298,7 @@ class CameraCapture:
             import numpy as _np
             data = _np.empty((0, 0), dtype=_np.uint8)
         elif integrity_error:
-            # Frame kept (arm cameras): report the warning, do not discard.
+            # Frame kept (transport with reject_corrupt False): report, do not discard.
             self._emit(
                 "camera_frame_integrity_warning",
                 severity="INFO",
@@ -323,8 +322,8 @@ class CameraCapture:
         Damaged frames are skipped (each is already reported by :meth:`grab`).
         If all *max_attempts* frames are corrupt, the last (corrupt) result is
         returned so the caller can decide; the capture loop does not stop.
-        At the measured scanner rate (64/300 at 1280x800) ten consecutive
-        corrupt frames are vanishingly unlikely.
+        At the measured rates (scanner 1280x800 ~12-21 %, arm cameras ~8-17 %)
+        ten consecutive corrupt frames are vanishingly unlikely.
         """
         result = self.grab()
         for _ in range(max(0, max_attempts - 1)):
