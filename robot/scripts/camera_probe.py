@@ -170,6 +170,7 @@ def _probe(args: argparse.Namespace) -> int:
             dropped_total = 0
             corrupt_total = 0
             reasons: dict[str, int] = {}
+            warned_kept = 0
             bad_samples: list = []
             good_samples: list = []
 
@@ -181,11 +182,13 @@ def _probe(args: argparse.Namespace) -> int:
                 frame_ts.append(result.ts_monotonic)
                 if result.dropped:
                     dropped_total += 1
+                reason = getattr(transport, "last_integrity_error", None)
+                if reason:
+                    reasons[reason] = reasons.get(reason, 0) + 1
+                    if not result.corrupt:
+                        warned_kept += 1
                 if result.corrupt:
                     corrupt_total += 1
-                    reason = getattr(transport, "last_integrity_error", None)
-                    if reason:
-                        reasons[reason] = reasons.get(reason, 0) + 1
                     rejected = getattr(transport, "last_rejected_frame", None)
                     if rejected is not None and len(bad_samples) < args.save_samples:
                         bad_samples.append((result.counter, rejected))
@@ -210,7 +213,8 @@ def _probe(args: argparse.Namespace) -> int:
             f"  latency p95    : {p95_lat_ms:.2f} ms",
             f"  latency max    : {max_lat_ms:.2f} ms",
             f"  dropped        : {dropped_total}",
-            f"  corrupt        : {corrupt_total}",
+            f"  corrupt        : {corrupt_total} (withheld)",
+            f"  warned, kept   : {warned_kept} (libjpeg warning, frame delivered)",
         ]
         for reason, n in sorted(reasons.items()):
             lines.append(f"    {n:4d} x {reason}")
@@ -248,6 +252,7 @@ def _probe(args: argparse.Namespace) -> int:
                 "dropped": dropped_total,
                 "corrupt": corrupt_total,
                 "corrupt_reasons": reasons,
+                "warned_kept": warned_kept,
             },
         )
 

@@ -258,13 +258,12 @@ def main() -> int:
                 calib = default_laser_calibration()
 
                 def capture_fn():
+                    # AA-14 AC#3: damaged scanner frames are skipped, never raised;
+                    # if no good frame arrives, return None (extract_fn yields no
+                    # points for this position) and the scan continues.
                     with arbiter.acquire("camera_scanner") as transport:
-                        raw = transport.read_frame()
-                    # Decode MJPEG to numpy
-                    import cv2
-                    buf = np.frombuffer(raw, dtype=np.uint8)
-                    frame = cv2.imdecode(buf, cv2.IMREAD_GRAYSCALE)
-                    return frame
+                        result = open_capture(transport, role="camera_scanner").grab_valid()
+                    return None if result.corrupt else result.data
 
                 def extract_fn(frame):
                     if frame is None:

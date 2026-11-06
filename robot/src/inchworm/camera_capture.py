@@ -131,8 +131,9 @@ class FrameResult:
     corrupt:
         True if the raw bytes could not be decoded (JPEG decode failure or
         zero-size output from imdecode), or the transport reported an
-        integrity error for the frame (libjpeg corruption warning, e.g. a
-        truncated MJPEG frame that still decoded).  The data field contains an empty
+        integrity error for a camera that withholds such frames (the scanner:
+        libjpeg corruption warning on a truncated MJPEG frame that still
+        decoded). Arm cameras deliver warned frames with corrupt False.  The data field contains an empty
         array (shape 0×0) when corrupt is True.
     """
 
@@ -293,10 +294,17 @@ class CameraCapture:
         # Transport-level integrity error (e.g. libjpeg "premature end of data
         # segment" on a truncated MJPEG frame that OpenCV still decoded).
         integrity_error = getattr(self._transport, "last_integrity_error", None)
-        if integrity_error:
+        if integrity_error and getattr(self._transport, "reject_corrupt", True):
             corrupt = True
             import numpy as _np
             data = _np.empty((0, 0), dtype=_np.uint8)
+        elif integrity_error:
+            # Frame kept (arm cameras): report the warning, do not discard.
+            self._emit(
+                "camera_frame_integrity_warning",
+                severity="INFO",
+                payload={"local_counter": local_counter, "reason": integrity_error},
+            )
 
         if corrupt:
             self._emit_corrupt(local_counter, integrity_error)
@@ -308,6 +316,22 @@ class CameraCapture:
             dropped=dropped,
             corrupt=corrupt,
         )
+
+    def grab_valid(self, max_attempts: int = 10) -> FrameResult:
+        """Grab frames until one is not corrupt; never raises for corrupt frames.
+
+        Damaged frames are skipped (each is already reported by :meth:`grab`).
+        If all *max_attempts* frames are corrupt, the last (corrupt) result is
+        returned so the caller can decide; the capture loop does not stop.
+        At the measured scanner rate (64/300 at 1280x800) ten consecutive
+        corrupt frames are vanishingly unlikely.
+        """
+        result = self.grab()
+        for _ in range(max(0, max_attempts - 1)):
+            if not result.corrupt:
+                break
+            result = self.grab()
+        return result
 
     # ------------------------------------------------------------------
     # Properties

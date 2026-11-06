@@ -1,11 +1,11 @@
 ---
 id: AA-14
 title: Mono camera capture pipeline for OV9281 devices
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:10'
-updated_date: '2026-11-05 19:47'
+updated_date: '2026-11-06 03:45'
 labels: []
 milestone: m-1
 dependencies:
@@ -32,7 +32,7 @@ See doc-1 sections 4 and 6.
 <!-- AC:BEGIN -->
 - [x] #1 Capture opens any configured camera by logical role through the USB arbiter, and streaming without holding the arbiter lock is impossible by construction
 - [x] #2 Resolution, frame rate, exposure and gain are explicitly settable, auto-exposure and auto-gain can be disabled, and the applied settings are read back and logged
-- [ ] #3 Frames are delivered as single-channel arrays with a monotonic capture timestamp and a frame counter, and dropped or corrupt frames are detected and reported rather than silently skipped
+- [x] #3 Frames are delivered as single-channel arrays with a monotonic capture timestamp and a frame counter, and dropped or corrupt frames are detected and reported rather than silently skipped
 - [x] #4 Achieved frame rate and latency are measured for each camera role at the settings used downstream and recorded in task notes
 - [x] #5 A snapshot and a short-recording CLI exist for any camera role, writing to the gitignored session artifact directory
 - [x] #6 Switching between two camera roles in sequence fully closes the first device before opening the second, verified by a test
@@ -62,6 +62,8 @@ See doc-1 sections 4 and 6.
 10. Leave AC#4 unchecked with hardware comment.
 
 AC#3 fix (owner chose option 2, 2026-11-05): detect libjpeg corruption warnings ('Corrupt JPEG data: premature end of data segment') by capturing OS fd 2 around cap.read() in V4L2CameraTransport; flag the frame corrupt, deliver an empty array, log the reason; probe --save-samples writes flagged/clean PNGs for owner visual confirmation. Live re-run required before checking AC#3.
+
+Revision (owner, 2026-11-06): only the scanner withholds frames with a libjpeg warning; arm cameras deliver them and log the warning. Damaged scanner frames are skipped, never raised: CameraCapture.grab_valid() retries up to 10 frames and returns the last result without raising; level_scan live capture uses it.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -92,6 +94,14 @@ AC#3 UNCHECKED 2026-10-25 by the orchestrator. Live evidence contradicts it: tru
 Truncated-frame detection attempt 2026-10-25: added an SOI/EOI check in _decode_to_gray (kept, with a unit test; it catches truncated JPEG bytes when the transport supplies raw JPEG). The raw passthrough via CAP_PROP_CONVERT_RGB=0 was REVERTED: on the openaicam arm cameras OpenCV then returns misaligned buffers (no SOI/EOI, every frame unreadable). So hardware truncated frames are still undetected and AC#3 stays unchecked. Next options: read V4L2 directly (v4l2 mmap buffer bytesused), or detect them via the libjpeg warning or the grey-tail pattern. Live probe after the revert: L 59.4 fps, R 53.3, scanner 99.7, reported corrupt 0 (as before).
 
 AC#3 option 2 implemented 2026-11-05 (software, mock-tested; NOT yet live): backends.py _StderrCapture (dup2 fd 2 to a temp file around cap.read(), restores fd 2, re-emits captured text so nothing is swallowed) + jpeg_corruption_warning(); V4L2CameraTransport sets last_integrity_error / last_rejected_frame and returns b'' -> CameraCapture.grab() reports corrupt=True, data 0x0, camera_frame_corrupt event with payload.reason. camera_probe.py: per-reason corrupt counts in the report, --save-samples N writes <role>_corrupt_*.png (rejected frame, evidence only) and <role>_clean_*.png. Tests: 6 new in test_camera_capture.py (fake cap writes the warning to fd 2 like libjpeg), full suite passes. Note: the opencv 5.0.0.93 wheel contains the libjpeg string 'Corrupt JPEG data: premature end of data segment'; imdecode on truncated bytes in this build returns None silently, so the warning path can only be proven on hardware. AC#3 stays UNCHECKED until: cameras attached via usbipd, then for each role: cd robot && uv run python scripts/camera_probe.py --live --role <role> --frames 300 --save-samples 5 (scanner also --width 1280 --height 800). Pass = corrupt count roughly matches the libjpeg lines printed (expected L ~36/300, scanner 1280x800 ~203/300), flagged PNGs show the grey tail and clean PNGs do not (owner visual check).
+
+Live run 2026-11-06 (agent ran it; cameras attached via usbipd 9-4/10-2/11-4; probe --live --frames 300 --save-samples 5): left arm corrupt 39/300 measured (41 libjpeg lines incl. warm-up, 41 corrupt events: 1:1), right arm 48/300 (49/49), dropped 0. Warning detection on hardware WORKS (every libjpeg line became a corrupt event; fd-2 capture overhead 0.07 ms/frame). BUT the visual check FAILED to distinguish: flagged and clean PNGs look identical, and BOTH have the same flat value-128 band in the last 8 rows (rows 472-479) with no larger grey tail. So the 'premature end' frames are missing at most the last MCU row, and clean frames show the same band; meaning unclear (sensor/camera artifact, or every frame short by one MCU row while libjpeg only warns on some). Achieved fps was 20.6 / 20.5 (was 59.9 / 54.6 on 2026-10-25) with auto exposure on (exposure read-back 313), dark scene (mean 33); the fd-2 capture is not the cause. Scanner not yet run. AC#3 NOT checked: stopped to ask the owner (two analysis probes did not explain the band). Artifacts: robot/sessions/20261106_030126_e8a6, 20261106_030142_d8be.
+
+Owner 2026-11-06: viewed both arm cameras in the Windows Camera app; they 'look good' and the grey band at the bottom of the frame is a real object in view (so the 8 flat rows in the saved PNGs are scene, not missing data). Room was dark during the probe run (explains auto-exposure ~31 ms and ~20 fps). Scanner camera released to Windows (usbipd detach 11-4) for the owner to view.
+
+Live cross-check 2026-11-06 (owner: all three cameras look good in the Windows Camera app). Per-frame comparison of the libjpeg flag against the decoded image: scanner 1280x800 flagged 64/300, every flagged frame almost entirely flat grey (784-792 of 800 rows), clean frames 0 flat rows: real damage, detection correct. Scanner 640x480: 0 flagged. Arm cameras 640x480: flagged 25/300 (L) and 40/300 (R), but flagged frames show only the normal 8-row band (a real object in view per the owner): the warning fires on frames that look fine, so rejecting them discards good frames (false positives for the arm cameras). Arm 'clean' frames sometimes show large flat areas (dark room, flat-row measure unreliable; not investigated). Asked the owner whether to keep rejecting on the arm cameras. AC#3 not checked.
+
+Owner decision 2026-11-06: withhold damaged frames for the DexArm (scanner) camera only; do not throw an error or stop. Implemented: backends._REJECT_CORRUPT_DEVICES={'camera_scanner'}, V4L2CameraTransport.reject_corrupt; arm cameras deliver warned frames (corrupt=False) and emit camera_frame_integrity_warning (INFO); CameraCapture.grab_valid(max_attempts=10) skips damaged frames and never raises; scripts/level_scan.py live capture_fn now uses grab_valid (returns None, scan continues, instead of the old raw imdecode, which raised cv2.error on empty bytes). camera_probe reports 'withheld' and 'warned, kept'. 4 new tests; full suite 1650 passed. LIVE 2026-11-06 (dark room, auto exposure), per-frame check of flag against the decoded image: scanner 1280x800 clean 263 (0 flat rows), withheld 37 (all 792/800 rows flat grey); left arm clean 249, warned-kept 51 (normal 8-row band only); right arm clean 271, warned-kept 29. Scanner grab_valid x100 live: 0 corrupt returned, 116 frames read, shape 800x1280, no exception.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -107,5 +117,5 @@ AC#4 unchecked — needs owner-supervised hardware session: uv run python script
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented the camera capture pipeline (software half). New modules: camera_capture.py (CameraCapture, open_capture, FrameResult, settings/read-back, drop/corrupt detection via MJPEG decode), camera_cli.py (snapshot/record CLI writing to robot/sessions/). New script: scripts/camera_probe.py (dry-run default, --live flag for AC#4). backends.py extended (AA-14 markers): CameraTransport.apply_settings()/read_frame_with_counter() defaults; MockMjpegCameraTransport with synthetic MJPEG, configurable counter gaps and corrupt bytes; MockMjpegBackend; V4L2CameraTransport (hardware path via AA-5 discovery). pyproject.toml: opencv-python-headless, numpy, inchworm-camera entry point. 48 new tests all pass (509 total). AC#1-3,5-7 verified by test output; AC#4 stays unchecked — needs owner-supervised hardware session (see comment).
+Camera capture pipeline complete. AC#3 closed 2026-11-06: OpenCV hides truncated MJPEG frames, so the V4L2 transport captures libjpeg's 'Corrupt JPEG data' warning (fd 2 around cap.read(), re-emitted, 0.07 ms/frame). Owner decision: the scanner (DexArm) camera withholds warned frames (live: all 37 withheld 1280x800 frames were 99% flat grey, 263 clean frames had none); arm cameras deliver warned frames and only log them (owner visual check: they look fine). Damaged frames never raise or stop a run: CameraCapture.grab_valid() skips them (live: 100 calls, 0 corrupt returned, no exception); level_scan uses it. Verified by 10 new tests, full suite 1650 passed, and live per-frame runs on all three cameras (task notes).
 <!-- SECTION:FINAL_SUMMARY:END -->
