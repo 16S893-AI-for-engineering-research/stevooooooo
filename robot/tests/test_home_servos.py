@@ -1,0 +1,96 @@
+"""AA-43: home_servos.py against a register-memory fake (no hardware)."""
+import importlib.util
+import pathlib
+
+import pytest
+
+_P = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "home_servos.py"
+spec = importlib.util.spec_from_file_location("hs", _P)
+hs = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hs)
+
+
+class FakeServos:
+    """STS3215-like memory: present = actual - homing_offset; EEPROM honours lock."""
+
+    def __init__(self, actual):
+        self.actual = dict(actual)
+        self.mem = {sid: [0] * 71 for sid in range(1, 7)}
+        for sid in self.mem:
+            self.mem[sid][5] = sid
+            self.mem[sid][55] = 1
+            self.mem[sid][11], self.mem[sid][12] = 0xFF, 0x0F
+            self.mem[sid][31] = 85  # factory-ish offset
+        self.writes = []
+
+    def _present(self, sid):
+        off = hs.decode_offset(self.mem[sid][31] | (self.mem[sid][32] << 8))
+        return (self.actual[sid] - off) % 4096
+
+    def read(self, sid, addr, n):
+        p = self._present(sid)
+        self.mem[sid][56], self.mem[sid][57] = p & 0xFF, p >> 8
+        return bytes(self.mem[sid][addr:addr + n])
+
+    def write(self, sid, addr, data):
+        self.writes.append((sid, addr, bytes(data)))
+        if addr != 55 and addr < 40 and self.mem[sid][55] == 1:
+            return
+        for i, b in enumerate(data):
+            self.mem[sid][addr + i] = b
+
+
+def test_offset_encoding_sign_magnitude():
+    assert hs.encode_offset(-1352) == 3400  # left ID1 2026-10-24: raw 3400 = -1352
+    assert hs.decode_offset(3400) == -1352
+    assert hs.encode_offset(384) == 384
+    with pytest.raises(ValueError):
+        hs.encode_offset(2048)
+
+
+def test_homing_centres_targets_and_relocks():
+    f = FakeServos({1: 100, 2: 200, 3: 300, 4: 368, 5: 3557, 6: 3639})
+    before = hs.dump(f.read, range(1, 7))
+    res = hs.do_homing(f.read, f.write, [4, 5, 6], settle_s=0)
+    for sid in (4, 5, 6):
+        assert abs(res[sid]["position_after"] - 2047) <= 1
+        assert f.mem[sid][55] == 1
+    after = hs.dump(f.read, range(1, 7))
+    written = {sid: {31, 32} for sid in (4, 5, 6)}
+    assert hs.unexpected_changes(before, after, written) == []
+    assert not any(w[0] in (1, 2, 3) for w in f.writes)
+
+
+def _ranges(j, sid, start, lo, hi, wrapped=False, seam=False):
+    return {"joints": {j: {"servo_id": sid, "start_ticks": start, "travel_lo_ticks_rel_start": lo,
+                           "travel_hi_ticks_rel_start": hi, "wrapped": wrapped, "crosses_seam": seam}}}
+
+
+JM = dict(zip(hs.JOINTS, range(1, 7)))
+
+
+def test_plan_limits_adds_margin_and_refuses_bad_sweeps():
+    assert hs.plan_limits(_ranges("wrist_flex", 4, 2047, -1100, 1100), JM, [4], 30) == {4: (917, 3177)}
+    with pytest.raises(SystemExit):
+        hs.plan_limits(_ranges("wrist_flex", 4, 2047, -1100, 1100, wrapped=True), JM, [4], 30)
+    with pytest.raises(SystemExit):
+        hs.plan_limits(_ranges("wrist_flex", 4, 2047, -2040, 100), JM, [4], 30)  # below 0
+    with pytest.raises(SystemExit):
+        hs.plan_limits(_ranges("wrist_flex", 4, 2047, -5, 5), JM, [4], 30)  # not swept
+    with pytest.raises(SystemExit):
+        hs.plan_limits(_ranges("wrist_flex", 5, 2047, -1100, 1100), JM, [4], 30)  # ID mismatch
+
+
+def test_limits_written_and_read_back():
+    f = FakeServos({sid: 2047 for sid in range(1, 7)})
+    res = hs.do_limits(f.read, f.write, {4: (917, 3177)}, settle_s=0)
+    assert res[4]["read_back"] == [917, 3177] and f.mem[4][55] == 1
+
+
+def test_dry_run_opens_nothing(capsys):
+    assert hs.main(["homing", "--arm", "left", "--ids", "4,5,6"]) == 0
+    assert "DRY-RUN" in capsys.readouterr().out
+
+
+def test_rejects_ids_outside_arm():
+    assert hs.main(["homing", "--arm", "left", "--ids", "4,7"]) == 4

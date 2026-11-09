@@ -4,6 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
+updated_date: '2026-11-09 01:21'
 labels:
   - hardware
 dependencies:
@@ -35,3 +36,9 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09: leader driver board = CH343 1a86:55d3 serial 5C93150485 (COM8, BusId 11-2), not yet bound for WSL (usbipd bind needs Windows admin).
+<!-- SECTION:NOTES:END -->

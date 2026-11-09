@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-09 00:41'
+updated_date: '2026-11-09 01:21'
 labels:
   - hardware
 dependencies: []
@@ -24,8 +24,8 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 doc-1 records the replacement servo model, gearing and firmware for IDs 4-6 on both arms, from the owner or the part listing
-- [ ] #2 All 12 servos answer with error byte 0, plausible temperature, and near-zero present current at rest with torque off, recorded by a read-only scan
+- [x] #1 doc-1 records the replacement servo model, gearing and firmware for IDs 4-6 on both arms, from the owner or the part listing
+- [x] #2 All 12 servos answer with error byte 0, plausible temperature, and near-zero present current at rest with torque off, recorded by a read-only scan
 - [ ] #3 IDs 4-6 on both arms have homing offsets and Min/Max position limits re-measured and written with an EEPROM backup and read-back, owner-supervised
 - [ ] #4 servo_calibration, soft limits and gripper bands for joints 4-6 are re-measured on hardware and updated in hardware.yaml with their source
 - [ ] #5 A supervised small powered move of each of IDs 4-6 on both arms reaches its goal within tolerance, logged
@@ -45,4 +45,6 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09: owner rebuilt both arms; all joints now have powered servos (per owner). Servo IDs are being re-assigned by the owner in their own terminal with lerobot-setup-motors (so101_follower), one servo connected at a time. lerobot_env now depends on lerobot[feetech] (scservo_sdk was missing). A read-only census before assignment found 0 servos on both buses (servos disconnected for assignment, expected). Next: owner gives the servo model/gearing/firmware (AC #1); then the read-only scan (AC #2).
+
+2026-11-09 read-only census (calibration_data/servo_census_2026-11-08T20-15-27.json, script: PING 0-252 + register dump 0-70, no writes): both arms answer IDs 1-6 only, all model 777 fw 3.9, error byte 0 (any non-zero raises ServoStatusError), temp 26-30 C, present current 0, voltage 12.1-12.3 V, torque off, lock 1. Owner: replacement servos are the same model as the first set (STS3215 1/345). AC#1 + #2 evidence. IDs 1-3 EEPROM identical to the 2026-10-27 backups (offsets/limits); IDs 4-6 factory: offset 85, limits 0..4095, Max_Torque 1000, P/D 32, prot_current 310, unload 44 (gripper caps of 500/250/25 not applied). Added scripts/home_servos.py (homing + limits, dry-run default, torque-off required, backup/read-back) with tests/test_home_servos.py.
 <!-- SECTION:NOTES:END -->
