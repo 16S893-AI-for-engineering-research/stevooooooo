@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-09 00:31'
+updated_date: '2026-11-09 03:21'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-06, AA-14 Done (live camera runs). Full suite **1651 passed**.
+**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1659 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -20,11 +20,20 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 3. Cura uses Rotrics' official settings (AA-34 Done). No tube fixture design. Keep the one-camera rule.
 4. **The owner cell URDF `CAD/robot_urdf_new/` is THE robot model** (both SO-101s with custom gripper and camera mounts, DexArm + laser camera, base mount `baseforreal`, tube `tube_1`). Adding limits is fine; nothing else to rebuild.
 5. The table is NOT a collision object. "Go with the real fold": model contacts at the measured fold are accepted only within 0.05 rad of it. Wrist roll: our 0 = cell URDF -127 deg. Tube = sections with one attachment point each (3 now, +1 per printed section).
-6. Owner prefers the official Feetech route for servo firmware; servo diagnosis is closed (see blocker).
+6. Owner prefers the official Feetech route for servo firmware.
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
+8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
+
+### In flight: AA-43 (servo swap + recalibration of joints 4-6)
+- Done: IDs assigned by the owner with `lerobot-setup-motors` (lerobot_env now has `lerobot[feetech]`). Read-only census `robot/calibration_data/servo_census_2026-11-08T20-15-27.json`: 12/12 at IDs 1-6, fw 3.9, error 0, 26-30 C, current 0. AC #1, #2 checked.
+- IDs 1-3 kept their 2026-10-25 offsets/limits. IDs 4-6 are factory (offset 85, limits 0..4095); grippers (ID 6) have Max_Torque 1000 (no LeRobot caps 500/250/25).
+- **Open owner questions:** (a) were servos 1-3 re-horned during the rebuild (then re-home them too)? (b) re-apply the gripper caps (recommended yes)?
+- **Next (owner at the robot, torque off), per arm:** `scripts/home_servos.py homing --arm left --ids 4,5,6 --live` (joints held mid-travel), then `scripts/record_joint_ranges.py --arm left --live --out out/ranges_left.json` (stop: `touch /tmp/inchworm_stop_ranges`), orchestrator reviews, then `home_servos.py limits ... --ranges out/ranges_left.json --live`. Then servo_calibration/soft limits/gripper bands for joints 4-6 (AC #4) and a supervised small powered move of IDs 4-6 (AC #5).
+- **Stale until AA-43 #4:** hardware.yaml `servo_calibration` (marked `unverified: false` from 2026-10-25), `servo_tick_limits` and `gripper_lock` bands for joints 4-6 describe the OLD servos. Do not run read_pose / fold / jog / gripper scripts live and trust joints 4-6 until they are re-measured.
+- **Leader arm (AA-44):** CH343 serial 5C93150485 (COM8, BusId 11-2) needs a one-time admin `usbipd bind --busid 11-2` by the owner; then add it to hardware.yaml/attach_usb and run a read-only scan.
 
 ### Blocker
-- **Servos ID 4-6 (wrist_flex, wrist_roll, gripper) on BOTH arms are encoder-only leader-arm servos with no motor drive** (owner, 2026-10-27; doc-1 s3). They read position but cannot move; that explained the zeroed drive EEPROM, 0 C, ~950 current and status 0x08. Owner is buying 6 powered servos and rebuilding both arms: **AA-43** (swap + recalibrate joints 4-6). AA-17 and AA-41 depend on it. Until then: no powered wrist/gripper motion; joints 1-3 are powered and fine; the arms work torque-off as pose readers. EEPROM writes to IDs 4-6 on 2026-10-27 are harmless (backups `robot/calibration_data/eeprom_*2026-10-27T23-*`).
+- None for software. Hardware progress waits on the owner for the AA-43 steps above.
 
 ### What is built (software, tested, not yet run live)
 - **Cell model + SO-101 mesh collision (AA-40, 5/6 AC):** `system_model/urdf.py`, `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. Live SO-101 motion stays blocked (`motion_guard.collision.mesh.unverified: true`) until **AA-40 #6**: the owner compares renders vs the real robot (`cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0`, PNGs in `robot/out/poses`).
@@ -35,10 +44,10 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
 3. **AA-30 scanner intrinsics** (owner deferred 2026-11-06, wants to do it soon). First, software only: fix the broken live path in `scripts/calibrate_scanner.py` (wrong CameraArbiter/CameraCapture calls, nonexistent `read_gray`; use `open_capture(...).grab_valid()` and a V4L2 live backend like `camera_probe`) with a test, and generate the missing `assets/chessboard_9x6_25mm.pdf`. Then the owner session: printed board on flat backing, one square checked with calipers, about 20 poses, good light. Details in the AA-30 notes. Optional: re-measure arm-camera fps with the room lit (about 17-20 fps in the dark 2026-11-06 vs 55-60 on 2026-10-25).
 4. **Software follow-ups:** wire `other_arm_pose_source` / `tube_source` / `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
-5. **AA-43** when the new servos arrive (owner to give the model, gearing and firmware for doc-1).
+5. **AA-43** (in flight, see above), then **AA-44** leader arm.
 
 ### Human-handoff queue
-- AA-41 (gripper lock probe): deferred; needs a fresh procedure after AA-43.
+- AA-41 (gripper lock probe): deferred; needs a fresh procedure after AA-43. The old 0x08 / encoder-only diagnosis no longer applies.
 - AA-42 (FD re-flash): moot after the root cause; paused in the walkthrough tab. The owner should close it there (`/human decline AA-42`); do not mark it verified. The left arm's IDs 4-6 were re-flashed (3.10 over 3.10) and still answer.
 
 ### Not committed on purpose
