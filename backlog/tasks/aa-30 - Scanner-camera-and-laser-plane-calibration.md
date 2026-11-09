@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:13'
-updated_date: '2026-10-24 18:33'
+updated_date: '2026-11-09 00:31'
 labels: []
 milestone: m-5
 dependencies:
@@ -87,6 +87,8 @@ Implementation notes:
 - Hardware-only ACs (#1-#4, #6) have comments with exact commands
 - cv2.calibrateHandEye not in OpenCV 5.0.0 alpha; pure-numpy Tsai-Lenz fallback implemented
 - Full test suite: 924 pass, 1 pre-existing fail (test_fold.py hardcoded path to other worktree)
+
+Pre-flight 2026-11-06 (orchestrator, before the first live intrinsics run; nothing run live yet): (1) scripts/calibrate_scanner.py live path is broken: it calls CameraArbiter(config) (needs a backend), CameraCapture(transport) (needs role, and open_capture is the public path), capture.read_gray() (does not exist; use grab_valid().data) at lines ~249-260, ~370-411, ~588-601; the live backend must open V4L2CameraTransport like camera_probe's _LiveBackend. Fix with a test before any live run. (2) assets/chessboard_9x6_25mm.pdf, referenced by robot/docs/scanner_calibration.md, does not exist: generate it (9x6 inner corners, 25 mm squares, print at 100 %, owner verifies one square with calipers). (3) Damaged scanner frames are withheld by AA-14 (grab_valid), so captures will not include truncated 1280x800 frames. Owner deferred the calibration session 2026-11-06.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

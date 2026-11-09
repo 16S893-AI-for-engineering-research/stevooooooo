@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-06 03:56'
+updated_date: '2026-11-09 00:31'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -33,7 +33,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### Next actions (pick one per session)
 1. **Supervised DexArm check** (owner at the robot): attach arm ports, read real SO-101 poses, dry-run queries including one expected refusal, one 5 mm move, compare reported vs model. Also explain the unexplained Z drop (31.05 -> 9.35 mm between two reads 2026-10-28, nothing commanded).
 2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
-3. **AA-30 scanner intrinsics** (AA-14 Done 2026-11-06, so the scanner frames are now trustworthy). Optional camera follow-up: re-measure arm-camera fps with the room lit (20 fps in the dark 2026-11-06 vs 55-60 on 2026-10-25, auto exposure).
+3. **AA-30 scanner intrinsics** (owner deferred 2026-11-06, wants to do it soon). First, software only: fix the broken live path in `scripts/calibrate_scanner.py` (wrong CameraArbiter/CameraCapture calls, nonexistent `read_gray`; use `open_capture(...).grab_valid()` and a V4L2 live backend like `camera_probe`) with a test, and generate the missing `assets/chessboard_9x6_25mm.pdf`. Then the owner session: printed board on flat backing, one square checked with calipers, about 20 poses, good light. Details in the AA-30 notes. Optional: re-measure arm-camera fps with the room lit (about 17-20 fps in the dark 2026-11-06 vs 55-60 on 2026-10-25).
 4. **Software follow-ups:** wire `other_arm_pose_source` / `tube_source` / `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
 5. **AA-43** when the new servos arrive (owner to give the model, gearing and firmware for doc-1).
 
