@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-09 03:21'
+updated_date: '2026-11-09 23:25'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1659 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
+**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1667 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -42,7 +42,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### Next actions (pick one per session)
 1. **Supervised DexArm check** (owner at the robot): attach arm ports, read real SO-101 poses, dry-run queries including one expected refusal, one 5 mm move, compare reported vs model. Also explain the unexplained Z drop (31.05 -> 9.35 mm between two reads 2026-10-28, nothing commanded).
 2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
-3. **AA-30 scanner intrinsics** (owner deferred 2026-11-06, wants to do it soon). First, software only: fix the broken live path in `scripts/calibrate_scanner.py` (wrong CameraArbiter/CameraCapture calls, nonexistent `read_gray`; use `open_capture(...).grab_valid()` and a V4L2 live backend like `camera_probe`) with a test, and generate the missing `assets/chessboard_9x6_25mm.pdf`. Then the owner session: printed board on flat backing, one square checked with calipers, about 20 poses, good light. Details in the AA-30 notes. Optional: re-measure arm-camera fps with the room lit (about 17-20 fps in the dark 2026-11-06 vs 55-60 on 2026-10-25).
+3. **AA-30 scanner intrinsics** (owner deferred 2026-11-06, wants to do it soon). Software pre-flight DONE 2026-11-09: live paths fixed and tested, `robot/assets/chessboard_9x6_25mm.pdf` generated (`scripts/make_chessboard_pdf.py`). Owner session: print the PDF at 100 % ("actual size"), check one square (25 mm) and the 100 mm bar with calipers, mount flat, good light, then `cd robot && uv run python scripts/calibrate_scanner.py --live --step intrinsics --n-frames 20` (about 20 board poses; the script re-prompts if the board is not detected). Needs the scanner camera attached (`scripts/attach_usb.py`); no arm motion, laser off. Optional: re-measure arm-camera fps with the room lit.
 4. **Software follow-ups:** wire `other_arm_pose_source` / `tube_source` / `dexarm_pose_source` into fold/cycle/approach/jog (live refuses until wired); re-derive `folded_transit` and the fold waypoints from the measured fold (the hardware.yaml placeholder is in contact in the model).
 5. **AA-43** (in flight, see above), then **AA-44** leader arm.
 

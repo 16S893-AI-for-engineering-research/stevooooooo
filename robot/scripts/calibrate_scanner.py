@@ -143,6 +143,66 @@ def _laser_on_off(laser_driver, duration_s: float, *, live: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Helper: scanner camera capture (live)
+# ---------------------------------------------------------------------------
+
+SCANNER_ROLE = "camera_scanner"
+
+
+def _v4l2_camera_backend(config):
+    """Backend whose cameras are real V4L2 devices (like camera_probe --live).
+
+    HardwareBackend refuses cameras by design; scripts open V4L2 through the
+    arbiter, which holds the single-camera lock while the device is opened.
+    """
+    from inchworm.backends import MockMjpegBackend, V4L2CameraTransport
+
+    class _LiveCameraBackend(MockMjpegBackend):
+        def _open_camera(self, device, identity):
+            return V4L2CameraTransport.open(device, identity)
+
+    return _LiveCameraBackend(config)
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def _scanner_capture(config, settings, *, camera_backend=None):
+    """Hold the global camera lock and yield an open scanner CameraCapture.
+
+    ``camera_backend`` is injectable for tests (a MockMjpegBackend); live use
+    defaults to V4L2. One camera streams at a time (arbiter lock).
+    """
+    from inchworm.camera_arbiter import CameraArbiter
+    from inchworm.camera_capture import open_capture
+
+    backend = camera_backend if camera_backend is not None else _v4l2_camera_backend(config)
+    with CameraArbiter(backend).acquire(SCANNER_ROLE) as transport:
+        capture = open_capture(transport, role=SCANNER_ROLE)
+        capture.apply_settings(settings)
+        yield capture
+
+
+def _grab_gray(capture):
+    """One undamaged grayscale frame (uint8, H x W). Damaged frames are skipped
+    by ``grab_valid``; if every attempt is damaged, raise rather than calibrate
+    on an empty array."""
+    result = capture.grab_valid()
+    if result.corrupt or result.data is None or result.data.size == 0:
+        raise RuntimeError("scanner camera returned only damaged frames")
+    return result.data
+
+
+def _subtract_background(laser_frame, bg_frame):
+    """laser - background in uint8 without wrap-around."""
+    import numpy as np
+
+    diff = laser_frame.astype(np.int16) - bg_frame.astype(np.int16)
+    return np.clip(diff, 0, 255).astype(np.uint8)
+
+
+# ---------------------------------------------------------------------------
 # Step 1: Intrinsics
 # ---------------------------------------------------------------------------
 
@@ -151,6 +211,9 @@ def run_intrinsics(
     config, backend, *,
     live: bool,
     n_frames: int = 15,
+    camera_backend=None,
+    prompt=input,
+    frames_dir=None,
 ) -> "IntrinsicsResult":
     """Calibrate camera intrinsics and distortion.
 
@@ -243,23 +306,30 @@ def run_intrinsics(
     )
     log.info("  Present the board at various angles, ~200–400 mm from camera.")
 
-    from inchworm.camera_arbiter import CameraArbiter
-    from inchworm.camera_capture import CameraCapture, CameraSettings
+    import cv2  # type: ignore[import]
+    from inchworm.camera_capture import CameraSettings
+    from inchworm.scanner_calibration import CHESSBOARD_PATTERN
 
-    arbiter = CameraArbiter(config)
+    settings = CameraSettings(
+        width=1280, height=800, fps=30.0,
+        auto_exposure=False, exposure=5000, gain=1,
+    )
+    if frames_dir is None:
+        frames_dir = Path(__file__).resolve().parents[1] / "out" / "scanner_intrinsics_frames"
+    frames_dir = Path(frames_dir)
+    frames_dir.mkdir(parents=True, exist_ok=True)
     frames = []
-    with arbiter.acquire("camera_scanner") as transport:
-        capture = CameraCapture(transport)
-        settings = CameraSettings(
-            width=1280, height=800, fps=30.0,
-            auto_exposure=False, exposure=5000, gain=1,
-        )
-        capture.apply_settings(settings)
-        for i in range(n_frames):
-            input(f"  Frame {i+1}/{n_frames}: position the board, then press Enter.")
-            frame = capture.read_gray()
+    with _scanner_capture(config, settings, camera_backend=camera_backend) as capture:
+        while len(frames) < n_frames:
+            prompt(f"  Frame {len(frames)+1}/{n_frames}: position the board, then press Enter.")
+            frame = _grab_gray(capture)
+            found, _ = cv2.findChessboardCorners(frame, CHESSBOARD_PATTERN, None)
+            if not found:
+                log.warning("  Chessboard NOT detected in this frame; reposition and retry.")
+                continue
+            cv2.imwrite(str(frames_dir / f"frame_{len(frames):02d}.png"), frame)
             frames.append(frame)
-            log.info("  Captured frame %d/%d.", i + 1, n_frames)
+            log.info("  Captured frame %d/%d (board detected).", len(frames), n_frames)
 
     result = calibrate_camera_intrinsics(frames)
     log.info(
@@ -281,6 +351,8 @@ def run_laser_plane(
     config, backend, intrinsics, *,
     live: bool,
     standoffs,
+    camera_backend=None,
+    prompt=input,
 ) -> "LaserPlaneResult":
     """Calibrate the laser plane from observations at multiple standoffs.
 
@@ -349,8 +421,7 @@ def run_laser_plane(
 
     from inchworm.laser import open_laser
     from inchworm.laser_line import extract_laser_line
-    from inchworm.camera_arbiter import CameraArbiter
-    from inchworm.camera_capture import CameraCapture, CameraSettings
+    from inchworm.camera_capture import CameraSettings
     import cv2  # type: ignore[import]
 
     from inchworm.scanner_calibration import (
@@ -364,24 +435,21 @@ def run_laser_plane(
     obj_template[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_mm
 
     clouds = []
-    arbiter = CameraArbiter(config)
+    settings = CameraSettings(
+        width=1280, height=800, fps=30.0,
+        auto_exposure=False, exposure=1000, gain=4,
+    )
 
     with open_laser(config, backend) as laser:
-        with arbiter.acquire("camera_scanner") as transport:
-            capture = CameraCapture(transport)
-            settings = CameraSettings(
-                width=1280, height=800, fps=30.0,
-                auto_exposure=False, exposure=1000, gain=4,
-            )
-            capture.apply_settings(settings)
+        with _scanner_capture(config, settings, camera_backend=camera_backend) as capture:
 
             for standoff_mm in standoffs:
-                input(
+                prompt(
                     f"\n  Position chessboard flat at {standoff_mm:.0f} mm from camera, "
                     "then press Enter."
                 )
                 # First capture background (laser OFF).
-                bg_frame = capture.read_gray()
+                bg_frame = _grab_gray(capture)
 
                 # Estimate board pose (target plane) from background frame.
                 ret, corners = cv2.findChessboardCorners(bg_frame, (cols, rows), None)
@@ -408,11 +476,11 @@ def run_laser_plane(
 
                 # Capture laser-on frame.
                 laser.on(duration_s=0.5)
-                laser_frame = capture.read_gray()
+                laser_frame = _grab_gray(capture)
                 laser.off()
 
                 # Extract laser line.
-                line_result = extract_laser_line(laser_frame - bg_frame.clip(min=0))
+                line_result = extract_laser_line(_subtract_background(laser_frame, bg_frame))
 
                 # Intersect laser-line rays with the target plane to get 3-D points.
                 from inchworm.laser_line import _undistort_point, _ray_plane_intersect, LaserCalibration
@@ -477,6 +545,7 @@ def run_hand_eye(
     live: bool,
     n_poses: int = 10,
     tube_advance_m=None,
+    camera_backend=None,
 ) -> "HandEyeResult":
     """Calibrate the camera-to-DexArm-tool transform (hand-eye).
 
@@ -543,8 +612,7 @@ def run_hand_eye(
     import cv2  # type: ignore[import]
     from inchworm.backends import create_backend
     from inchworm.dexarm import DexArmDriver
-    from inchworm.camera_arbiter import CameraArbiter
-    from inchworm.camera_capture import CameraCapture, CameraSettings
+    from inchworm.camera_capture import CameraSettings
     from inchworm.scanner_calibration import (
         CHESSBOARD_PATTERN, CHESSBOARD_SQUARE_MM, calibrate_hand_eye
     )
@@ -582,23 +650,20 @@ def run_hand_eye(
     )
     driver.connect()
 
-    arbiter = CameraArbiter(config)
     R_g2b, t_g2b, R_t2c, t_t2c = [], [], [], []
 
-    with arbiter.acquire("camera_scanner") as transport:
-        capture = CameraCapture(transport)
-        settings = CameraSettings(
-            width=1280, height=800, fps=30.0,
-            auto_exposure=False, exposure=5000, gain=1,
-        )
-        capture.apply_settings(settings)
+    settings = CameraSettings(
+        width=1280, height=800, fps=30.0,
+        auto_exposure=False, exposure=5000, gain=1,
+    )
+    with _scanner_capture(config, settings, camera_backend=camera_backend) as capture:
 
         for i, (x, y, z) in enumerate(dexarm_positions):
             driver.move_absolute(x, y, z, feedrate=2000.0)
             pos = driver.get_position()
             log.info("  Pose %d/%d: arm at (%.1f, %.1f, %.1f) mm", i+1, n_poses, pos.x, pos.y, pos.z)
 
-            frame = capture.read_gray()
+            frame = _grab_gray(capture)
             ret, corners = cv2.findChessboardCorners(frame, (cols, rows), None)
             if not ret:
                 log.warning("  Pose %d: chessboard not detected; skipping.", i+1)
