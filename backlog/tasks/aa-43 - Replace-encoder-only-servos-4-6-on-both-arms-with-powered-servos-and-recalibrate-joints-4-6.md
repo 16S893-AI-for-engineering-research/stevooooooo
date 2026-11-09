@@ -3,10 +3,11 @@ id: AA-43
 title: >-
   Replace encoder-only servos 4-6 on both arms with powered servos and
   recalibrate joints 4-6
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-10-28 22:45'
+updated_date: '2026-11-09 00:41'
 labels:
   - hardware
 dependencies: []
@@ -39,3 +40,9 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09: owner rebuilt both arms; all joints now have powered servos (per owner). Servo IDs are being re-assigned by the owner in their own terminal with lerobot-setup-motors (so101_follower), one servo connected at a time. lerobot_env now depends on lerobot[feetech] (scservo_sdk was missing). A read-only census before assignment found 0 servos on both buses (servos disconnected for assignment, expected). Next: owner gives the servo model/gearing/firmware (AC #1); then the read-only scan (AC #2).
+<!-- SECTION:NOTES:END -->

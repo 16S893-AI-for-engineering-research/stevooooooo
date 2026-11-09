@@ -16,7 +16,7 @@ description = "Pinned LeRobot 0.6.x environment for the inchworm SO-101 robot"
 requires-python = ">=3.12"
 dependencies = [
     # Newest available 0.6.x release on PyPI (0.6.2 does not exist).
-    "lerobot==0.6.1",
+    "lerobot[feetech]==0.6.1",
 ]
 
 [build-system]
