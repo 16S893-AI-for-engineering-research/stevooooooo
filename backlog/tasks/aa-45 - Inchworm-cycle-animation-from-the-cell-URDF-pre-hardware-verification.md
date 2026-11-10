@@ -5,6 +5,7 @@ status: To Do
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
+updated_date: '2026-11-10 21:49'
 labels:
   - simulation
   - verification
@@ -40,3 +41,13 @@ The owner cannot trust the agents' text descriptions of physical motion; rendere
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 (worker run 8dcd014c, paused by owner; partial code lost with its worktree, nothing merged).
+FINDING (cell model, not hardware): the placeholder printing pose folded_transit q=[0,-1.25,1.64,-1.31,1.36] at tube advance 0 does NOT put the grippers on the attachment points: each tip ~25 mm from the tube and ~74 mm along Y from the attachment features (left tip y=0.069 vs feature y~0.143; right tip y=0.252 vs y~0.327); gripper z axis ~37 deg off the working-pose grip. The owner working pose (-90/90/-90) lines up: left on the middle point (y~0.143), right on the far point (y~0.327); the point nearest the DexArm (y~-0.040) is free = left arm regrip target.
+Camera for the side view: at +X looking -X, DexArm at -Y on the left (test frame rendered, not yet shown to the owner).
+DECISION (orchestrator, 2026-11-10): attachment frames = mesh features (working-pose grips, one pitch along tube_axis). Start/fold-back state = IK solution with left on the middle point and right on the far point, seeded from folded_transit, labelled 'printing pose (IK, seeded from placeholder)'. Do NOT write it to hardware.yaml. report.txt leads with the PLACEHOLDER finding and the stored vs IK joint values. If IK cannot reach, stop and report. The printing pose is a single input so the owner's re-measured pose drops in later.
+NEXT: re-launch one worker with the original brief plus this decision; first deliverable = test_frame.png shown to the owner.
+<!-- SECTION:NOTES:END -->

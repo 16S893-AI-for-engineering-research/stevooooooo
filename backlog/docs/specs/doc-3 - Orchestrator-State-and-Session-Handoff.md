@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-10 17:26'
+updated_date: '2026-11-10 21:49'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-10, AA-43 In Progress (2/5 AC). Full suite **1701 passed** (leader-homing support committed). Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
+**Last verified:** 2026-11-10 (paused), AA-43 In Progress (2/5 AC); AA-45 animation paused, see below. Full suite **1701 passed** (leader-homing support committed). Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -33,6 +33,14 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **AA-43 still open:** AC #3 (gripper limits are owner-assumed old values, not measured), AC #4 (joint 4-5 signs and the gripper open end not re-verified on hardware), AC #5 (first supervised small powered move of IDs 4-6, both arms; dry-run first, owner supervising). `servo_calibration.unverified` is still false from the old servos: re-verify signs with a read-only move check before powered motion.
 - **Torque/drive settings vs LeRobot (read 2026-11-09):** LeRobot so_follower.configure() sets P=16, I=0, D=32 on every joint and, for the gripper only, Max_Torque 500, Protection_Current 250, Overload_Torque 25; it leaves the other joints at factory Max_Torque 1000, Protection_Current 310, Overload 80, and writes Acceleration 254. Ours now: gripper = LeRobot exactly; joints 1-5 = factory (Max_Torque 1000, current 310, overload 80, P 32, D 32). The only difference on joints 1-5 is P 32 vs 16 (and Acceleration register 0 vs 254). Not changed; decision pending with the owner (stiffness for holding the tube vs LeRobot-like smoothness for the learned policy).
 - **Leader arm (AA-44), 2026-11-09:** bound, attached (`/dev/ttyACM3`, role `arm_leader`, `arms.leader` in hardware.yaml), IDs 1-6 assigned by the owner, read-only scan OK (`scripts/scan_leader.py`: all six answer, fw 3.10, 214 Hz, 0 errors). discover/attach_usb find it (8/8). AC #1 needs the owner's gearing; AC #4 not started. **Software ready (commit 25a2458):** `home_servos.py` and `record_joint_ranges.py` accept `--arm leader` (tolerate ONLY error bit 0x08, writes read back; dry-run by default). **Next (owner at the arm, torque irrelevant, encoder-only):** half-turn-home the leader with `cd robot && uv run python scripts/home_servos.py homing --arm leader --ids 1,2,3,4,5 --reading ID=TICKS ...` (dry-run first, then live) at a pose matching the followers' zero pose, record ranges, then the leader-to-follower mapping at low speed. Ask the owner before reworking AA-23 around the leader (decision 8).
+
+### In flight: AA-45 (inchworm cycle animation from the cell URDF), paused 2026-11-10
+- Owner-specified cycle and acceptance criteria are in the task. First worker run paused by the owner; its partial code was lost with the worktree (nothing merged). The finding and the orchestrator's decision are in the AA-45 notes: the placeholder printing pose is ~74 mm / 37 deg off the attachment features. Start pose = IK onto the mesh attachment frames, seeded from folded_transit, never written to hardware.yaml.
+- **Resume:** re-launch ONE worker with the original brief (in the AA-45 description + notes) plus that decision. First deliverable: robot/out/inchworm/test_frame.png, shown to the owner to confirm the camera side (+X looking -X, DexArm on the left).
+- The owner will re-provide the real printing pose at the robot.
+
+### Pending: nono sandbox profile (owner request 2026-11-10)
+- The owner wants this project to run under nono (installed 0.77.0; 0.81.0 available; existing profile ~/.config/nono/profiles/mit-parley.json extends node-dev). The permission analysis was started, not finished or delivered. Resume by finishing it: filesystem (repo, ~/.pi/agent, pi-node, uv/torch/hf caches, ~/worktrees/893 for sub-agent worktrees, /tmp), git push over SSH (~/.ssh is denied by deny_credentials), serial/video devices (/dev/ttyACM*, /dev/serial, /dev/video*, /dev/v4l, /sys for vhci), Windows interop (powershell.exe/usbipd.exe for attach_usb.py), network (Parley, github, pypi, huggingface).
 
 ### Blocker
 - None for software. Hardware progress waits on the owner for the AA-43 steps above.
