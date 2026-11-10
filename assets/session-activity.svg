@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="860" viewBox="0 0 1100 860" role="img" aria-labelledby="title desc">
-<title id="title">pi agent session activity through 11/5/26</title>
+<title id="title">pi agent session activity through 11/10/26</title>
 <desc id="desc">Daily totals from all persisted pi sessions for this repository, including sub-agent workers and the walkthrough guide. The first chart compares user messages and agent tool calls; the second shows recorded model cost in US dollars, split by session type.</desc>
 <rect width="100%" height="100%" rx="18" fill="#120f24"/>
 <text x="550.0" y="44.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="28" text-anchor="middle">Agent activity and cost by day</text>
-<text x="550.0" y="72.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="15" text-anchor="middle">130 sessions through 11/5/26 · total recorded cost $421</text>
+<text x="550.0" y="72.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="15" text-anchor="middle">137 sessions through 11/10/26 · total recorded cost $441</text>
 <rect x="82" y="112" width="984" height="300" rx="8" fill="#17132e" stroke="#2a2450"/>
 <line x1="82" y1="412.0" x2="1066" y2="412.0" stroke="#2a2450" stroke-width="1" stroke-dasharray="3 5"/>
 <text x="72.0" y="417.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="13" text-anchor="end">0</text>
@@ -38,136 +38,149 @@
 <text x="374.0" y="577.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="14" text-anchor="start">Sub-agent workers</text>
 <rect x="600" y="564" width="16" height="16" rx="4" fill="#ffc857"/>
 <text x="624.0" y="577.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="14" text-anchor="start">Walkthrough guide</text>
-<rect x="90.0" y="411.3" width="14.1" height="0.7" rx="2" fill="#ff5c8a"/>
-<rect x="106.8" y="405.6" width="14.1" height="6.5" rx="2" fill="#3ec1b4"/>
-<text x="113.9" y="399.6" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">86</text>
-<text x="105.4" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/15</text>
-<rect x="91.4" y="745.7" width="28.1" height="2.3" fill="#ff7a45"/>
-<text x="105.4" y="738.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$2</text>
-<text x="105.4" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/15</text>
-<rect x="136.8" y="410.1" width="14.1" height="1.9" rx="2" fill="#ff5c8a"/>
-<rect x="153.7" y="382.3" width="14.1" height="29.7" rx="2" fill="#3ec1b4"/>
-<text x="160.7" y="376.3" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">396</text>
-<text x="152.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/22</text>
-<rect x="138.2" y="723.5" width="28.1" height="24.5" fill="#ff7a45"/>
-<text x="152.3" y="716.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$25</text>
-<text x="152.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/22</text>
-<rect x="183.7" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="200.5" y="411.8" width="14.1" height="0.2" rx="2" fill="#3ec1b4"/>
-<text x="199.1" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/23</text>
-<rect x="185.1" y="748.0" width="28.1" height="0.0" fill="#ff7a45"/>
-<text x="199.1" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/23</text>
-<rect x="230.5" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="247.4" y="411.5" width="14.1" height="0.5" rx="2" fill="#3ec1b4"/>
-<text x="246.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/29</text>
-<rect x="231.9" y="747.9" width="28.1" height="0.1" fill="#ff7a45"/>
-<text x="246.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/29</text>
-<rect x="277.4" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="294.3" y="411.9" width="14.1" height="0.1" rx="2" fill="#3ec1b4"/>
-<text x="292.9" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/1</text>
-<rect x="278.8" y="748.0" width="28.1" height="0.0" fill="#ff7a45"/>
-<text x="292.9" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/1</text>
-<rect x="324.3" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="341.1" y="411.9" width="14.1" height="0.1" rx="2" fill="#3ec1b4"/>
-<text x="339.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/6</text>
-<rect x="325.7" y="748.0" width="28.1" height="0.0" fill="#ff7a45"/>
-<text x="339.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/6</text>
-<rect x="371.1" y="409.9" width="14.1" height="2.1" rx="2" fill="#ff5c8a"/>
-<rect x="388.0" y="410.8" width="14.1" height="1.2" rx="2" fill="#3ec1b4"/>
-<text x="386.6" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/12</text>
-<rect x="372.5" y="747.2" width="28.1" height="0.8" fill="#ff7a45"/>
-<text x="386.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/12</text>
-<rect x="418.0" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="434.8" y="411.9" width="14.1" height="0.1" rx="2" fill="#3ec1b4"/>
-<text x="433.4" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/13</text>
-<rect x="419.4" y="748.0" width="28.1" height="0.0" fill="#ff7a45"/>
-<text x="433.4" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/13</text>
-<rect x="464.8" y="408.9" width="14.1" height="3.1" rx="2" fill="#ff5c8a"/>
-<rect x="481.7" y="395.9" width="14.1" height="16.1" rx="2" fill="#3ec1b4"/>
-<text x="488.7" y="389.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">214</text>
-<text x="480.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/15</text>
-<rect x="466.2" y="720.8" width="28.1" height="27.2" fill="#ff7a45"/>
-<text x="480.3" y="713.8" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$27</text>
-<text x="480.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/15</text>
-<rect x="511.7" y="410.1" width="14.1" height="1.9" rx="2" fill="#ff5c8a"/>
-<rect x="528.5" y="397.3" width="14.1" height="14.7" rx="2" fill="#3ec1b4"/>
-<text x="535.6" y="391.3" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">196</text>
-<text x="527.1" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/20</text>
-<rect x="513.1" y="726.9" width="28.1" height="21.1" fill="#ff7a45"/>
-<text x="527.1" y="719.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$21</text>
-<text x="527.1" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/20</text>
-<rect x="558.5" y="412.0" width="14.1" height="0.0" rx="2" fill="#ff5c8a"/>
-<rect x="575.4" y="411.9" width="14.1" height="0.1" rx="2" fill="#3ec1b4"/>
-<text x="574.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/21</text>
-<rect x="559.9" y="747.9" width="28.1" height="0.1" fill="#ffc857"/>
-<text x="574.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/21</text>
-<rect x="605.4" y="410.3" width="14.1" height="1.7" rx="2" fill="#ff5c8a"/>
-<rect x="622.3" y="409.4" width="14.1" height="2.5" rx="2" fill="#3ec1b4"/>
-<text x="620.9" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/22</text>
-<rect x="606.8" y="747.2" width="28.1" height="0.8" fill="#ff7a45"/>
-<rect x="606.8" y="747.0" width="28.1" height="0.1" fill="#ffc857"/>
-<text x="620.9" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/22</text>
-<rect x="652.3" y="403.7" width="14.1" height="8.3" rx="2" fill="#ff5c8a"/>
-<text x="659.3" y="397.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">111</text>
-<rect x="669.1" y="346.5" width="14.1" height="65.5" rx="2" fill="#3ec1b4"/>
-<text x="676.1" y="340.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">873</text>
-<text x="667.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/23</text>
-<rect x="653.7" y="637.6" width="28.1" height="110.4" fill="#ff7a45"/>
-<rect x="653.7" y="628.9" width="28.1" height="8.7" fill="#ffc857"/>
-<text x="667.7" y="621.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$119</text>
-<text x="667.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/23</text>
-<rect x="699.1" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="716.0" y="185.7" width="14.1" height="226.3" rx="2" fill="#3ec1b4"/>
-<text x="723.0" y="179.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">3017</text>
-<text x="714.6" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/24</text>
-<rect x="700.5" y="644.0" width="28.1" height="104.0" fill="#3ec1b4"/>
-<text x="714.6" y="637.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$104</text>
-<text x="714.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/24</text>
-<rect x="746.0" y="412.0" width="14.1" height="0.0" rx="2" fill="#ff5c8a"/>
-<rect x="762.8" y="402.9" width="14.1" height="9.1" rx="2" fill="#3ec1b4"/>
-<text x="769.9" y="396.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">121</text>
-<text x="761.4" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/25</text>
-<rect x="747.4" y="742.2" width="28.1" height="5.8" fill="#3ec1b4"/>
-<text x="761.4" y="735.2" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$6</text>
-<text x="761.4" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/25</text>
-<rect x="792.8" y="408.2" width="14.1" height="3.8" rx="2" fill="#ff5c8a"/>
-<text x="799.9" y="402.2" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">51</text>
-<rect x="809.7" y="334.1" width="14.1" height="77.8" rx="2" fill="#3ec1b4"/>
-<text x="816.7" y="328.1" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">1038</text>
-<text x="808.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/27</text>
-<rect x="794.2" y="665.8" width="28.1" height="82.2" fill="#ff7a45"/>
-<rect x="794.2" y="640.4" width="28.1" height="25.4" fill="#3ec1b4"/>
-<rect x="794.2" y="640.1" width="28.1" height="0.4" fill="#ffc857"/>
-<text x="808.3" y="633.1" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$108</text>
-<text x="808.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/27</text>
-<rect x="839.7" y="411.8" width="14.1" height="0.2" rx="2" fill="#ff5c8a"/>
-<rect x="856.5" y="409.7" width="14.1" height="2.3" rx="2" fill="#3ec1b4"/>
-<text x="855.1" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/28</text>
-<rect x="841.1" y="747.5" width="28.1" height="0.5" fill="#ff7a45"/>
-<rect x="841.1" y="744.6" width="28.1" height="2.9" fill="#ffc857"/>
-<text x="855.1" y="737.6" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$3</text>
-<text x="855.1" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/28</text>
-<rect x="886.5" y="411.8" width="14.1" height="0.2" rx="2" fill="#ff5c8a"/>
-<rect x="903.4" y="412.0" width="14.1" height="0.0" rx="2" fill="#3ec1b4"/>
-<text x="902.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/29</text>
-<text x="902.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/29</text>
-<rect x="933.4" y="411.3" width="14.1" height="0.7" rx="2" fill="#ff5c8a"/>
-<rect x="950.3" y="412.0" width="14.1" height="0.0" rx="2" fill="#3ec1b4"/>
-<text x="948.9" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/2</text>
-<rect x="934.8" y="747.9" width="28.1" height="0.1" fill="#ff7a45"/>
-<text x="948.9" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/2</text>
-<rect x="980.3" y="411.7" width="14.1" height="0.3" rx="2" fill="#ff5c8a"/>
-<rect x="997.1" y="409.5" width="14.1" height="2.5" rx="2" fill="#3ec1b4"/>
-<text x="995.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/3</text>
-<rect x="981.7" y="745.5" width="28.1" height="2.5" fill="#ff7a45"/>
-<text x="995.7" y="738.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$2</text>
-<text x="995.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/3</text>
-<rect x="1027.1" y="411.9" width="14.1" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="1044.0" y="410.5" width="14.1" height="1.5" rx="2" fill="#3ec1b4"/>
-<text x="1042.6" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/5</text>
-<rect x="1028.5" y="747.0" width="28.1" height="1.0" fill="#ff7a45"/>
-<text x="1042.6" y="740.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$1</text>
-<text x="1042.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/5</text>
+<rect x="89.3" y="411.3" width="12.8" height="0.7" rx="2" fill="#ff5c8a"/>
+<rect x="104.7" y="405.6" width="12.8" height="6.5" rx="2" fill="#3ec1b4"/>
+<text x="111.1" y="399.6" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">86</text>
+<text x="103.4" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/15</text>
+<rect x="90.6" y="745.7" width="25.7" height="2.3" fill="#ff7a45"/>
+<text x="103.4" y="738.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$2</text>
+<text x="103.4" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/15</text>
+<rect x="132.1" y="410.1" width="12.8" height="1.9" rx="2" fill="#ff5c8a"/>
+<rect x="147.5" y="382.3" width="12.8" height="29.7" rx="2" fill="#3ec1b4"/>
+<text x="153.9" y="376.3" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">396</text>
+<text x="146.2" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/22</text>
+<rect x="133.3" y="723.5" width="25.7" height="24.5" fill="#ff7a45"/>
+<text x="146.2" y="716.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$25</text>
+<text x="146.2" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/22</text>
+<rect x="174.8" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="190.2" y="411.8" width="12.8" height="0.2" rx="2" fill="#3ec1b4"/>
+<text x="189.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/23</text>
+<rect x="176.1" y="748.0" width="25.7" height="0.0" fill="#ff7a45"/>
+<text x="189.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/23</text>
+<rect x="217.6" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="233.0" y="411.5" width="12.8" height="0.5" rx="2" fill="#3ec1b4"/>
+<text x="231.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/29</text>
+<rect x="218.9" y="747.9" width="25.7" height="0.1" fill="#ff7a45"/>
+<text x="231.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">9/29</text>
+<rect x="260.4" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="275.8" y="411.9" width="12.8" height="0.1" rx="2" fill="#3ec1b4"/>
+<text x="274.5" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/1</text>
+<rect x="261.7" y="748.0" width="25.7" height="0.0" fill="#ff7a45"/>
+<text x="274.5" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/1</text>
+<rect x="303.2" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="318.6" y="411.9" width="12.8" height="0.1" rx="2" fill="#3ec1b4"/>
+<text x="317.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/6</text>
+<rect x="304.5" y="748.0" width="25.7" height="0.0" fill="#ff7a45"/>
+<text x="317.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/6</text>
+<rect x="346.0" y="409.9" width="12.8" height="2.1" rx="2" fill="#ff5c8a"/>
+<rect x="361.4" y="410.8" width="12.8" height="1.2" rx="2" fill="#3ec1b4"/>
+<text x="360.1" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/12</text>
+<rect x="347.3" y="747.2" width="25.7" height="0.8" fill="#ff7a45"/>
+<text x="360.1" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/12</text>
+<rect x="388.8" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="404.2" y="411.9" width="12.8" height="0.1" rx="2" fill="#3ec1b4"/>
+<text x="402.9" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/13</text>
+<rect x="390.0" y="748.0" width="25.7" height="0.0" fill="#ff7a45"/>
+<text x="402.9" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/13</text>
+<rect x="431.5" y="408.9" width="12.8" height="3.1" rx="2" fill="#ff5c8a"/>
+<rect x="446.9" y="395.9" width="12.8" height="16.1" rx="2" fill="#3ec1b4"/>
+<text x="453.4" y="389.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">214</text>
+<text x="445.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/15</text>
+<rect x="432.8" y="720.8" width="25.7" height="27.2" fill="#ff7a45"/>
+<text x="445.7" y="713.8" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$27</text>
+<text x="445.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/15</text>
+<rect x="474.3" y="410.1" width="12.8" height="1.9" rx="2" fill="#ff5c8a"/>
+<rect x="489.7" y="397.3" width="12.8" height="14.7" rx="2" fill="#3ec1b4"/>
+<text x="496.1" y="391.3" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">196</text>
+<text x="488.4" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/20</text>
+<rect x="475.6" y="726.9" width="25.7" height="21.1" fill="#ff7a45"/>
+<text x="488.4" y="719.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$21</text>
+<text x="488.4" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/20</text>
+<rect x="517.1" y="412.0" width="12.8" height="0.0" rx="2" fill="#ff5c8a"/>
+<rect x="532.5" y="411.9" width="12.8" height="0.1" rx="2" fill="#3ec1b4"/>
+<text x="531.2" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/21</text>
+<rect x="518.4" y="747.9" width="25.7" height="0.1" fill="#ffc857"/>
+<text x="531.2" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/21</text>
+<rect x="559.9" y="410.3" width="12.8" height="1.7" rx="2" fill="#ff5c8a"/>
+<rect x="575.3" y="409.4" width="12.8" height="2.5" rx="2" fill="#3ec1b4"/>
+<text x="574.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/22</text>
+<rect x="561.2" y="747.2" width="25.7" height="0.8" fill="#ff7a45"/>
+<rect x="561.2" y="747.0" width="25.7" height="0.1" fill="#ffc857"/>
+<text x="574.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/22</text>
+<rect x="602.7" y="403.7" width="12.8" height="8.3" rx="2" fill="#ff5c8a"/>
+<text x="609.1" y="397.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">111</text>
+<rect x="618.1" y="346.5" width="12.8" height="65.5" rx="2" fill="#3ec1b4"/>
+<text x="624.5" y="340.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">873</text>
+<text x="616.8" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/23</text>
+<rect x="603.9" y="637.6" width="25.7" height="110.4" fill="#ff7a45"/>
+<rect x="603.9" y="628.9" width="25.7" height="8.7" fill="#ffc857"/>
+<text x="616.8" y="621.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$119</text>
+<text x="616.8" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/23</text>
+<rect x="645.4" y="411.9" width="12.8" height="0.1" rx="2" fill="#ff5c8a"/>
+<rect x="660.8" y="185.7" width="12.8" height="226.3" rx="2" fill="#3ec1b4"/>
+<text x="667.3" y="179.7" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">3017</text>
+<text x="659.6" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/24</text>
+<rect x="646.7" y="644.0" width="25.7" height="104.0" fill="#3ec1b4"/>
+<text x="659.6" y="637.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$104</text>
+<text x="659.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/24</text>
+<rect x="688.2" y="412.0" width="12.8" height="0.0" rx="2" fill="#ff5c8a"/>
+<rect x="703.6" y="402.9" width="12.8" height="9.1" rx="2" fill="#3ec1b4"/>
+<text x="710.0" y="396.9" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">121</text>
+<text x="702.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/25</text>
+<rect x="689.5" y="742.2" width="25.7" height="5.8" fill="#3ec1b4"/>
+<text x="702.3" y="735.2" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$6</text>
+<text x="702.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/25</text>
+<rect x="731.0" y="408.2" width="12.8" height="3.8" rx="2" fill="#ff5c8a"/>
+<text x="737.4" y="402.2" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">51</text>
+<rect x="746.4" y="334.1" width="12.8" height="77.8" rx="2" fill="#3ec1b4"/>
+<text x="752.8" y="328.1" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">1038</text>
+<text x="745.1" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/27</text>
+<rect x="732.3" y="665.8" width="25.7" height="82.2" fill="#ff7a45"/>
+<rect x="732.3" y="640.4" width="25.7" height="25.4" fill="#3ec1b4"/>
+<rect x="732.3" y="640.1" width="25.7" height="0.4" fill="#ffc857"/>
+<text x="745.1" y="633.1" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$108</text>
+<text x="745.1" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/27</text>
+<rect x="773.8" y="411.8" width="12.8" height="0.2" rx="2" fill="#ff5c8a"/>
+<rect x="789.2" y="409.7" width="12.8" height="2.3" rx="2" fill="#3ec1b4"/>
+<text x="787.9" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/28</text>
+<rect x="775.1" y="747.5" width="25.7" height="0.5" fill="#ff7a45"/>
+<rect x="775.1" y="744.6" width="25.7" height="2.9" fill="#ffc857"/>
+<text x="787.9" y="737.6" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$3</text>
+<text x="787.9" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/28</text>
+<rect x="816.6" y="411.8" width="12.8" height="0.2" rx="2" fill="#ff5c8a"/>
+<rect x="832.0" y="412.0" width="12.8" height="0.0" rx="2" fill="#3ec1b4"/>
+<text x="830.7" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/29</text>
+<text x="830.7" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">10/29</text>
+<rect x="859.4" y="411.3" width="12.8" height="0.7" rx="2" fill="#ff5c8a"/>
+<rect x="874.8" y="412.0" width="12.8" height="0.0" rx="2" fill="#3ec1b4"/>
+<text x="873.5" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/2</text>
+<rect x="860.6" y="747.9" width="25.7" height="0.1" fill="#ff7a45"/>
+<text x="873.5" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/2</text>
+<rect x="902.1" y="411.7" width="12.8" height="0.3" rx="2" fill="#ff5c8a"/>
+<rect x="917.5" y="409.5" width="12.8" height="2.5" rx="2" fill="#3ec1b4"/>
+<text x="916.3" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/3</text>
+<rect x="903.4" y="745.5" width="25.7" height="2.5" fill="#ff7a45"/>
+<text x="916.3" y="738.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$2</text>
+<text x="916.3" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/3</text>
+<rect x="944.9" y="410.4" width="12.8" height="1.6" rx="2" fill="#ff5c8a"/>
+<rect x="960.3" y="402.2" width="12.8" height="9.8" rx="2" fill="#3ec1b4"/>
+<text x="966.7" y="396.2" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">131</text>
+<text x="959.0" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/5</text>
+<rect x="946.2" y="740.5" width="25.7" height="7.5" fill="#ff7a45"/>
+<text x="959.0" y="733.5" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$7</text>
+<text x="959.0" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/5</text>
+<rect x="987.7" y="410.1" width="12.8" height="1.9" rx="2" fill="#ff5c8a"/>
+<rect x="1003.1" y="395.4" width="12.8" height="16.6" rx="2" fill="#3ec1b4"/>
+<text x="1009.5" y="389.4" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="11" text-anchor="middle">222</text>
+<text x="1001.8" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/9</text>
+<rect x="989.0" y="735.6" width="25.7" height="12.4" fill="#ff7a45"/>
+<text x="1001.8" y="728.6" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$12</text>
+<text x="1001.8" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/9</text>
+<rect x="1030.5" y="411.6" width="12.8" height="0.4" rx="2" fill="#ff5c8a"/>
+<rect x="1045.9" y="410.1" width="12.8" height="1.9" rx="2" fill="#3ec1b4"/>
+<text x="1044.6" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/10</text>
+<rect x="1031.8" y="747.3" width="25.7" height="0.7" fill="#ff7a45"/>
+<text x="1044.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/10</text>
 <text x="550.0" y="808.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">Sessions are dated by the day they started. Sub-agent cost is dated by its own start day. $0 days had little or no paid model usage.</text>
-<text x="550.0" y="830.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">Generated 11/5/26 from local pi session metadata only; prompt and tool contents are not included.</text>
+<text x="550.0" y="830.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">Generated 11/10/26 from local pi session metadata only; prompt and tool contents are not included.</text>
 </svg>

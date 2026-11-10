@@ -25,7 +25,7 @@
 
   <main>
     <div class="container page-head">
-      <p class="eyebrow">Progress &middot; updated Nov 5, 2026</p>
+      <p class="eyebrow">Progress &middot; updated Nov 10, 2026</p>
       <h1 class="page-title">Dev Log</h1>
       <p class="subtitle">
         Where the inchworm robot stands, what is finished, and dated notes on
@@ -43,17 +43,17 @@
           <div class="panel overall">
             <h3>Overall progress</h3>
             <div class="pct">67%<small>of 239 milestone acceptance criteria met</small></div>
-            <div class="progress lg" role="img" aria-label="12 of 35 milestone tasks done, 16 in progress, 7 to do">
-              <span class="done" style="width:34.3%"></span>
-              <span class="doing" style="width:45.7%"></span>
+            <div class="progress lg" role="img" aria-label="13 of 35 milestone tasks done, 15 in progress, 7 to do">
+              <span class="done" style="width:37.1%"></span>
+              <span class="doing" style="width:42.9%"></span>
               <span class="todo" style="width:20%"></span>
             </div>
             <ul class="legend">
-              <li><i class="key-done"></i>12 tasks done</li>
-              <li><i class="key-doing"></i>16 in progress</li>
+              <li><i class="key-done"></i>13 tasks done</li>
+              <li><i class="key-doing"></i>15 in progress</li>
               <li><i class="key-todo"></i>7 to do</li>
             </ul>
-            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by 1,640 passing tests. Most remaining criteria need measurements on the real robot.</p>
+            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by 1,701 passing tests. Most remaining criteria need measurements on the real robot.</p>
           </div>
           <div class="panel">
             <h3>Phases</h3>
@@ -61,7 +61,7 @@
               <li><strong>Sep</strong> &mdash; Website, agent skills, paper simulation</li>
               <li><strong>Mid Oct</strong> &mdash; Robot designed, ordered and built</li>
               <li><strong>Late Oct</strong> &mdash; Robot software planned and written by agents</li>
-              <li><strong>Now</strong> &mdash; Bringing the hardware to life, safely</li>
+              <li><strong>Now</strong> &mdash; Rebuilt arms moving under supervision, checked against the model</li>
               <li><strong>Next</strong> &mdash; Learned insertion, then full autonomous print-crawl</li>
             </ul>
           </div>
@@ -74,8 +74,8 @@
               <div class="progress"><span class="done" style="width:100%"></span></div>
               <span class="ms-count"><b>4/4</b> tasks<br>25/25 criteria</span></li>
             <li><span class="ms-name"><span class="ms-id">M1</span>Hardware bring-up<span class="ms-desc">Drive the arms, DexArm and cameras from code</span></span>
-              <div class="progress"><span class="done" style="width:25%"></span><span class="doing" style="width:50%"></span></div>
-              <span class="ms-count"><b>2/8</b> tasks<br>32/48 criteria</span></li>
+              <div class="progress"><span class="done" style="width:37.5%"></span><span class="doing" style="width:37.5%"></span></div>
+              <span class="ms-count"><b>3/8</b> tasks<br>33/48 criteria</span></li>
             <li><span class="ms-name"><span class="ms-id">M2</span>Geometry &amp; coarse motion<span class="ms-desc">Frames, gripper lock, approach, fold, dry crawl</span></span>
               <div class="progress"><span class="done" style="width:28.6%"></span><span class="doing" style="width:71.4%"></span></div>
               <span class="ms-count"><b>2/7</b> tasks<br>38/48 criteria</span></li>
@@ -102,14 +102,15 @@
         <div class="status-cards">
           <div class="card blocker">
             <h3>Current blocker</h3>
-            <p>The wrist and gripper servos (4&ndash;6) on both arms are encoder-only &ldquo;leader&rdquo; servos: they read position but have no motor. New powered servos are on order, then both arms get rebuilt and recalibrated. <span class="task-id">AA-43</span></p>
+            <p>No software blocker. Hardware progress waits on supervised sessions: checking the remaining joint directions and which end of the gripper travel is open on both arms <span class="task-id">AA-43</span>, and homing the leader arm <span class="task-id">AA-44</span>.</p>
           </div>
           <div class="card">
             <h3>Up next</h3>
             <ul>
+              <li>Finish the joint direction checks and first powered wrist and gripper moves <span class="task-id">AA-43</span></li>
+              <li>Home and map the leader arm <span class="task-id">AA-44</span></li>
+              <li>Calibrate the scanner camera with the chessboard <span class="task-id">AA-30</span></li>
               <li>Supervised first DexArm move against the robot model</li>
-              <li>DexArm repeatability measured with the scanner camera</li>
-              <li>Servo swap and recalibration when parts arrive</li>
             </ul>
           </div>
           <div class="card">
@@ -138,10 +139,11 @@
             </ul>
           </div>
           <div class="panel done-group">
-            <h3>M1 Hardware bring-up <small>2 of 8</small></h3>
+            <h3>M1 Hardware bring-up <small>3 of 8</small></h3>
             <ul class="done-list">
               <li><b>Talking to the arm servos</b>: a driver for the SO-101 servo bus and a map of which servo is which joint. <span class="task-id">AA-8</span></li>
               <li><b>Talking to the DexArm</b>: a driver for its G-code dialect that handles its quirks and reconnects safely. <span class="task-id">AA-12</span></li>
+              <li><b>Reading the cameras</b>: capture from the mono cameras, skipping damaged frames instead of stopping the run. <span class="task-id">AA-14</span></li>
             </ul>
           </div>
           <div class="panel done-group">
@@ -183,6 +185,31 @@
       <section class="section" id="log">
         <div class="section-head"><span class="num">04</span><h2>Dated entries</h2></div>
         <p class="section-lead">Newest first. &ldquo;Work done&rdquo; is a plain summary; &ldquo;Notes&rdquo; are my own words, unedited.</p>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase hw">Hardware</span>
+            <time class="log-date">Nov 10, 2026</time>
+          </header>
+          <h3 class="log-title">Rebuilt arms and checking the model against reality</h3>
+          <p class="log-tldr">Both arms now have powered servos on every joint; the first supervised move matched the model&rsquo;s picture, not just its words.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Arms rebuilt</b> with powered STS3215 servos on every joint; all 12 servos checked: right firmware, no errors, normal temperatures.<span class="task-id">AA-43</span></li>
+              <li><b>Wrists and grippers set up</b> on both arms: homed, swept through their range, and joint limits written and read back.<span class="task-id">AA-43</span></li>
+              <li><b>First supervised powered move</b>: the left wrist moved &plusmn;5&deg;, and I confirmed its direction against the model render. New tools draw the model&rsquo;s predicted motion as images (<code>view_joint_move.py</code>, <code>view_zero_pose.py</code>).<span class="task-id">AA-43</span></li>
+              <li><b>Leader arm for teaching</b>: a separate encoder-only arm is connected and scanned, for recording demonstrations by hand; its homing software is ready.<span class="task-id">AA-44</span></li>
+              <li><b>Scanner calibration prepared</b>: the live calibration path fixed and a printable chessboard generated.<span class="task-id">AA-30</span></li>
+              <li><b>Damaged camera frames skipped</b> instead of stopping a run.<span class="task-id">AA-14</span></li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Had issues with agents and orchestrator getting stuck in loops. Agent activity now runs with a time limit. Was having a hard time verifying that the agent knows what's happening with the physical model. It'll say one things in text but that doesn't necessarily match what's physically happening. As such, I've realized I can't necessarily trust the text output and instead need to examine the png it creates for the expected behavior. Considering creating an end to end animation of the robot's movement to confirm behavior as well.</p>
+            </section>
+          </div>
+        </article>
         <article class="panel log-entry">
           <header class="log-head">
             <span class="phase hw">Hardware</span>

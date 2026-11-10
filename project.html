@@ -35,8 +35,8 @@
       <div class="stat-row">
         <div class="stat"><b>3 arms</b><span>two SO-101 grippers and a DexArm print head</span></div>
         <div class="stat"><b>67%</b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
-        <div class="stat"><b>1,640</b><span>automated software tests passing</span></div>
-        <div class="stat"><b>~$421</b><span>total AI agent cost so far</span></div>
+        <div class="stat"><b>1,701</b><span>automated software tests passing</span></div>
+        <div class="stat"><b>~$441</b><span>total AI agent cost so far</span></div>
       </div>
     </div>
 
@@ -137,7 +137,7 @@
           <table class="role-table">
             <thead><tr><th>Piece</th><th>What it does</th></tr></thead>
             <tbody>
-              <tr><td>Backlog.md tasks</td><td>43 tasks and about 250 acceptance criteria. A criterion is only checked with evidence, and agents may not rewrite one to match what they built.</td></tr>
+              <tr><td>Backlog.md tasks</td><td>44 tasks and about 270 acceptance criteria. A criterion is only checked with evidence, and agents may not rewrite one to match what they built.</td></tr>
               <tr><td>Shared memory docs</td><td>Three documents every agent reads first: the hardware facts, the change-control rules, and a live "where are we" state with the next action.</td></tr>
               <tr><td>Safety rules</td><td>Hard limits agents can't relax: one camera streaming at a time, never both grippers open while holding the tube, laser off on every exit, dry-run before any first live move.</td></tr>
               <tr><td>Clarify-before-build skill</td><td>For anything visual or physical, the agent must ask questions and restate the plan before writing code.</td></tr>
@@ -150,15 +150,15 @@
         <div class="grid-2" style="margin-top:1.25rem">
           <div class="panel">
             <h3>Where the money went</h3>
-            <div class="big-number">$421</div>
-            <p class="muted small">Recorded model cost across 130 sessions, 9/15 to 11/5/26.</p>
+            <div class="big-number">$441</div>
+            <p class="muted small">Recorded model cost across 137 sessions, 9/15 to 11/10/26.</p>
             <div class="cost-bar" aria-hidden="true">
-              <span style="width:65%; background:var(--orange)"></span>
-              <span style="width:32%; background:var(--teal)"></span>
+              <span style="width:66%; background:var(--orange)"></span>
+              <span style="width:31%; background:var(--teal)"></span>
               <span style="width:3%; background:var(--mustard)"></span>
             </div>
             <ul class="legend">
-              <li><i style="background:var(--orange)"></i>Main sessions $274</li>
+              <li><i style="background:var(--orange)"></i>Main sessions $293</li>
               <li><i style="background:var(--teal)"></i>Sub-agents $135</li>
               <li><i style="background:var(--mustard)"></i>Walkthrough guide $12</li>
             </ul>
@@ -170,11 +170,13 @@
               <li><strong>Written acceptance criteria</strong> stopped agents from declaring victory early.</li>
               <li><strong>A hand-made URDF</strong> worked far better than raw CAD, where many parts shared the same name.</li>
               <li><strong>Asking before building</strong> caught wrong assumptions at the cheapest point.</li>
+              <li><strong>Checking the model&rsquo;s rendered images</strong>, not the agent&rsquo;s text description, is how I confirm what the robot will physically do.</li>
             </ul>
             <ul class="lesson-list bad">
               <li><strong>Hardware goose chase:</strong> several sessions went into "broken" servos that turned out to be encoder-only leader servos. Now: ask me after two failed probes.</li>
               <li><strong>Open-ended sub-agents</strong> explored for 30&ndash;45 minutes and wrote nothing. Now: one narrow task, an early deliverable, a time cap.</li>
               <li><strong>Long sessions</strong> are expensive. Now: save state, commit, and start fresh.</li>
+              <li><strong>Stuck in loops:</strong> agents and the orchestrator sometimes repeated the same steps without finishing. Now: every agent run has a time limit.</li>
             </ul>
           </div>
         </div>
