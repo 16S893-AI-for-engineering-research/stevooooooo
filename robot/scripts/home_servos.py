@@ -26,6 +26,9 @@ Usage (from robot/)::
 
     uv run python scripts/home_servos.py homing --arm left --ids 4,5,6            # dry-run
     uv run python scripts/home_servos.py homing --arm left --ids 4,5,6 --live
+    # joint resting on a known end stop (e.g. gripper at its closed stop), previously measured limits:
+    uv run python scripts/home_servos.py homing --arm left --ids 6 --reading 6=2521 --live
+    uv run python scripts/home_servos.py limits --arm left --ids 6 --set-limits 6=1521:2531 --live
     uv run python scripts/record_joint_ranges.py --arm left --live --out out/ranges_left.json
     uv run python scripts/home_servos.py limits --arm left --ids 4,5,6 --ranges out/ranges_left.json --live
 """
@@ -108,19 +111,29 @@ def plan_limits(ranges: dict, ids_by_joint: Dict[str, int], targets: Iterable[in
     return out
 
 
-def do_homing(read: ReadFn, write: WriteFn, targets: Iterable[int], settle_s: float = 0.05) -> Dict[int, dict]:
+def shortest_offset(raw: int, target: int) -> int:
+    """Homing offset (reported = actual - offset, mod 4096) in -2048..2047 that makes ``raw`` read ``target``."""
+    return ((raw - target + 2048) % 4096) - 2048
+
+
+def do_homing(read: ReadFn, write: WriteFn, targets: Iterable[int], settle_s: float = 0.05,
+              readings: Optional[Dict[int, int]] = None) -> Dict[int, dict]:
+    """Set each target's homing offset so the CURRENT pose reads ``readings[sid]`` (default 2047)."""
+    readings = readings or {}
     res: Dict[int, dict] = {}
     for sid in targets:
+        want = readings.get(sid, HALF_TURN)
         _eeprom_write(write, sid, REG_HOMING_OFFSET, le16(0), settle_s)
         if decode_offset(u16(read, sid, REG_HOMING_OFFSET)) != 0:
             raise SystemExit(f"READ-BACK MISMATCH: ID {sid} homing offset did not clear to 0")
         raw = u16(read, sid, REG_PRESENT_POSITION)
-        off = raw - HALF_TURN
+        off = shortest_offset(raw, want)
         _eeprom_write(write, sid, REG_HOMING_OFFSET, le16(encode_offset(off)), settle_s)
         got = decode_offset(u16(read, sid, REG_HOMING_OFFSET))
         pos = u16(read, sid, REG_PRESENT_POSITION)
-        res[sid] = {"raw_position": raw, "offset": off, "offset_read_back": got, "position_after": pos}
-        if got != off or abs(pos - HALF_TURN) > 3:
+        res[sid] = {"raw_position": raw, "offset": off, "offset_read_back": got, "position_after": pos,
+                    "wanted_reading": want}
+        if got != off or abs(pos - want) > 3:
             raise SystemExit(f"READ-BACK MISMATCH: ID {sid} {res[sid]}")
     return res
 
@@ -148,6 +161,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--arm", choices=("left", "right"), required=True)
     ap.add_argument("--ids", default="4,5,6", help="comma-separated servo IDs (default 4,5,6)")
     ap.add_argument("--ranges", type=Path, help="record_joint_ranges.py JSON (limits only)")
+    ap.add_argument("--reading", action="append", default=[], metavar="ID=TICKS",
+                    help="homing only: make the CURRENT pose of servo ID read TICKS (default 2047 = mid-travel). "
+                         "For a joint held at a known end stop, e.g. a gripper at its closed stop. Repeatable.")
+    ap.add_argument("--set-limits", action="append", default=[], metavar="ID=LO:HI",
+                    help="limits only: write these exact Min:Max_Position_Limit ticks instead of deriving them "
+                         "from --ranges (owner-assumed, previously measured values). Repeatable.")
     ap.add_argument("--margin", type=int, default=30, help="limit margin in ticks (default 30)")
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--backup-dir", type=Path, default=Path(__file__).resolve().parents[1] / "calibration_data")
@@ -155,8 +174,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     targets = [int(x) for x in a.ids.split(",")]
     if any(t not in range(1, 7) for t in targets):
         print(f"REFUSED: IDs must be within 1-6, got {targets}"); return 4
-    if a.action == "limits" and a.ranges is None:
-        print("REFUSED: limits needs --ranges <record_joint_ranges.py JSON>"); return 4
+    try:
+        readings = {int(k): int(v) for k, v in (x.split("=") for x in a.reading)}
+        explicit = {int(k): tuple(int(t) for t in v.split(":")) for k, v in (x.split("=") for x in a.set_limits)}
+    except ValueError:
+        print("REFUSED: --reading wants ID=TICKS and --set-limits wants ID=LO:HI"); return 4
+    if readings and a.action != "homing":
+        print("REFUSED: --reading is for the homing action"); return 4
+    if explicit and a.action != "limits":
+        print("REFUSED: --set-limits is for the limits action"); return 4
+    for sid, v in readings.items():
+        if sid not in targets or not 0 <= v <= 4095:
+            print(f"REFUSED: --reading {sid}={v} must name a target ID with ticks in 0..4095"); return 4
+    for sid, v in explicit.items():
+        if sid not in targets or len(v) != 2 or not 0 <= v[0] < v[1] <= 4095:
+            print(f"REFUSED: --set-limits {sid}={v} must name a target ID with 0 <= LO < HI <= 4095"); return 4
+    if a.action == "limits" and a.ranges is None and set(explicit) != set(targets):
+        print("REFUSED: limits needs --ranges <record_joint_ranges.py JSON> or --set-limits for every target ID"); return 4
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from inchworm.config import load_config
@@ -165,13 +199,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     jm = {n: getattr(sj, n) for n in JOINTS}
     if [jm[n] for n in JOINTS] != [1, 2, 3, 4, 5, 6]:
         print(f"REFUSED: expected servo IDs 1-6 in joint order, got {jm}"); return 4
-    limits = plan_limits(json.loads(a.ranges.read_text()), jm, targets, a.margin) if a.action == "limits" else None
+    limits = None
+    if a.action == "limits":
+        rest = [t for t in targets if t not in explicit]
+        limits = plan_limits(json.loads(a.ranges.read_text()), jm, rest, a.margin) if rest else {}
+        limits.update(explicit)
 
     if not a.live:
         names = {sid: j for j, sid in jm.items()}
         if a.action == "homing":
-            print(f"DRY-RUN: arm_{a.arm}, hold {[names[t] for t in targets]} at MID-TRAVEL. Would set each "
-                  "homing offset so that pose reads 2047. Torque must be off; nothing moves. Add --live.")
+            print(f"DRY-RUN: arm_{a.arm}: would set the homing offset of "
+                  + ", ".join(f"{names[t]} (ID {t}) so the CURRENT pose reads {readings.get(t, HALF_TURN)}" for t in targets)
+                  + ". Joints without --reading must be held at MID-TRAVEL. Torque must be off; nothing moves. Add --live.")
         else:
             print(f"DRY-RUN: arm_{a.arm} would write Min/Max_Position_Limit "
                   + ", ".join(f"{names[s]} (ID {s}) {lo}..{hi}" for s, (lo, hi) in limits.items()) + ". Add --live.")
@@ -195,7 +234,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                                      "targets": targets, "limits": limits}, indent=1))
         print(f"backup: {bpath}")
         if a.action == "homing":
-            res = do_homing(read, write, targets)
+            res = do_homing(read, write, targets, readings=readings)
             written = {sid: {REG_HOMING_OFFSET, REG_HOMING_OFFSET + 1} for sid in targets}
         else:
             res = do_limits(read, write, limits)

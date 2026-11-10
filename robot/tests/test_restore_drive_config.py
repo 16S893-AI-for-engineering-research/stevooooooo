@@ -100,3 +100,10 @@ def test_fw310_mask_apply_only_touches_two_registers():
     assert bad == {}
     assert {w[1] for w in b.writes} == {55, 19, 20}
     assert b.mem[4][19] == 33 and b.mem[6][20] == 35 and b.mem[3][19] == 44
+
+
+def test_gripper_caps_only_dry_run_and_exclusive(capsys):
+    assert rdc.main(["--arm", "left", "--gripper-caps-only"]) == 0
+    out = capsys.readouterr().out
+    assert "ID 6 only" in out and "500" in out
+    assert rdc.main(["--arm", "left", "--gripper-caps-only", "--fw310-mask"]) == 4

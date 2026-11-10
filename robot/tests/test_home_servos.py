@@ -94,3 +94,33 @@ def test_dry_run_opens_nothing(capsys):
 
 def test_rejects_ids_outside_arm():
     assert hs.main(["homing", "--arm", "left", "--ids", "4,7"]) == 4
+
+
+def test_homing_to_a_known_end_stop_reading():
+    f = FakeServos({4: 1000, 5: 1000, 6: 3642, 1: 0, 2: 0, 3: 0})
+    res = hs.do_homing(f.read, f.write, [6], settle_s=0, readings={6: 2521})
+    assert res[6]["wanted_reading"] == 2521
+    assert abs(f.read(6, 56, 2)[0] + (f.read(6, 56, 2)[1] << 8) - 2521) <= 1
+    assert f.mem[6][55] == 1
+    assert not any(w[0] != 6 for w in f.writes)
+
+
+def test_shortest_offset_wraps_across_the_seam():
+    assert hs.shortest_offset(100, 2047) == -1947
+    assert hs.shortest_offset(4000, 100) == -196
+    assert hs.shortest_offset(3642, 2521) == 1121
+    assert -2048 <= hs.shortest_offset(0, 4095) <= 2047
+
+
+def test_cli_reading_and_set_limits_validation(capsys):
+    assert hs.main(["homing", "--arm", "left", "--ids", "6", "--reading", "5=100"]) == 4
+    assert hs.main(["homing", "--arm", "left", "--ids", "6", "--reading", "6=9999"]) == 4
+    assert hs.main(["limits", "--arm", "left", "--ids", "6", "--reading", "6=100"]) == 4
+    assert hs.main(["homing", "--arm", "left", "--ids", "6", "--set-limits", "6=1:2"]) == 4
+    assert hs.main(["limits", "--arm", "left", "--ids", "6", "--set-limits", "6=2531:1521"]) == 4
+    assert hs.main(["limits", "--arm", "left", "--ids", "4,6", "--set-limits", "6=1521:2531"]) == 4  # 4 has no source
+    capsys.readouterr()
+    assert hs.main(["homing", "--arm", "left", "--ids", "6", "--reading", "6=2521"]) == 0
+    assert "so the CURRENT pose reads 2521" in capsys.readouterr().out
+    assert hs.main(["limits", "--arm", "left", "--ids", "6", "--set-limits", "6=1521:2531"]) == 0
+    assert "1521..2531" in capsys.readouterr().out

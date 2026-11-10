@@ -180,8 +180,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--fw310-mask", action="store_true",
                     help=f"only set {FW310_MASK} on IDs 4-6 (owner decision (a), 2026-10-27)")
+    ap.add_argument("--gripper-caps-only", action="store_true",
+                    help=f"only write the LeRobot gripper caps {GRIPPER_CAPS} to ID 6 (replacement servos at "
+                         "firmware 3.9: no OverEle workaround, nothing else is touched)")
     ap.add_argument("--backup-dir", type=Path, default=Path(__file__).resolve().parents[1] / "calibration_data")
     a = ap.parse_args(argv)
+    if a.gripper_caps_only and a.fw310_mask:
+        print("REFUSED: --gripper-caps-only and --fw310-mask are exclusive"); return 4
+    if not a.live and a.gripper_caps_only:
+        print(f"DRY-RUN (default): would back up all 6 servos of arm_{a.arm} and write {GRIPPER_CAPS} to ID 6 "
+              "only. Add --live (torque must be off; nothing moves).")
+        return 0
     if not a.live and a.fw310_mask:
         print(f"DRY-RUN (default): would back up all 6 servos of arm_{a.arm} and set {FW310_MASK} "
               "on IDs 4-6 only. Add --live (torque must be off; nothing moves).")
@@ -210,7 +219,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         on = [sid for sid in range(1, 7) if _get(rd, sid, REG_TORQUE_ENABLE, 1) != 0]
         if on:
             print(f"REFUSED: torque is ON for servo(s) {on}; switch it off first"); return 4
-        if a.fw310_mask:
+        if a.gripper_caps_only:
+            targets = {GRIPPER_ID: dict(GRIPPER_CAPS)}
+        elif a.fw310_mask:
             fw = {sid: (_get(rd, sid, 0, 1), _get(rd, sid, 1, 1)) for sid in TARGET_IDS}
             if any(v != (3, 10) for v in fw.values()):
                 print(f"REFUSED: --fw310-mask expects firmware 3.10 on IDs 4-6, got {fw}"); return 4
@@ -219,7 +230,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             targets = plan(rd)
         before = dump(rd, range(1, 7))
         stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
-        tag = "fw310_mask" if a.fw310_mask else "drive_restore"
+        tag = "gripper_caps" if a.gripper_caps_only else ("fw310_mask" if a.fw310_mask else "drive_restore")
         bpath = a.backup_dir / f"eeprom_backup_{a.arm}_{stamp}_pre_{tag}.json"
         bpath.write_text(json.dumps({"arm": a.arm, "utc": stamp, "registers_0_70": before,
                                      "targets": targets}, indent=1))

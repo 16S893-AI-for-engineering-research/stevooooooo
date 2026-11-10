@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-09 23:25'
+updated_date: '2026-11-10 00:23'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1667 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
+**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1671 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -25,12 +25,13 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)
-- Done: IDs assigned by the owner with `lerobot-setup-motors` (lerobot_env now has `lerobot[feetech]`). Read-only census `robot/calibration_data/servo_census_2026-11-08T20-15-27.json`: 12/12 at IDs 1-6, fw 3.9, error 0, 26-30 C, current 0. AC #1, #2 checked.
-- IDs 1-3 kept their 2026-10-25 offsets/limits. IDs 4-6 are factory (offset 85, limits 0..4095); grippers (ID 6) have Max_Torque 1000 (no LeRobot caps 500/250/25).
-- **Open owner questions:** (a) were servos 1-3 re-horned during the rebuild (then re-home them too)? (b) re-apply the gripper caps (recommended yes)?
-- **Next (owner at the robot, torque off), per arm:** `scripts/home_servos.py homing --arm left --ids 4,5,6 --live` (joints held mid-travel), then `scripts/record_joint_ranges.py --arm left --live --out out/ranges_left.json` (stop: `touch /tmp/inchworm_stop_ranges`), orchestrator reviews, then `home_servos.py limits ... --ranges out/ranges_left.json --live`. Then servo_calibration/soft limits/gripper bands for joints 4-6 (AC #4) and a supervised small powered move of IDs 4-6 (AC #5).
-- **Stale until AA-43 #4:** hardware.yaml `servo_calibration` (marked `unverified: false` from 2026-10-25), `servo_tick_limits` and `gripper_lock` bands for joints 4-6 describe the OLD servos. Do not run read_pose / fold / jog / gripper scripts live and trust joints 4-6 until they are re-measured.
-- **Leader arm (AA-44):** CH343 serial 5C93150485 (COM8, BusId 11-2) needs a one-time admin `usbipd bind --busid 11-2` by the owner; then add it to hardware.yaml/attach_usb and run a read-only scan.
+- Done: IDs assigned by the owner with `lerobot-setup-motors`; read-only census `robot/calibration_data/servo_census_2026-11-08T20-15-27.json` (12/12 at IDs 1-6, fw 3.9, error 0, current 0). AC #1, #2 checked.
+- **Owner answers (2026-11-09):** IDs 1-3 on both arms are UNCHANGED (keep their 2026-10-25 offsets/limits and hardware.yaml calibration). Gripper caps are to be re-applied (done).
+- **Grippers (ID 6) DONE 2026-11-09, both arms, torque off, nothing moved:** the owner cannot sweep them by hand (powered servo), both rest at the full clockwise stop = the old `closed_empty` stop. So the closed stop was homed to read the old closed_empty tick (left offset 1207 -> 2521, right offset -1914 -> 2494) and Min/Max_Position_Limit set to the previously written values (left 1521..2531, right 1563..2504). LeRobot gripper caps re-applied: Max_Torque_Limit 500, Protection_Current 250, Overload_Torque 25, P 16, D 32. Read back; nothing else changed. **ASSUMPTION, not measured:** the open end sits at the old open tick (L 1531, R 1576), so the hardware.yaml gripper bands stay valid. Verify with one supervised powered move before relying on them.
+- **Still open: IDs 4 (wrist_flex) and 5 (wrist_roll), both arms** are factory (offset 85, limits 0..4095). Owner, torque off, per arm: `cd robot && uv run python scripts/home_servos.py homing --arm left --ids 4,5 --live` (both joints held at mid-travel), then `uv run python scripts/record_joint_ranges.py --arm left --live --out out/ranges_left.json` (sweep, stop: `touch /tmp/inchworm_stop_ranges`), orchestrator reviews, then `home_servos.py limits --arm left --ids 4,5 --ranges out/ranges_left.json --live`. Same for `right`. Then servo_calibration/soft limits for joints 4-5 (AC #4) and a supervised small powered move of IDs 4-6 (AC #5).
+- **Stale until AA-43 #4:** hardware.yaml `servo_calibration` for wrist_flex/wrist_roll, their `servo_tick_limits`, and `servo_tick_limits.gripper` (older than the EEPROM values) describe the OLD servos. Do not run read_pose / fold / jog / gripper scripts live and trust joints 4-5 until re-measured.
+- **Torque/drive settings vs LeRobot (read 2026-11-09):** LeRobot so_follower.configure() sets P=16, I=0, D=32 on every joint and, for the gripper only, Max_Torque 500, Protection_Current 250, Overload_Torque 25; it leaves the other joints at factory Max_Torque 1000, Protection_Current 310, Overload 80, and writes Acceleration 254. Ours now: gripper = LeRobot exactly; joints 1-5 = factory (Max_Torque 1000, current 310, overload 80, P 32, D 32). The only difference on joints 1-5 is P 32 vs 16 (and Acceleration register 0 vs 254). Not changed; decision pending with the owner (stiffness for holding the tube vs LeRobot-like smoothness for the learned policy).
+- **Leader arm (AA-44):** CH343 serial 5C93150485 (COM8, BusId 11-2) needs a one-time admin `usbipd bind --busid 11-2` by the owner (still "Not shared" 2026-11-09). Owner assigns its servo IDs with `lerobot-setup-motors --teleop.type so101_leader --teleop.port <port>` (standard IDs 1-6, shoulder_pan..gripper, one servo connected at a time); then add it to hardware.yaml/attach_usb and run a read-only scan.
 
 ### Blocker
 - None for software. Hardware progress waits on the owner for the AA-43 steps above.

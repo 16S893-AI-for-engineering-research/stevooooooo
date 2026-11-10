@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-09 03:21'
+updated_date: '2026-11-10 00:23'
 labels:
   - hardware
 dependencies: []
@@ -49,4 +49,6 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 2026-11-09 read-only census (calibration_data/servo_census_2026-11-08T20-15-27.json, script: PING 0-252 + register dump 0-70, no writes): both arms answer IDs 1-6 only, all model 777 fw 3.9, error byte 0 (any non-zero raises ServoStatusError), temp 26-30 C, present current 0, voltage 12.1-12.3 V, torque off, lock 1. Owner: replacement servos are the same model as the first set (STS3215 1/345). AC#1 + #2 evidence. IDs 1-3 EEPROM identical to the 2026-10-27 backups (offsets/limits); IDs 4-6 factory: offset 85, limits 0..4095, Max_Torque 1000, P/D 32, prot_current 310, unload 44 (gripper caps of 500/250/25 not applied). Added scripts/home_servos.py (homing + limits, dry-run default, torque-off required, backup/read-back) with tests/test_home_servos.py.
 
 2026-11-09 paused by owner: safe state verified (torque_enable 0 read back on all 12 servos, laser relay OFF commanded, no robot processes). Open owner questions: servos 1-3 re-horned? re-apply gripper caps? Next: home_servos.py homing per arm (see doc-3).
+
+2026-11-09 (owner session, live, torque off, nothing moved): owner answers: IDs 1-3 on both arms are unchanged (no re-homing needed); IDs 4-5 limits still to be measured; grippers cannot be swept by hand (powered servo too stiff), both rest at their full CLOCKWISE limit = the old closed_empty stop (clockwise limit short of entering the attachment point); owner: assume the previous gripper range and restore LeRobot's lower gripper torque settings. DONE (backups calibration_data/eeprom_backup_{left,right}_2026-11-09T19-21-4x_pre_gripper_caps.json, ...19-22-xx_pre_homing/pre_limits.json; whole-bus read-back, only ID 6 registers changed): (1) gripper caps via new restore_drive_config.py --gripper-caps-only: ID 6 Max_Torque_Limit 1000->500, Protection_Current 310->250, Overload_Torque 80->25, P 32->16 (D 32), both arms. (2) gripper homing offset so the closed stop reads the OLD closed_empty tick: left offset 1207 (raw 3728 -> reads 2521), right offset -1914 (raw 580 -> reads 2494), via new home_servos.py homing --reading ID=TICKS. (3) gripper Min/Max_Position_Limit = the previously written values: left 1521..2531, right 1563..2504 (home_servos.py limits --set-limits). ASSUMPTION (not measured): same offset/range as the old servo, i.e. the open end is at ~old open (L 1531, R 1576), so the existing hardware.yaml gripper bands (open/locked/closed_empty) stay valid in the new frame. Verify the open end with one supervised powered move before relying on the bands. Torque comparison with LeRobot recorded in doc-3. Tests: 3 new in test_home_servos.py, 1 in test_restore_drive_config.py. AC #3 still open for IDs 4-5 (both arms): homing at mid-travel + sweep + limits.
 <!-- SECTION:NOTES:END -->
