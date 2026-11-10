@@ -94,3 +94,9 @@ def test_drive_config_faults_flags_zeroed_eeprom():
     healthy = {16: b"\xe8\x03", 21: b"\x20", 28: b"\x36\x01", 48: b"\xe8\x03"}  # as read on IDs 1-3
     assert set(x.split("(")[0] for x in m.drive_config_faults(zeroed, 6)) == set(m.DRIVE_REGS)
     assert m.drive_config_faults(lambda sid, addr, n: healthy[addr], 6) == []
+
+
+def test_probe_cleanup_restores_the_eeprom_cap_not_a_hardcoded_1000():
+    """Owner 2026-11-09: grippers use LeRobot's lower torque cap (500); the probe must not undo it."""
+    src = (Path(__file__).parents[1] / "scripts" / "gripper_lock_probe.py").read_text()
+    assert "restore_torque" in src and "bus.set_torque_limit(sid, _TORQUE_LIMIT_FULL)" not in src

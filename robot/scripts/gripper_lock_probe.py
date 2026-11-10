@@ -44,7 +44,8 @@ from typing import Callable, List, Optional
 
 ARM_JOINTS = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll")
 _REG_TORQUE_ENABLE = 40
-_TORQUE_LIMIT_FULL = 1000
+_TORQUE_LIMIT_FULL = 1000   # fallback only; the cleanup restores the servo's EEPROM Max_Torque_Limit (reg 16)
+_REG_MAX_TORQUE_LIMIT = 16
 _TORQUE_MIN, _TORQUE_MAX = 50, 600   # probe range; above 600 is not needed to seat a key
 
 
@@ -172,6 +173,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     bus = ArmServoBus(t, role=role, joint_id_map=joint_map)
     sid = joint_map["gripper"]
     records: List[dict] = []
+    restore_torque = _TORQUE_LIMIT_FULL
     try:
         on = [n for n in ARM_JOINTS if bus._bus.read_bytes(joint_map[n], _REG_TORQUE_ENABLE, 1)[0] != 0]
         if on:
@@ -184,12 +186,16 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"REFUSED: gripper servo {sid} drive config is zeroed: {', '.join(eeprom_bad)}. "
                       "It cannot produce torque; the EEPROM must be restored first (AA-41 finding).")
                 return 5
+        # Restore target for cleanup: the EEPROM Max_Torque_Limit (owner 2026-11-09: LeRobot's
+        # lower gripper cap, 500). Restoring a hard-coded 1000 would silently undo that cap.
+        mt = bus._bus.read_bytes(sid, _REG_MAX_TORQUE_LIMIT, 2)
+        restore_torque = (mt[0] | (mt[1] << 8)) or _TORQUE_LIMIT_FULL
         bus.set_torque_enable(sid, True)        # goal := present first (no jump)
         sm = GripperLockSM(bus=bus, role=role, config=probe_cfg,
                            opposite_arm_locked_fn=lambda: False, dry_run=False)
         records = run_trials(bus, sm, bands, role=role, torque_raw=a.torque, key=a.key, trials=a.trials)
     finally:
-        for step in (lambda: bus.set_torque_limit(sid, _TORQUE_LIMIT_FULL),
+        for step in (lambda: bus.set_torque_limit(sid, restore_torque),
                      lambda: bus.set_torque_enable(sid, False)):
             try:
                 step()
