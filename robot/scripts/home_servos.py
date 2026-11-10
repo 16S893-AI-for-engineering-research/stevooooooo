@@ -21,6 +21,11 @@ Safety
 * EEPROM unlock (reg 55 = 0) per servo, re-lock (reg 55 = 1) in ``finally``.
 * Every value read back; any change outside the written registers is reported.
 * Never writes ID, baud, mode, phase, drive or torque registers.
+* ``--arm leader`` (AA-44, encoder-only leader): same procedure on ``arm_leader``. Its firmware-3.10
+  servos flag error byte 0x08 on some replies; ONLY that bit is tolerated (any other bit refuses),
+  and every write is still verified by read-back. Hold the leader in the pose that should read the
+  target ticks (default mid-travel 2047; use ``--reading ID=TICKS`` per joint, e.g. the follower's
+  expected zero-pose ticks from ``view_zero_pose.py`` so leader ticks equal follower ticks).
 
 Usage (from robot/)::
 
@@ -158,7 +163,7 @@ def unexpected_changes(before: Dict[int, List[int]], after: Dict[int, List[int]]
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("action", choices=("homing", "limits"))
-    ap.add_argument("--arm", choices=("left", "right"), required=True)
+    ap.add_argument("--arm", choices=("left", "right", "leader"), required=True)
     ap.add_argument("--ids", default="4,5,6", help="comma-separated servo IDs (default 4,5,6)")
     ap.add_argument("--ranges", type=Path, help="record_joint_ranges.py JSON (limits only)")
     ap.add_argument("--reading", action="append", default=[], metavar="ID=TICKS",
@@ -195,7 +200,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from inchworm.config import load_config
     cfg = load_config()
-    sj = (cfg.arms.left if a.arm == "left" else cfg.arms.right).servo_joints
+    arm_cfg = {"left": cfg.arms.left, "right": cfg.arms.right, "leader": cfg.arms.leader}[a.arm]
+    if arm_cfg is None:
+        print(f"REFUSED: arms.{a.arm} is not configured in hardware.yaml"); return 4
+    sj = arm_cfg.servo_joints
     jm = {n: getattr(sj, n) for n in JOINTS}
     if [jm[n] for n in JOINTS] != [1, 2, 3, 4, 5, 6]:
         print(f"REFUSED: expected servo IDs 1-6 in joint order, got {jm}"); return 4
@@ -222,7 +230,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     t = live_backend(cfg).open_serial(role)
     bus = ArmServoBus(t, role=role, joint_id_map=jm)
     raw = bus._bus
-    read, write = raw.read_bytes, raw.write_bytes
+    if a.arm == "leader":   # AA-44: tolerate ONLY the fw-3.10 encoder-only error bit 0x08
+        read, write = raw.read_bytes_tolerating, raw.write_bytes_tolerating
+    else:
+        read, write = raw.read_bytes, raw.write_bytes
     try:
         on = [sid for sid in range(1, 7) if read(sid, REG_TORQUE_ENABLE, 1)[0] != 0]
         if on:

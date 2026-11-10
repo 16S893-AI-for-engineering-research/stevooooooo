@@ -379,6 +379,36 @@ class _ServoBus:
         raw = self._transact(request, servo_id, f"write reg=0x{register:02X}")
         _parse_status_packet(raw, servo_id)
 
+    def read_bytes_tolerating(self, servo_id: int, register: int, length: int, tolerated: int = 0x08) -> bytes:
+        """Like :meth:`read_bytes`, but a status error byte made ONLY of ``tolerated`` bits is accepted.
+
+        AA-44: the encoder-only leader's firmware-3.10 servos flag 0x08 on some replies. Any other
+        error bit still raises :class:`ServoStatusError`; checksum and length are still enforced.
+        """
+        request = _build_request(servo_id, _INST_READ, bytes([register, length]))
+        raw = self._transact(request, servo_id, f"read reg=0x{register:02X} len={length}")
+        try:
+            _, payload = _parse_status_packet(raw, servo_id)
+        except ServoStatusError as e:
+            if e.error_byte & ~tolerated:
+                raise
+            data = raw[raw.find(b"\xff\xff"):]
+            payload = data[5 : 4 + data[3] - 1]
+        if len(payload) < length:
+            raise ServoRangeError(servo_id, len(payload),
+                                  f"expected {length} bytes from register 0x{register:02X}, got {len(payload)}")
+        return payload[:length]
+
+    def write_bytes_tolerating(self, servo_id: int, register: int, data: bytes, tolerated: int = 0x08) -> None:
+        """Like :meth:`write_bytes`, tolerating a status error byte made only of ``tolerated`` bits."""
+        request = _build_request(servo_id, _INST_WRITE, bytes([register]) + data)
+        raw = self._transact(request, servo_id, f"write reg=0x{register:02X}")
+        try:
+            _parse_status_packet(raw, servo_id)
+        except ServoStatusError as e:
+            if e.error_byte & ~tolerated:
+                raise
+
     def sync_read(
         self, servo_ids: Sequence[int], register: int, length: int
     ) -> Dict[int, bytes]:

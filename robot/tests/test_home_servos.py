@@ -124,3 +124,59 @@ def test_cli_reading_and_set_limits_validation(capsys):
     assert "so the CURRENT pose reads 2521" in capsys.readouterr().out
     assert hs.main(["limits", "--arm", "left", "--ids", "6", "--set-limits", "6=1521:2531"]) == 0
     assert "1521..2531" in capsys.readouterr().out
+
+
+# ---- AA-44: --arm leader (encoder-only, firmware-3.10 error byte 0x08 tolerated, nothing else) ----
+def _status(sid, err, payload):
+    body = bytes([sid, len(payload) + 2, err]) + payload
+    return b"\xff\xff" + body + bytes([(~sum(body)) & 0xFF])
+
+
+def _bus_replying(reply):
+    from inchworm.servo_bus import _ServoBus
+
+    class T:
+        is_open = True
+        def __init__(self): self.sent = []
+        def write(self, b): self.sent.append(bytes(b))
+        def read(self, n, timeout_s=None):
+            r, self._r = self._r, b""
+            return r
+        def flush_input(self): pass
+        def reset_input_buffer(self): pass
+        def close(self): pass
+    t = T()
+    t._r = reply
+    return _ServoBus(t)
+
+
+def test_tolerating_read_accepts_only_error_bit_0x08():
+    from inchworm.servo_bus import ServoStatusError
+    assert _bus_replying(_status(3, 0x08, b"\x34\x12")).read_bytes_tolerating(3, 56, 2) == b"\x34\x12"
+    with pytest.raises(ServoStatusError):
+        _bus_replying(_status(3, 0x08, b"\x34\x12")).read_bytes(3, 56, 2)          # strict read still refuses
+    for bad in (0x01, 0x04, 0x20, 0x28):                                          # any other bit refuses
+        with pytest.raises(ServoStatusError):
+            _bus_replying(_status(3, bad, b"\x34\x12")).read_bytes_tolerating(3, 56, 2)
+
+
+def test_tolerating_write_accepts_only_error_bit_0x08():
+    from inchworm.servo_bus import ServoStatusError
+    _bus_replying(_status(3, 0x08, b"")).write_bytes_tolerating(3, 31, b"\x00\x00")
+    with pytest.raises(ServoStatusError):
+        _bus_replying(_status(3, 0x20, b"")).write_bytes_tolerating(3, 31, b"\x00\x00")
+
+
+def test_leader_cli_dry_run_and_homing_to_follower_zero_ticks(capsys):
+    assert hs.main(["homing", "--arm", "leader", "--ids", "1,2,3,4,5", "--reading", "2=2127", "--reading", "4=2028"]) == 0
+    out = capsys.readouterr().out
+    assert "arm_leader" in out and "reads 2127" in out and "reads 2028" in out
+    assert hs.main(["limits", "--arm", "leader", "--ids", "4", "--set-limits", "4=800:3200"]) == 0
+    assert hs.main(["homing", "--arm", "leader", "--ids", "7"]) == 4
+
+
+def test_leader_homing_never_touches_other_servos():
+    f = FakeServos({1: 100, 2: 500, 3: 900, 4: 1300, 5: 1700, 6: 3000})
+    hs.do_homing(f.read, f.write, [2, 4], settle_s=0, readings={2: 2127, 4: 2028})
+    assert {w[0] for w in f.writes} == {2, 4}
+    assert abs(int.from_bytes(f.read(2, 56, 2), "little") - 2127) <= 1

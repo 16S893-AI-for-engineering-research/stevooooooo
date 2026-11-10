@@ -122,7 +122,7 @@ def _status_line(rec: Recorder) -> str:
 
 def main(argv: List[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--arm", choices=("left", "right"), required=True)
+    ap.add_argument("--arm", choices=("left", "right", "leader"), required=True)
     ap.add_argument("--live", action="store_true", help="read the real arm (read-only)")
     ap.add_argument("--stop-file", type=Path, default=Path("/tmp/inchworm_stop_ranges"))
     ap.add_argument("--max-seconds", type=float, default=600.0)
@@ -142,7 +142,11 @@ def main(argv: List[str] | None = None) -> int:
     from inchworm.servo_bus import ArmServoBus
 
     cfg = load_config()
-    sj = (cfg.arms.left if args.arm == "left" else cfg.arms.right).servo_joints
+    arm_cfg = {"left": cfg.arms.left, "right": cfg.arms.right, "leader": cfg.arms.leader}[args.arm]
+    if arm_cfg is None:
+        print(f"REFUSED: arms.{args.arm} is not configured in hardware.yaml")
+        return 4
+    sj = arm_cfg.servo_joints
     ids = {j: getattr(sj, j) for j in JOINTS}
     if any(v is None for v in ids.values()):
         print(f"REFUSED: null servo IDs in config: {[k for k, v in ids.items() if v is None]}")
@@ -151,12 +155,14 @@ def main(argv: List[str] | None = None) -> int:
     bus = ArmServoBus(t, role=f"arm_{args.arm}", joint_id_map=ids)
     raw = bus._bus  # read-only register access; NOTHING in this script writes
     try:
-        torque_on = {j: raw.read_bytes(s, 40, 1)[0] for j, s in ids.items()}
+        # AA-44: the encoder-only leader flags error byte 0x08 (fw 3.10); ONLY that bit is tolerated.
+        rd = raw.read_bytes_tolerating if args.arm == "leader" else raw.read_bytes
+        torque_on = {j: rd(s, 40, 1)[0] for j, s in ids.items()}
         if any(torque_on.values()):
             print(f"REFUSED: torque is ON for {[j for j, v in torque_on.items() if v]}; "
                   "this read-only recorder requires torque OFF on every joint.")
             return 4
-        rec = Recorder(lambda sid: struct.unpack("<H", raw.read_bytes(sid, 56, 2))[0], ids)
+        rec = Recorder(lambda sid: struct.unpack("<H", rd(sid, 56, 2))[0], ids)
         rec.start()
         args.stop_file.unlink(missing_ok=True)
         print(f"RECORDING arm_{args.arm} (read-only). Stop: touch {args.stop_file}", flush=True)
