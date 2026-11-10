@@ -71,3 +71,14 @@ def test_small_movement_is_not_counted():
 def test_cli_dry_run_and_bad_joint(capsys):
     assert dc.main(["--arm", "left"]) == 0 and "DRY-RUN" in capsys.readouterr().out
     assert dc.main(["--arm", "left", "--joints", "gripper"]) == 2
+
+
+def test_view_joint_move_renders_and_states_the_sense(tmp_path, capsys):
+    spec = importlib.util.spec_from_file_location("vjm", _P.parent / "view_joint_move.py")
+    vjm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vjm)
+    png = tmp_path / "m.png"
+    assert vjm.main(["--arm", "left", "--joint", "wrist_flex", "--delta-deg", "10", "--png", str(png)]) == 0
+    out = capsys.readouterr().out
+    assert png.stat().st_size > 10_000
+    assert "ticks DOWN = CLOCKWISE seen from the cable side (+X), COUNTER-clockwise seen from the opposite side (-X)" in out
