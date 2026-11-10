@@ -202,6 +202,7 @@ hs  0007 004 000 00000000 000000 0-0
 # Symlink names taken directly from hardware.yaml.
 _ARM_LEFT_BY_ID = "usb-1a86_USB_Single_Serial_5B91045044-if00"
 _ARM_RIGHT_BY_ID = "usb-1a86_USB_Single_Serial_5B91030298-if00"
+_ARM_LEADER_BY_ID = "usb-1a86_USB_Single_Serial_5C93150485-if00"  # AA-44
 _DEXARM_BY_ID = "usb-STMicroelectronics_STM32F407ZG_CDC_in_FS_Mode_306133643438-if00"
 _RELAY_BY_ID = "usb-1a86_USB_Serial-if00-port0"
 _CAM_SCANNER_BY_ID = (
@@ -215,6 +216,7 @@ _RELAY_BY_PATH = "platform-vhci_hcd.0-usb-0:4:1.0-port0"
 _ALL_SERIAL = {
     _ARM_LEFT_BY_ID: "ttyACM1",
     _ARM_RIGHT_BY_ID: "ttyACM0",
+    _ARM_LEADER_BY_ID: "ttyACM3",
     _DEXARM_BY_ID: "ttyACM2",
     _RELAY_BY_ID: "ttyUSB0",
 }
@@ -712,7 +714,7 @@ class TestDuplicateInvariant:
             usb_devices_dir=usb_dev_dir,
             v4l_class_dir=v4l_class,
         )
-        assert len(results) == 7
+        assert len(results) == 8
 
 
 # ---------------------------------------------------------------------------
@@ -742,7 +744,7 @@ class TestJsonOutput:
         parsed = json.loads(output)
         assert isinstance(parsed, list)
 
-    def test_json_contains_all_seven_roles(self, tmp_path: Path, config):
+    def test_json_contains_all_eight_roles(self, tmp_path: Path, config):
         serial_dir = _make_serial_by_id(tmp_path, _ALL_SERIAL)
         v4l_dir = _make_v4l_by_id(tmp_path, _ALL_V4L)
         vhci_status, usb_dev_dir, v4l_class = _make_vhci_sysfs(
@@ -759,7 +761,7 @@ class TestJsonOutput:
         )
         parsed = json.loads(format_json(results))
         roles = {item["role"] for item in parsed}
-        expected = {"arm_left", "arm_right", "dexarm", "relay", "cam_left", "cam_right", "cam_scanner"}
+        expected = {"arm_left", "arm_right", "arm_leader", "dexarm", "relay", "cam_left", "cam_right", "cam_scanner"}
         assert roles == expected
 
     def test_json_entry_has_required_fields(self, tmp_path: Path, config):
@@ -983,3 +985,21 @@ def test_busid_holding_wrong_device_is_refused(tmp_path):
     with pytest.raises(LookupError, match="dock port changed"):
         resolve_busid_to_video_node("9-4", expected_vid_pid="32e6:9251",
                                     vhci_status_path=vhci, usb_devices_dir=usb, v4l_class_dir=v4l)
+
+
+class TestLeaderArmOptional:
+    """AA-44: arms.leader is optional; without it the 7-device behaviour is unchanged."""
+
+    def test_config_without_leader_still_discovers_seven(self, tmp_path: Path, config):
+        no_leader = config.model_copy(update={"arms": config.arms.model_copy(update={"leader": None})})
+        serial_dir = _make_serial_by_id(tmp_path, _ALL_SERIAL)
+        v4l_dir = _make_v4l_by_id(tmp_path, _ALL_V4L)
+        vhci_status, usb_dev_dir, v4l_class = _make_vhci_sysfs(tmp_path, VHCI_STATUS_SAMPLE)
+        results = discover(no_leader, serial_by_id_dir=serial_dir, v4l_by_id_dir=v4l_dir,
+                           vhci_status_path=vhci_status, usb_devices_dir=usb_dev_dir, v4l_class_dir=v4l_class)
+        assert len(results) == 7 and "arm_leader" not in {r.role for r in results}
+
+    def test_leader_has_its_own_usb_serial(self, config):
+        ids = {config.arms.left.identity.usb_serial, config.arms.right.identity.usb_serial,
+               config.arms.leader.identity.usb_serial}
+        assert len(ids) == 3 and config.arms.leader.identity.usb_serial == "5C93150485"

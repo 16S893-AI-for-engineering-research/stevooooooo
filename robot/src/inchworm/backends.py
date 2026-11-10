@@ -31,7 +31,7 @@ class DeviceKind(str, Enum):
 
 def device_table(config: HardwareConfig) -> Dict[str, Tuple[DeviceKind, DeviceIdentity]]:
     """Every addressable device by stable name, with its transport kind and identity."""
-    return {
+    table = {
         "arm_left": (DeviceKind.SERIAL, config.arms.left.identity),
         "arm_right": (DeviceKind.SERIAL, config.arms.right.identity),
         "dexarm": (DeviceKind.SERIAL, config.dexarm.identity),
@@ -40,6 +40,9 @@ def device_table(config: HardwareConfig) -> Dict[str, Tuple[DeviceKind, DeviceId
         "camera_right_arm": (DeviceKind.CAMERA, config.cameras.right_arm.identity),
         "camera_scanner": (DeviceKind.CAMERA, config.cameras.scanner.identity),
     }
+    if config.arms.leader is not None:  # AA-44: read-only leader arm
+        table["arm_leader"] = (DeviceKind.SERIAL, config.arms.leader.identity)
+    return table
 
 
 class SerialTransport(ABC):
@@ -240,6 +243,7 @@ class HardwareBackend(Backend):
     _BACKEND_TO_DISCOVERY_ROLE: Dict[str, str] = {
         "arm_left": "arm_left",
         "arm_right": "arm_right",
+        "arm_leader": "arm_leader",
         "dexarm": "dexarm",
         "relay": "relay",
     }
@@ -254,6 +258,7 @@ class HardwareBackend(Backend):
         _device_serial_cfg = {
             "arm_left": self.config.arms.left.serial,
             "arm_right": self.config.arms.right.serial,
+            "arm_leader": self.config.arms.leader.serial if self.config.arms.leader else None,
             "dexarm": self.config.dexarm.serial,
             "relay": self.config.relay.serial,
         }
@@ -291,6 +296,7 @@ class HardwareBackend(Backend):
 _ROLE_SERIAL_DEFAULTS: Dict[str, Dict[str, object]] = {
     "arm_left":  {"baudrate": 1_000_000, "timeout_s": 0.1},  # Feetech STS3215 — rustypot/LeRobot
     "arm_right": {"baudrate": 1_000_000, "timeout_s": 0.1},  # Feetech STS3215 — rustypot/LeRobot
+    "arm_leader": {"baudrate": 1_000_000, "timeout_s": 0.1},  # AA-44 encoder-only leader (read 2026-11-09)
     "dexarm":    {"baudrate": 115_200,   "timeout_s": 0.1},  # Rotrics — UNVERIFIED
     "relay":     {"baudrate": 9_600,     "timeout_s": 0.1},  # CH340 LCUS-1 — UNVERIFIED
 }

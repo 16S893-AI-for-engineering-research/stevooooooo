@@ -96,6 +96,31 @@ arms:
       baudrate: 1000000
       timeout_s: 0.1
     # --- serial-transport end ---
+  # AA-44: dedicated encoder-only LEADER arm (teleop demonstrations). Never commanded.
+  # Read-only scan 2026-11-09 (scripts/scan_leader.py): IDs 1-6 model 777 fw 3.10, 214 Hz,
+  # 0 errors; error byte 0x08 on some replies is the fw-3.10 encoder-only signature.
+  # Servo EEPROM is still factory on IDs 1,2,4,5 (limits 0..4095, offset 0); IDs 3 and 6
+  # carry older offsets from their former life. Leader calibration is a later AA-44 step.
+  leader:
+    adapter_chip: CH343
+    role_verification: owner_reported
+    identity:
+      vendor_id: "1a86"
+      product_id: "55d3"
+      usb_serial: "5C93150485"
+      identify_by: usb_serial
+      linux_by_id: usb-1a86_USB_Single_Serial_5C93150485-if00
+      windows_busid_observed: "11-2"
+    servo_joints:
+      shoulder_pan: 1
+      shoulder_lift: 2
+      elbow_flex: 3
+      wrist_flex: 4
+      wrist_roll: 5
+      gripper: 6
+    serial:
+      baudrate: 1000000
+      timeout_s: 0.1
 
 dexarm:
   identity:

@@ -149,6 +149,9 @@ class ArmConfig(_Strict):
 class ArmsConfig(_Strict):
     left: ArmConfig
     right: ArmConfig
+    # AA-44: dedicated encoder-only leader arm (teleop demonstrations). Read-only
+    # device: it is never commanded. Optional so configs without it still load.
+    leader: Optional[ArmConfig] = None
 
 
 # --- AA-12 ---

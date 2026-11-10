@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-10 00:53'
+updated_date: '2026-11-10 01:16'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1671 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
+**Last verified:** 2026-11-09, AA-43 In Progress (2/5 AC). Full suite **1676 passed**. Session paused by the owner in a safe state: torque off on all 12 servos (read back), laser commanded off, no robot processes running, nothing half-written in EEPROM.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -31,7 +31,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **IDs 4 (wrist_flex) and 5 (wrist_roll) DONE 2026-11-09, both arms:** homed at mid-travel, swept, limits written with 30-tick margin and read back. Left: flex 831..3226, roll 550..3573. Right: flex 797..3191, roll 533..3577. hardware.yaml updated (tick limits, mid-range zeros, wrist_roll soft limit capped at +-2.2165 rad = the cell URDF's modelled range). `test_cell_collision._measured_fold` pins the OLD wrist zeros for the 2026-10-25 fold ticks; re-measure the fold on the new servos and drop the pin.
 - **AA-43 still open:** AC #3 (gripper limits are owner-assumed old values, not measured), AC #4 (joint 4-5 signs and the gripper open end not re-verified on hardware), AC #5 (first supervised small powered move of IDs 4-6, both arms; dry-run first, owner supervising). `servo_calibration.unverified` is still false from the old servos: re-verify signs with a read-only move check before powered motion.
 - **Torque/drive settings vs LeRobot (read 2026-11-09):** LeRobot so_follower.configure() sets P=16, I=0, D=32 on every joint and, for the gripper only, Max_Torque 500, Protection_Current 250, Overload_Torque 25; it leaves the other joints at factory Max_Torque 1000, Protection_Current 310, Overload 80, and writes Acceleration 254. Ours now: gripper = LeRobot exactly; joints 1-5 = factory (Max_Torque 1000, current 310, overload 80, P 32, D 32). The only difference on joints 1-5 is P 32 vs 16 (and Acceleration register 0 vs 254). Not changed; decision pending with the owner (stiffness for holding the tube vs LeRobot-like smoothness for the learned policy).
-- **Leader arm (AA-44):** CH343 serial 5C93150485 (COM8, BusId 11-2) needs a one-time admin `usbipd bind --busid 11-2` by the owner (still "Not shared" 2026-11-09). Owner assigns its servo IDs with `lerobot-setup-motors --teleop.type so101_leader --teleop.port <port>` (standard IDs 1-6, shoulder_pan..gripper, one servo connected at a time); then add it to hardware.yaml/attach_usb and run a read-only scan.
+- **Leader arm (AA-44), 2026-11-09:** bound, attached (`/dev/ttyACM3`, role `arm_leader`, `arms.leader` in hardware.yaml), IDs 1-6 assigned by the owner, read-only scan OK (`scripts/scan_leader.py`: all six answer, fw 3.10, 214 Hz, 0 errors). discover/attach_usb find it (8/8). AC #1 needs the owner's gearing; AC #4 not started. **Next (owner at the arm, torque irrelevant, encoder-only):** half-turn-home the leader with the same `home_servos.py` approach (needs an `arm_leader` mode) at a pose matching the followers' zero pose, record ranges, then the leader-to-follower mapping at low speed. Ask the owner before reworking AA-23 around the leader (decision 8).
 
 ### Blocker
 - None for software. Hardware progress waits on the owner for the AA-43 steps above.

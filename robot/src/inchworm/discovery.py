@@ -87,6 +87,7 @@ class DeviceStatus(str, Enum):
 _ROLE_DEVICE_DIR = {
     "arm_left": "serial",
     "arm_right": "serial",
+    "arm_leader": "serial",  # AA-44; only probed when arms.leader is configured
     "dexarm": "serial",
     "relay": "serial",
     "cam_left": "v4l",
@@ -300,6 +301,10 @@ class DeviceNotAttachedError(RuntimeError):
 
 def _identity_for_role(role: str, config: HardwareConfig) -> DeviceIdentity:
     """Return the :class:`DeviceIdentity` for *role* from *config*."""
+    if role == "arm_leader":
+        if config.arms.leader is None:
+            raise ValueError("arm_leader is not configured (arms.leader missing in hardware.yaml)")
+        return config.arms.leader.identity
     mapping = {
         "arm_left": config.arms.left.identity,
         "arm_right": config.arms.right.identity,
@@ -781,6 +786,8 @@ def discover(
 
     results = []
     for role in _ROLE_DEVICE_DIR:
+        if role == "arm_leader" and config.arms.leader is None:
+            continue
         identity = _identity_for_role(role, config)
         result = _probe_role(
             role=role,

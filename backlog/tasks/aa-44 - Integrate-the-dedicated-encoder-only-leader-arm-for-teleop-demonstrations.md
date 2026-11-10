@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-09 01:21'
+updated_date: '2026-11-10 01:16'
 labels:
   - hardware
 dependencies:
@@ -41,4 +41,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09: leader driver board = CH343 1a86:55d3 serial 5C93150485 (COM8, BusId 11-2), not yet bound for WSL (usbipd bind needs Windows admin).
+
+2026-11-09 (owner + orchestrator): owner bound (usbipd bind 11-2, admin) and assigned IDs 1-6 with lerobot-setup-motors. Orchestrator attached it (WSL /dev/ttyACM3, matched by USB serial 5C93150485). New read-only scripts/scan_leader.py (PING/READ only, finds the port by USB serial, tolerates ONLY error byte 0x08): IDs 1-6 answer, model 777, fw 3.10, 12.2-12.3 V, 214.2 Hz joint-set read over 3.0 s, 643 sets, 0 errors (AC #3 evidence: >= 20 Hz, error byte 0 except the 0x08 encoder-only flag on IDs 3 and 6). hardware.yaml arms.leader added (optional ArmConfig), discovery/attach_usb/backends know role arm_leader: discover shows it attached, attach_usb 8/8 OK on hardware (AC #2 evidence). Tests: 1676 passed (4 fixtures updated 7->8 devices, 2 new for the optional leader). AC #1 partial: gearing still to be recorded by the owner. AC #4 NOT started: leader EEPROM is factory (limits 0..4095, offset 0) on IDs 1,2,4,5; IDs 3 and 6 have leftover offsets 2468 / 269 and limits 929..3187 / 860..3167. Next: half-turn homing of the leader at a pose matching the followers' zero pose, then the leader-to-follower mapping (sign, offset, joint 6 excluded) at low speed under owner supervision.
 <!-- SECTION:NOTES:END -->

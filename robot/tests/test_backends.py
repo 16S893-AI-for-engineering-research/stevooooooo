@@ -61,8 +61,9 @@ def test_invalid_env_var_rejected(config, monkeypatch):
         create_backend(config)
 
 
-def test_device_table_covers_all_seven_devices(config):
+def test_device_table_covers_all_eight_devices(config):
     assert sorted(device_table(config)) == [
+        "arm_leader",
         "arm_left",
         "arm_right",
         "camera_left_arm",

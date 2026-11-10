@@ -252,6 +252,7 @@ def _device_specs_from_config(config: HardwareConfig) -> list[_DeviceSpec]:
     raw = [
         ("arm_left", config.arms.left.identity),
         ("arm_right", config.arms.right.identity),
+        *([("arm_leader", config.arms.leader.identity)] if config.arms.leader is not None else []),
         ("dexarm", config.dexarm.identity),
         ("relay", config.relay.identity),
         ("cam_left", config.cameras.left_arm.identity),

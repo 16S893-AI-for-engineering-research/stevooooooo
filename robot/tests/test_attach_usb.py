@@ -41,7 +41,7 @@ import attach_usb  # noqa: E402 — must come after sys.path insertion
 # Fixtures
 # ---------------------------------------------------------------------------
 
-# Minimal usbipd state JSON covering all 7 inchworm devices.
+# Minimal usbipd state JSON covering all 8 inchworm devices.
 _USBIPD_STATE: dict = {
     "Devices": [
         # arm_right: 1a86:55d3 serial 5B91030298, already attached
@@ -53,6 +53,16 @@ _USBIPD_STATE: dict = {
             "IsForced": False,
             "PersistedGuid": "aaa",
             "StubInstanceId": "USB\\VID_80EE&PID_CAFE\\5B91030298",
+        },
+        # arm_leader (AA-44): 1a86:55d3 serial 5C93150485, already attached
+        {
+            "BusId": "11-2",
+            "ClientIPAddress": "172.26.80.62",
+            "Description": "USB-Enhanced-SERIAL CH343 (COM8)",
+            "InstanceId": "USB\\VID_1A86&PID_55D3\\5C93150485",
+            "IsForced": False,
+            "PersistedGuid": "ccc",
+            "StubInstanceId": "USB\\VID_80EE&PID_CAFE\\5C93150485",
         },
         # relay: 1a86:7523 no serial (Windows path segment), already attached
         {
