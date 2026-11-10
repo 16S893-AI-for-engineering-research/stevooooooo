@@ -89,3 +89,17 @@ def test_cli_dry_run_and_refusals(capsys):
     assert "DRY-RUN" in capsys.readouterr().out
     assert pmc.main(["--arm", "left", "--joint", "wrist_flex", "--delta-deg", "30"]) == 2
     assert pmc.main(["--arm", "right", "--joint", "gripper"]) == 0
+
+
+def test_direction_hint_matches_the_convention_and_the_model():
+    h = pmc.direction_hint("wrist_flex", -57)          # the move that was run on 2026-11-09
+    assert "DOWN" in h and "counter-clockwise" in h and "RISES" in h and "AWAY from the DexArm" in h
+    h = pmc.direction_hint("wrist_flex", +57)
+    assert "UP" in h and "clockwise" in h and "counter" not in h and "DROPS" in h
+    assert "tip looking back" in pmc.direction_hint("wrist_roll", 57)
+
+
+def test_record_states_the_expectation_of_its_own_leg(tmp_path):
+    b = FakeBus(2000)
+    recs = pmc.move_joint(b, "wrist_flex", 4, -5.0, role="arm_left", limits=(800, 3200), stop_file=tmp_path / "x")
+    assert "DOWN" in recs[0]["direction_expected"] and "UP" in recs[1]["direction_expected"]

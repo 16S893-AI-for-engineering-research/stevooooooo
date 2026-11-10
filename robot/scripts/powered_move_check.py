@@ -60,6 +60,27 @@ def _u16(b: bytes) -> int:
     return b[0] | (b[1] << 8)
 
 
+def direction_hint(joint: str, delta_ticks: int) -> str:
+    """Plain-language expectation for a move, with a side-independent check.
+
+    Convention (doc-1, owner 2026-10-24): HIGHER ticks = clockwise when the servo's cable
+    exits AWAY from the viewer. wrist_flex cables exit to the robot's left (toward the
+    DexArm), so the cable-away viewer stands on the robot's right; a viewer on the cable side
+    sees the opposite sense. The cell model (sign +1) gives the side-independent version:
+    fewer ticks on wrist_flex lifts the gripper tip and swings it away from the DexArm.
+    wrist_roll: viewed from the gripper tip looking back toward the wrist, clockwise = ticks up.
+    """
+    up = delta_ticks > 0
+    if joint == "wrist_flex":
+        return (f"ticks {'UP' if up else 'DOWN'}: {'clockwise' if up else 'counter-clockwise'} seen with the cable "
+                f"pointing AWAY from you (cable-side viewer sees the opposite); gripper tip "
+                f"{'DROPS and swings TOWARD the DexArm' if up else 'RISES and swings AWAY from the DexArm'}")
+    if joint == "wrist_roll":
+        return (f"ticks {'UP' if up else 'DOWN'}: seen from the gripper tip looking back toward the wrist, "
+                f"{'clockwise' if up else 'counter-clockwise'}")
+    return "gripper: opens toward its open band"
+
+
 def wait_for_goal(bus, sid: int, goal_ticks: int, *, tol: int = TOL_TICKS, timeout_s: float = TIMEOUT_S,
                   stall_s: float = STALL_S, stop_file: Path = STOP_FILE, sleep=time.sleep, clock=time.monotonic):
     """Poll until within ``tol`` of goal. Returns (status, final_ticks, trace)."""
@@ -113,6 +134,7 @@ def move_joint(bus, joint: str, sid: int, delta_deg: float, *, role: str, limits
         bus.set_torque_limit(sid, TORQUE_LIMIT_RAW)
         bus.set_torque_enable(sid, True)               # goal := present first
         for leg, goal in (("out", target), ("back", back)):
+            print(f"[{leg}] expect: {direction_hint(joint, goal - (start if leg == 'out' else target))}")
             bus.write_position_deg(joint, goal * 360.0 / 4096)
             status, final, trace = wait_for_goal(bus, sid, goal, stop_file=stop_file)
             stt = bus.read_joint_state(sid)
@@ -120,7 +142,7 @@ def move_joint(bus, joint: str, sid: int, delta_deg: float, *, role: str, limits
                    "goal_ticks": goal, "final_ticks": final, "error_ticks": final - goal, "status": status,
                    "tolerance_ticks": TOL_TICKS, "speed_limit": SPEED_TICKS_S, "torque_limit_raw": TORQUE_LIMIT_RAW,
                    "peak_current": max(p["current"] for p in trace), "peak_abs_load": max(abs(p["load"]) for p in trace),
-                   "temp_c": stt.temperature_c, "direction_expected": "higher ticks = clockwise (cable-away view)",
+                   "temp_c": stt.temperature_c, "direction_expected": direction_hint(joint, goal - (start if leg == "out" else target)),
                    "samples": len(trace), "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
             records.append(rec)
             print(json.dumps(rec))
@@ -156,6 +178,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     else:
         what = (f"move {a.joint} {a.delta_deg:+.1f} deg and back at {SPEED_TICKS_S} ticks/s, torque limit {TORQUE_LIMIT_RAW}, "
                 f"tolerance {TOL_TICKS} ticks")
+    if a.joint != "gripper":
+        print(f"Direction: {direction_hint(a.joint, round(a.delta_deg * 4096 / 360))}")
     print(f"Plan: {role}: {what}. Everything else on the arm stays torque-OFF. Abort: touch {STOP_FILE}")
     if not a.live:
         print("DRY-RUN: nothing opened or moved. Add --live with the owner present.")
