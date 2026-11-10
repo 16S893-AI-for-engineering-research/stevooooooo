@@ -63,6 +63,16 @@ def checker(mesh_cfg):
     return g.checker
 
 
+# The fold in poses_2026-10-25.jsonl was read in the tick frame of the ORIGINAL servos.
+# AA-43 (2026-11-09) re-homed wrist_flex / wrist_roll on the replacement servos and moved
+# those zeros, so these ticks must be converted with the zeros that were valid when they
+# were read. Re-measure the fold on the new servos, then drop this pin.
+_FOLD_FRAME_WRIST_ZEROS_DEG = {
+    "left": {"wrist_flex": 180.879, "wrist_roll": 166.553},
+    "right": {"wrist_flex": 178.682, "wrist_roll": 175.254},
+}
+
+
 def _measured_fold():
     """Measured folded_transit, pan recomputed from ticks with the landmark zero."""
     cfg = load_config()
@@ -75,7 +85,8 @@ def _measured_fold():
             continue
         blk = sc.left_arm if d["arm"] == "left" else sc.right_arm
         out[d["arm"]] = np.array([
-            math.radians(getattr(blk, f"{n}_sign") * (d["ticks"][i] * 360 / 4096 - getattr(blk, f"{n}_zero_offset_deg")))
+            math.radians(getattr(blk, f"{n}_sign") * (d["ticks"][i] * 360 / 4096
+                         - _FOLD_FRAME_WRIST_ZEROS_DEG[d["arm"]].get(n, getattr(blk, f"{n}_zero_offset_deg"))))
             for i, n in enumerate(names)
         ])
     return out["left"], out["right"]

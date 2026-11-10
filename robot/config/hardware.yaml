@@ -481,8 +481,10 @@ motion_guard:
     elbow_flex_upper_rad: 1.69
     wrist_flex_lower_rad: -1.6581
     wrist_flex_upper_rad: 1.6581
-    wrist_roll_lower_rad: -2.1399
-    wrist_roll_upper_rad: 2.1399
+    # AA-43 2026-11-09: new EEPROM span 550..3573 is +-2.3186 rad, wider than the cell URDF models
+    # (-254..0 deg = +-2.2166 rad about our zero), so the soft limit is capped at the model range.
+    wrist_roll_lower_rad: -2.2165
+    wrist_roll_upper_rad: 2.2165
     # Radians = EEPROM servo-tick limits converted with the verified servo_calibration
     # (2026-10-25). They are per-joint maxima, NOT the combined-joint envelope; kept
     # unverified so live motion stays blocked until the collision geometry is real.
@@ -498,9 +500,11 @@ motion_guard:
       shoulder_pan: [674, 2527]
       shoulder_lift: [1255, 3000]
       elbow_flex: [939, 3091]
-      wrist_flex: [929, 3187]
-      wrist_roll: [500, 3290]
-      gripper: [1558, 2487]
+      # AA-43 2026-11-09: joints 4-6 re-measured on the REPLACEMENT servos (EEPROM, read back);
+      # gripper = previous values assumed (owner), see AA-43 notes.
+      wrist_flex: [831, 3226]
+      wrist_roll: [550, 3573]
+      gripper: [1521, 2531]
   right_arm_limits:
     shoulder_pan_lower_rad: -1.9199
     shoulder_pan_upper_rad: 1.9199
@@ -510,8 +514,9 @@ motion_guard:
     elbow_flex_upper_rad: 1.69
     wrist_flex_lower_rad: -1.6581
     wrist_flex_upper_rad: 1.6581
-    wrist_roll_lower_rad: -2.2089
-    wrist_roll_upper_rad: 2.2089
+    # AA-43 2026-11-09: EEPROM span 533..3577 is +-2.3347 rad; capped at the cell-URDF model range.
+    wrist_roll_lower_rad: -2.2165
+    wrist_roll_upper_rad: 2.2165
     # Radians = EEPROM servo-tick limits converted with the verified servo_calibration
     # (2026-10-25). They are per-joint maxima, NOT the combined-joint envelope; kept
     # unverified so live motion stays blocked until the collision geometry is real.
@@ -525,9 +530,10 @@ motion_guard:
       shoulder_pan: [1191, 3044]
       shoulder_lift: [1323, 2935]
       elbow_flex: [906, 3046]
-      wrist_flex: [899, 3167]
-      wrist_roll: [554, 3434]
-      gripper: [1573, 2479]
+      # AA-43 2026-11-09: see left_arm_limits.
+      wrist_flex: [797, 3191]
+      wrist_roll: [533, 3577]
+      gripper: [1563, 2504]
 
   # Collision model.
   # Dense sampling of straight-line joint interpolations: 50 samples.
@@ -693,9 +699,9 @@ motion_guard:
       shoulder_lift_sign: 1
       elbow_flex_zero_offset_deg: 177.1
       elbow_flex_sign: 1
-      wrist_flex_zero_offset_deg: 180.879
+      wrist_flex_zero_offset_deg: 178.286  # AA-43 2026-11-09: mid-range of new limits 831..3226 (was 180.879)
       wrist_flex_sign: 1
-      wrist_roll_zero_offset_deg: 166.553
+      wrist_roll_zero_offset_deg: 181.187  # AA-43 2026-11-09: mid-range of new limits 550..3573 (was 166.553)
       wrist_roll_sign: 1
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
@@ -727,9 +733,9 @@ motion_guard:
       shoulder_lift_sign: 1
       elbow_flex_zero_offset_deg: 173.672
       elbow_flex_sign: 1
-      wrist_flex_zero_offset_deg: 178.682
+      wrist_flex_zero_offset_deg: 175.254  # AA-43 2026-11-09: mid-range of new limits 797..3191 (was 178.682)
       wrist_flex_sign: 1
-      wrist_roll_zero_offset_deg: 175.254
+      wrist_roll_zero_offset_deg: 180.615  # AA-43 2026-11-09: mid-range of new limits 533..3577 (was 175.254)
       wrist_roll_sign: 1
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
