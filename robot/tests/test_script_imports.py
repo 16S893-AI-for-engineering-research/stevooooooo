@@ -51,6 +51,8 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     "restore_drive_config.py": ["--arm", "left"],
     "record_joint_ranges.py": ["--arm", "left"],
     "home_servos.py": ["homing", "--arm", "left"],
+    "powered_move_check.py": ["--arm", "left", "--joint", "wrist_flex"],
+    "scan_leader.py": ["--help"],   # opens the leader serial port otherwise (read-only, but real hardware)
     # attach_usb queries the LIVE usbipd device list even in --dry-run, so its
     # result depends on what is powered on. Smoke-test --help instead.
     "attach_usb.py": ["--help"],
