@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 03:21'
+updated_date: '2026-11-11 05:17'
 labels:
   - simulation
   - verification
@@ -50,4 +50,6 @@ FINDING (cell model, not hardware): the placeholder printing pose folded_transit
 Camera for the side view: at +X looking -X, DexArm at -Y on the left (test frame rendered, not yet shown to the owner).
 DECISION (orchestrator, 2026-11-10): attachment frames = mesh features (working-pose grips, one pitch along tube_axis). Start/fold-back state = IK solution with left on the middle point and right on the far point, seeded from folded_transit, labelled 'printing pose (IK, seeded from placeholder)'. Do NOT write it to hardware.yaml. report.txt leads with the PLACEHOLDER finding and the stored vs IK joint values. If IK cannot reach, stop and report. The printing pose is a single input so the owner's re-measured pose drops in later.
 NEXT: re-launch one worker with the original brief plus this decision; first deliverable = test_frame.png shown to the owner.
+
+2026-11-11 worker run 890df617 (opus-4-8, 30 min cap) timed out while writing tests; orchestrator rescued the patch, fixed exists_on_tube (was checked at advance=+1 pitch, so the absent-target test could not fail; now checked in the tube frame), moved the pitch literal out of the docstring (test_constants), smoke-test the script with --help only (full plan ~1 min, exits 1 while violations exist). Commit 91409d1. Suite passes. Outputs (local, gitignored): robot/out/inchworm/{test_frame.png,timeline.jsonl,report.txt,cycle.gif}. RESULT: IK printing pose reachable (L [0,-1.573,1.571,-1.569,0], R [-0.062,-1.604,1.564,-1.531,0.062] rad, residual ~0.07 mm) but it is NOT collision-clean (lower_arm within ~3 mm of shoulder at 5 mm margin), and the both-locked carry breaks the rigid-tube constraint (drift 3.9 mm at 0.25 pitch to 84 mm at 1 pitch) and intersects lower_arm/shoulder: 181 violations over 53 frames. So the owner cycle is not achievable from this placeholder pose with fixed grips; the planner reports this and does not hide it. AC status: #1-#4 have code + tests (tests/test_inchworm_plan.py, 7 pass) but are not checked: they need owner review of the report. #5 GIF exists (14 frames, every 4th). #6 owner. NEXT: owner looks at test_frame.png (camera side) and cycle.gif; owner provides the real printing pose; a both-locked carry probably needs the arms to move along the tube axis, which the current IK tracking does not model well.
 <!-- SECTION:NOTES:END -->
