@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 17:38'
+updated_date: '2026-11-11 17:59'
 labels:
   - simulation
   - verification
@@ -56,4 +56,6 @@ NEXT: re-launch one worker with the original brief plus this decision; first del
 2026-11-11 OWNER REVIEW of cycle.gif + refined cycle (owner words, recorded here; description NOT edited): the tube is not limited to moving straight back; first move the tube AWAY from both robots (up in the frame), then translate it right (away from the DexArm). The tube only moves because the arms move it. Then left regrip, then right regrip, then move the tube down and the arms return to their start pose. Joint 1 should not be needed; the elbow must be used.
 REWORK (orchestrator): plan_cycle now = start -> lift (both locked, chassis +Z) -> carry right (both locked, chassis +Y, default half a pitch) -> left regrip (retract down by approach.standoff_m, move under the near point, insert, relock) -> right regrip (same, onto the point the left just left) -> lower + return (both locked, ends exactly one pitch along the tube axis). IK = planar joints 2-4 solve, then weighted DLS (pan/roll weight 50). CellState gained tube_transform (rigid 4x4, checked) so the lifted tube is drawn and collision-checked where it is. Rigid-tube reference now follows the current grip pair (the old fixed reference falsely flagged the relock after the left regrip). Report adds JOINT USE. Lift default 170 mm, from a model sweep (lift 130-190 x carry 70-110 mm; fewest violations). Tested: a 1 deg tube yaw to remove the CAD axis tilt (worse, reverted).
 RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg: left pan 2.5, lift 81, elbow 118, wrist_flex 78, roll 2.5; right pan 13.8, lift 83, elbow 119, wrist_flex 77, roll 13.8. Remaining: (a) start/end pose lower_arm within ~3 mm of shoulder (placeholder pose, 5 mm margin); (b) carry frames 18-20 right gripper misses by up to 3.6 mm (and rigid drift same) where the right gripper passes near its own pan axis: the CAD tube axis is ~1 deg off the arm plane so the far point is ~3 mm out of plane and needs pan; (c) right regrip frame 58 misses 2.9 mm. Nothing relaxed. Suite passes. NEXT: owner watches the new cycle.gif; the real printing pose and a CAD check of the ~1 deg tube-axis tilt / 1.2 mm grip spacing mismatch (grips 182.4 mm apart at the working pose vs pitch 183.676) should clear (b) and (c).
+
+2026-11-11 owner on the reworked cycle.gif: 'this is really good', 'the animation looks great'. Owner decision: skip the ~1 deg CAD tube-tilt error for now (the right-gripper reach misses of up to 3.6 mm stay reported, not fixed). AC #6 NOT checked yet: awaiting the owner's explicit confirmation that the motion matches the intended cycle. Owner asked what the real printing pose means (explained; it is still the IK placeholder).
 <!-- SECTION:NOTES:END -->
