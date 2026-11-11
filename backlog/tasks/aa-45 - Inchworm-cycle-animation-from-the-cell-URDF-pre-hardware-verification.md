@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 17:59'
+updated_date: '2026-11-11 18:26'
 labels:
   - simulation
   - verification
@@ -24,12 +24,12 @@ The owner cannot trust the agents' text descriptions of physical motion; rendere
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A planner produces a timeline (JSONL) of both arms' joint angles, gripper lock states and tube pose for the owner-specified cycle, using the existing approach planner, frame model, joint limits and mesh collision guard
-- [ ] #2 During every both-arms-locked segment, the two grippers keep a constant relative pose along the tube (rigid-tube constraint), checked per frame within a stated tolerance
-- [ ] #3 Every frame is checked for mesh collision, joint limits and the gripper invariants (never both unlocked with the tube attached, at most one unlocked); any violation fails the run with the frame and reason, and tests show a colliding frame and a both-unlocked frame each fail
-- [ ] #4 Any extra reposition the planner inserts is logged with its reason; if an owner-specified regrip target does not exist on the modelled tube the run stops and reports instead of inventing one
-- [ ] #5 An MP4 or GIF renders the cycle in one side view (DexArm, left, right from left to right, +x cable side) with the step name, per-gripper lock state and tube advance overlaid, and contacting parts drawn red; the placeholder printing pose is labelled as such
-- [ ] #6 The owner has watched the animation and confirmed the motion matches the intended inchworm cycle
+- [x] #1 A planner produces a timeline (JSONL) of both arms' joint angles, gripper lock states and tube pose for the owner-specified cycle, using the existing approach planner, frame model, joint limits and mesh collision guard
+- [x] #2 During every both-arms-locked segment, the two grippers keep a constant relative pose along the tube (rigid-tube constraint), checked per frame within a stated tolerance
+- [x] #3 Every frame is checked for mesh collision, joint limits and the gripper invariants (never both unlocked with the tube attached, at most one unlocked); any violation fails the run with the frame and reason, and tests show a colliding frame and a both-unlocked frame each fail
+- [x] #4 Any extra reposition the planner inserts is logged with its reason; if an owner-specified regrip target does not exist on the modelled tube the run stops and reports instead of inventing one
+- [x] #5 An MP4 or GIF renders the cycle in one side view (DexArm, left, right from left to right, +x cable side) with the step name, per-gripper lock state and tube advance overlaid, and contacting parts drawn red; the placeholder printing pose is labelled as such
+- [x] #6 The owner has watched the animation and confirmed the motion matches the intended inchworm cycle
 <!-- AC:END -->
 
 ## Definition of Done
@@ -58,4 +58,6 @@ REWORK (orchestrator): plan_cycle now = start -> lift (both locked, chassis +Z) 
 RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg: left pan 2.5, lift 81, elbow 118, wrist_flex 78, roll 2.5; right pan 13.8, lift 83, elbow 119, wrist_flex 77, roll 13.8. Remaining: (a) start/end pose lower_arm within ~3 mm of shoulder (placeholder pose, 5 mm margin); (b) carry frames 18-20 right gripper misses by up to 3.6 mm (and rigid drift same) where the right gripper passes near its own pan axis: the CAD tube axis is ~1 deg off the arm plane so the far point is ~3 mm out of plane and needs pan; (c) right regrip frame 58 misses 2.9 mm. Nothing relaxed. Suite passes. NEXT: owner watches the new cycle.gif; the real printing pose and a CAD check of the ~1 deg tube-axis tilt / 1.2 mm grip spacing mismatch (grips 182.4 mm apart at the working pose vs pitch 183.676) should clear (b) and (c).
 
 2026-11-11 owner on the reworked cycle.gif: 'this is really good', 'the animation looks great'. Owner decision: skip the ~1 deg CAD tube-tilt error for now (the right-gripper reach misses of up to 3.6 mm stay reported, not fixed). AC #6 NOT checked yet: awaiting the owner's explicit confirmation that the motion matches the intended cycle. Owner asked what the real printing pose means (explained; it is still the IK placeholder).
+
+2026-11-11 owner: 'the animation looks correct' (AC #6 evidence). AC #1-#5 evidence: tests/test_inchworm_plan.py 7 passed 2026-11-11 (timeline JSONL with both arms/locks/tube pose; per-frame rigid-tube check at 1 mm / 0.5 deg; colliding and both-unlocked frames fail; absent regrip target stops; unreachable printing pose stops); scripts/inchworm_animation.py writes report (exit 1 while violations remain) and cycle.gif with step/lock/advance/lift overlays, contacts red, placeholder label; owner watched it. Owner decisions 2026-11-11: (1) the tube is not exactly placed in the URDF; the current placement is good enough. Final insertion will be done by the trained policy, so mm-level grip mismatch in the model is accepted. (2) NEW REQUIREMENT, not yet implemented: on returning to the start position the two arms should in general match each other (same joint pose). Today the IK start differs: left [0,-90.1,90.0,-89.9,0] deg vs right [-3.6,-91.9,89.6,-87.7,3.6] deg. Hardware fact: arm bases are 182.4-182.5 mm apart, but the attachment pitch is 183.676 mm, so identical poses leave ~1.2 mm on one grip (for the policy to absorb). (3) Owner asked how the animation will be checked against the real robot; verification plan proposed (static pose match, then unpowered/powered replay without the tube, then with it). Task stays In Progress until the matching-arms start pose is in.
 <!-- SECTION:NOTES:END -->
