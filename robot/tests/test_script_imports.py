@@ -65,6 +65,11 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     "record_seating_traces.py": ["--help"],
     # scan_servos.py dry-runs fine with no args, but --help is safer.
     "scan_servos.py": ["--help"],
+    # inchworm_animation.py plans the full cycle on the cell meshes (~1 min,
+    # longer than the 30 s smoke timeout) and exits 1 while the placeholder
+    # printing pose has violations; its behaviour is covered by
+    # tests/test_inchworm_plan.py.
+    "inchworm_animation.py": ["--help"],
 }
 
 #: Scripts that need special arguments to reach a clean dry-run exit.
