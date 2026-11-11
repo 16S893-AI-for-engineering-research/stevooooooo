@@ -171,15 +171,44 @@ def test_plan_cycle_produces_labelled_timeline(cfg, checker, tmp_path):
     for fr in plan.frames:
         assert fr.left_locked or fr.right_locked
 
-    # Steps follow the owner-specified order.
+    # Steps follow the owner-specified order (2026-11-11): lift, carry right,
+    # left regrip, right regrip, lower + return.
+    order = ["printing pose (start)", "lift tube (both locked)",
+             "carry tube right (both locked)", "left regrip near point",
+             "right regrip middle point",
+             "lower tube, arms return to start (both locked)"]
     steps = [fr.step for fr in plan.frames]
-    assert steps[0] == "printing pose (start)"
-    assert any("reposition" in s for s in steps)
-    assert any("left regrip" in s for s in steps)
-    assert any("right regrip" in s for s in steps)
-    assert steps[-1] == "fold back to printing pose"
+    seen = [s for i, s in enumerate(steps) if i == 0 or s != steps[i - 1]]
+    assert seen == order, seen
 
-    # Inserted repositions are logged with a reason.
+    # The tube moves only while both arms are locked (it cannot move by itself).
+    for a, b in zip(plan.frames, plan.frames[1:]):
+        moved = (abs(b.tube_advance_m - a.tube_advance_m) > 1e-9
+                 or abs(b.tube_lift_m - a.tube_lift_m) > 1e-9)
+        if moved:
+            assert b.left_locked and b.right_locked, b.step
+
+    # Lift goes up first, before any advance; the cycle ends one pitch on, lowered.
+    lift_frames = [f for f in plan.frames if f.step == "lift tube (both locked)"]
+    assert lift_frames[-1].tube_lift_m == pytest.approx(plan.lift_m, abs=1e-9)
+    # Pure vertical lift: no horizontal tube motion yet.
+    assert all(np.linalg.norm(f.tube_motion[:2, 3]) < 1e-9 for f in lift_frames)
+    from inchworm.constants import ATTACHMENT_PITCH_MM
+    assert plan.frames[-1].tube_advance_m == pytest.approx(ATTACHMENT_PITCH_MM / 1000.0, abs=1e-6)
+    # Back down: the end displacement is exactly one pitch along the tube's own
+    # (CAD-tilted) axis, i.e. the lift is fully undone.
+    end = plan.frames[-1]
+    np.testing.assert_allclose(end.tube_motion[:3, 3],
+                               end.tube_axis * ATTACHMENT_PITCH_MM / 1000.0, atol=1e-9)
+
+    # Planar crawl (owner): the elbow is used and joint 1 stays small for the
+    # left arm (the right arm's pan is reported, see the report JOINT USE).
+    L = np.array([f.left_q for f in plan.frames])
+    assert np.degrees(np.ptp(L[:, 2])) > 30.0
+    assert np.degrees(np.ptp(L[:, 0])) < 5.0
+    assert "JOINT USE" in plan.report
+
+    # Both-arm moves are logged with a reason.
     assert plan.repositions and all(rp.reason for rp in plan.repositions)
 
     # Report leads with the PLACEHOLDER finding.

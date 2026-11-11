@@ -133,6 +133,11 @@ class CellState:
     #: Tube advance along its axis (m) from the URDF placement, or None when
     #: there is no tube in the cell. One crawl cycle = one attachment pitch.
     tube_advance_m: Optional[float] = None
+    #: Extra rigid tube motion (4x4 homogeneous, cell frame), applied on top
+    #: of the advance: tube pose = tube_transform @ advance @ URDF placement.
+    #: AA-45: the locked arms lift, carry and yaw the tube. Only used when the
+    #: tube is present (tube_advance_m is not None).
+    tube_transform: Optional[Sequence[Sequence[float]]] = None
 
 
 @dataclass(frozen=True)
@@ -359,6 +364,14 @@ class CellCollisionChecker:
                 raise CollisionModelError("tube advance must be finite")
             T = np.eye(4)
             T[:3, 3] = self.tube_axis * adv
+            if state.tube_transform is not None:
+                G = np.asarray(state.tube_transform, dtype=float)
+                if G.shape != (4, 4) or not np.all(np.isfinite(G)):
+                    raise CollisionModelError("tube transform must be a finite 4x4")
+                R = G[:3, :3]
+                if not np.allclose(R @ R.T, np.eye(3), atol=1e-6) or np.linalg.det(R) < 0:
+                    raise CollisionModelError("tube transform must be rigid")
+                T = G @ T
             poses[TUBE_LINK] = T @ poses[TUBE_LINK]
         return poses
 

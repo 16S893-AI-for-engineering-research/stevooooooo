@@ -74,12 +74,19 @@ def animate(plan, checker, out_path: Path, every: int = 1, max_faces: int = 2000
 
     from inchworm.system_model.collision import CellState
 
+    from inchworm.constants import ATTACHMENT_PITCH_MM
+
+    pitch_m = ATTACHMENT_PITCH_MM / 1000.0
     frames = plan.frames[::max(1, every)]
+    if frames[-1] is not plan.frames[-1]:
+        frames.append(plan.frames[-1])
 
     # Fixed bounds from the start frame (grippers/tube do not travel far).
-    st0 = CellState(frames[0].left_q, frames[0].right_q, dexarm_q={},
-                    tube_advance_m=frames[0].tube_advance_m)
-    allv = np.vstack([m.vertices for _, m in checker.world_meshes(st0)])
+    # Bounds over the start and the highest-lift frame (the tube is lifted).
+    top = max(frames, key=lambda f: f.tube_lift_m)
+    allv = np.vstack([m.vertices for fr in (frames[0], top) for _, m in checker.world_meshes(
+        CellState(fr.left_q, fr.right_q, dexarm_q={}, tube_advance_m=fr.tube_advance_m,
+                  tube_transform=fr.tube_transform()))])
     lo, hi = allv.min(0), allv.max(0)
     centre, half = (lo + hi) / 2, (hi - lo).max() / 2
 
@@ -90,7 +97,8 @@ def animate(plan, checker, out_path: Path, every: int = 1, max_faces: int = 2000
     def draw(idx):
         ax.clear()
         fr = frames[idx]
-        st = CellState(fr.left_q, fr.right_q, dexarm_q={}, tube_advance_m=fr.tube_advance_m)
+        st = CellState(fr.left_q, fr.right_q, dexarm_q={}, tube_advance_m=fr.tube_advance_m,
+                       tube_transform=fr.tube_transform())
         contacts = _frame_contacts(checker, st)
         hit = {c.link_a for c in contacts} | {c.link_b for c in contacts}
         for link, m in checker.world_meshes(st):
@@ -113,7 +121,7 @@ def animate(plan, checker, out_path: Path, every: int = 1, max_faces: int = 2000
             f"step: {fr.step}\n"
             f"left gripper: {lk(fr.left_locked)}   right gripper: {lk(fr.right_locked)}\n"
             f"tube advance: {fr.tube_advance_m * 1000:.1f} mm "
-            f"({fr.tube_advance_m / (0.183676):.2f} pitch)"
+            f"({fr.tube_advance_m / pitch_m:.2f} pitch)   lift: {fr.tube_lift_m * 1000:.0f} mm"
         )
         if contacts:
             overlay += "\nCONTACT (red): " + "; ".join(str(c) for c in contacts[:3])
@@ -131,6 +139,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--out", type=Path, default=_ROBOT / "out" / "inchworm")
     ap.add_argument("--animate", action="store_true", help="also render cycle.gif")
     ap.add_argument("--every", type=int, default=1, help="animate every Nth frame")
+    ap.add_argument("--lift-mm", type=float, default=None,
+                    help="tube lift before the carry (default: planner default)")
+    ap.add_argument("--first-carry-mm", type=float, default=None,
+                    help="carry before the regrips (default: half a pitch)")
     args = ap.parse_args(argv)
 
     from inchworm.config import load_config
@@ -146,7 +158,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     try:
-        plan = plan_cycle(cfg, checker)
+        kw = {}
+        if args.lift_mm is not None:
+            kw["lift_m"] = args.lift_mm / 1000.0
+        if args.first_carry_mm is not None:
+            kw["first_carry_m"] = args.first_carry_mm / 1000.0
+        plan = plan_cycle(cfg, checker, **kw)
     except PlanStopped as exc:
         report = args.out / "report.txt"
         report.write_text(
