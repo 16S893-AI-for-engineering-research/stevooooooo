@@ -4,10 +4,9 @@ title: >-
   Re-flash STS3215 firmware 3.10 on servos 4-6 of both arms with Feetech FD
   (Windows)
 status: In Progress
-assignee:
-  - '@human'
+assignee: []
 created_date: '2026-10-28 13:35'
-updated_date: '2026-11-11 23:34'
+updated_date: '2026-11-11 23:38'
 labels:
   - human-action
   - human-key-8d8f686b9ed669e1
@@ -158,7 +157,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "8d8f686b9ed669e1e8cdc5b0ee8e97d3c7e0b6b08c8c35a337431bcc64d03189",
-  "phase": "paused",
+  "phase": "declined",
   "createdAt": "2026-10-28T13:35:30.642Z",
   "origin": "01a17fcd-ad6a-7474-9ab6-a7b139b28469",
   "step": 3,
@@ -240,6 +239,11 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
     {
       "action": "accept",
       "at": "2026-10-28T16:11:53.923Z",
+      "hash": "3419bdcae0a19a3637bb37ad5716a18e3c3da7d716854723dc41e03d29e821b0"
+    },
+    {
+      "action": "decline",
+      "at": "2026-11-11T23:38:24.163Z",
       "hash": "3419bdcae0a19a3637bb37ad5716a18e3c3da7d716854723dc41e03d29e821b0"
     }
   ],

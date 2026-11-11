@@ -1,11 +1,11 @@
 ---
 id: AA-46
 title: 'Re-measure shoulder_lift travel (both arms) and take pose snapshots, read-only'
-status: To Do
+status: In Progress
 assignee:
   - '@human'
 created_date: '2026-11-11 23:06'
-updated_date: '2026-11-11 23:21'
+updated_date: '2026-11-11 23:53'
 labels:
   - human-action
   - human-key-b9a975d02991ba9c
@@ -135,6 +135,12 @@ Preparation: The robot is powered as in earlier sessions, with both arms limp (t
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Follow the user-accepted procedure one step at a time, record evidence and stop on deviations. Submit the outcome for orchestrator verification; do not complete the originating project task.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -143,11 +149,44 @@ Preparation: The robot is powered as in earlier sessions, with both arms limp (t
 {
   "version": 1,
   "key": "b9a975d02991ba9c472ec76332a48349ccdd36d56798f7edd84131943363f2f2",
-  "phase": "accepted",
+  "phase": "active",
   "createdAt": "2026-11-11T23:06:14.558Z",
   "origin": "01a1cb2b-5f23-70da-906d-dcbf45d889dd",
-  "step": 0,
-  "evidence": [],
+  "step": 2,
+  "evidence": [
+    {
+      "step": 1,
+      "note": "Preparation complete; step 1 not yet started. attach_usb.py: arm_left attached BusId 10-4, arm_right attached BusId 9-3, the DexArm shows MISSING, as the procedure allows. 7/8 devices OK. The arm ports are now on WSL, so FD has released them. Cross-task observation for the orchestrator (AA-42): the AA-42 evidence calls the FD port COM3 / BusId 9-3 \"the LEFT arm\", but attach_usb maps BusId 9-3 to arm_right. So the AA-42 flashing and the 3.9 readings may have been on the RIGHT arm, not the left. Unverified; it needs orchestrator review. No action taken on it here.",
+      "type": "automated",
+      "reference": "attach_usb.py terminal output pasted by owner in conversation: arm_left 10-4, arm_right 9-3, dexarm MISSING, 7/8 devices OK",
+      "advanced": false,
+      "at": "2026-11-11T23:40:13.839Z"
+    },
+    {
+      "step": 1,
+      "note": "Step 1 attempt interrupted: the owner stopped record_joint_ranges.py (left arm) with Ctrl+C before it finished. The script saves its JSON only after the recording loop ends normally, so Ctrl+C means no output. The agent confirmed calibration_data/joint_ranges_left_lift_2026-11-11.json does not exist. No safety issue: the script is read-only and the port closes in a finally block. Step 1 not verified and not advanced; the owner needs to re-run it, letting it run the full 90 s or stopping it with `touch /tmp/inchworm_stop_ranges`. It is not yet known whether the owner swept the joint or saw any stop condition before pressing Ctrl+C.",
+      "type": "automated",
+      "reference": "read of /home/stevotimp/893/robot/calibration_data/joint_ranges_left_lift_2026-11-11.json returned ENOENT; script source robot/scripts/record_joint_ranges.py (writes output only after the loop ends)",
+      "advanced": false,
+      "at": "2026-11-11T23:44:24.657Z"
+    },
+    {
+      "step": 1,
+      "note": "Step 1 done. The agent read calibration_data/joint_ranges_left_lift_2026-11-11.json (recorded 2026-11-11T23:45:39Z, 827 samples per joint). shoulder_lift (servo 2): start 1443, min_ticks 1224 (107.58 servo deg), max_ticks 3647 (320.54 servo deg), span 212.96 deg, wrapped false, crosses_seam false. The verification's hard criteria are met: a min/lo value is present and wrapped is false. KEY RESULT: min 1224 is NOT at or below the ~1100 target; it is ~132 ticks (~11.6 deg) short of the printing-pose ~1092, and only 8 ticks past the existing left soft limit 1216. So on this sweep -91 deg was not reached. Whether 1224 is the true mechanical fold stop or just where the hand stopped is still to be confirmed by the owner in step 2. DEVIATION: the procedure says to move only shoulder_lift, but shoulder_pan also moved 78.6 deg (1911-2805) and elbow_flex moved 86.8 deg (2133-3121). Elbow position may change where the lower arm contacts the shoulder, so the fold-side stop could depend on elbow angle; the orchestrator should consider this. Wrist and gripper did not move.",
+      "type": "automated",
+      "reference": "read of /home/stevotimp/893/robot/calibration_data/joint_ranges_left_lift_2026-11-11.json",
+      "advanced": true,
+      "at": "2026-11-11T23:46:26.171Z"
+    },
+    {
+      "step": 2,
+      "note": "Step 2 completed WITH DEVIATION: the owner gave no note on what stopped the left shoulder_lift on the fold side. When asked, the owner said \"just mark the limits and lets move on\". So the cause of the 1224-tick fold-side minimum is NOT RECORDED. It could be a real mechanical stop (hard stop, bracket, cable, chassis), or just where the hand stopped. The agent did not guess. The outcome's required \"what physically stops it\" note is missing for the left arm, and the orchestrator should decide whether 1224 can be treated as the true mechanical limit. The recorded limit stays as measured in calibration_data/joint_ranges_left_lift_2026-11-11.json: min 1224 / max 3647 ticks. The owner's \"mark the limits\" was taken as recording the measured numbers. No EEPROM or soft-limit write was done or offered: limit writes are explicitly out of scope for this procedure and need the owner's approval in the main session. Advanced at the owner's request so the walkthrough can continue.",
+      "type": "self-reported",
+      "reference": "Owner verbal reply in conversation: \"just mark the limits and lets move on\"; measured values from calibration_data/joint_ranges_left_lift_2026-11-11.json",
+      "advanced": true,
+      "at": "2026-11-11T23:53:09.414Z"
+    }
+  ],
   "history": [
     {
       "action": "accept",

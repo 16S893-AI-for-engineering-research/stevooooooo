@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-11 23:36'
+updated_date: '2026-11-11 23:54'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -45,7 +45,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
   - the tube placement in the URDF is good enough (insertion is learned);
   - on return to the start, the two arms should match each other.
 - **Done since:** the matching start (one shared pose for both arms, about 2 mm grip residual, the cycle ends exactly in it). Frames are now checked against the configured soft limits.
-- **Owner decision (b):** re-measure shoulder_lift travel rather than raise the printing pose. The printing pose needs about tick 1092 (L) / 1094 (R), against the EEPROM minimum of 1216 / 1283. Read-only procedure AA-46 is proposed and awaits acceptance. Afterwards: if the stop allows it, widen the EEPROM and soft limits with the owner's approval (home_servos.py limits --set-limits, backup, read-back); otherwise raise the printing pose.
+- **Zeros suspected (owner, agreed):** the shoulder_lift soft-limit conflict is probably a zero-offset error. The zeros for joints 2-5 are sweep midpoints and were never landmark-checked; the model puts the real hand-posed fold in self-contact. AA-47 is proposed: a URDF-zero landmark check, the lift sweep and a fold snapshot, all read-only. It supersedes AA-46 (decline AA-46). Then: compute new offsets and update hardware.yaml + soft limits with the owner's approval, re-plan, and re-check the fold snapshot.
 - **Verification plan (owner asked how the animation will match reality):**
   1. Static pose match: `scripts/pose_snapshot.py --label X --live`. Read-only, torque off. It renders the reading and logs the owner's y/n. This also covers AA-40 #6 and most of AA-43 #4.
   2. Start-pose check before motion: `inchworm.start_pose_check`, or `--plan-start out/inchworm/timeline.jsonl`.
@@ -74,7 +74,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### Human-handoff queue
 - AA-41 (gripper lock probe): deferred; needs a fresh procedure after AA-43. The old 0x08 / encoder-only diagnosis no longer applies.
 - AA-42 (FD re-flash): moot. On 2026-11-11 the owner checked with FD at 1000000 baud (FD had fallen back to 115200): all 6 left servos answer, all on 3.9. That is the expected factory firmware of the replacement IDs 4-6 (census 2026-11-09); the earlier 3.10 was the removed servo. Owner to decline it (`/human decline AA-42`); do not mark it verified.
-- AA-46 (shoulder_lift re-measure + pose snapshots): accepted 2026-11-11. The tab auto-launch died (no credentials), so start the guide by hand with `tools/human-handoff/open-walkthrough.sh`.
+- AA-46: superseded by AA-47 (zero landmark check added). AA-42: declined by the owner 2026-11-11. Walkthrough tab: if the auto-launch dies, start it by hand with `tools/human-handoff/open-walkthrough.sh`.
 
 ### Not committed on purpose
 - `CAD/exports/wrist_gripper.stl` deleted and `CAD/exports/gripper_update.stl` added by the owner (superseded by `CAD/robot_urdf_new`). Ask before committing either.

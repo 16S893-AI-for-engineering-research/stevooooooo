@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 23:06'
+updated_date: '2026-11-11 23:54'
 labels:
   - simulation
   - verification
@@ -69,4 +69,6 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 - Result now: 42 violations = 30 soft limit, 10 reach (regrip retract near the reach edge, 1-2.3 mm), 2 x2 start/end lower_arm-shoulder within 3 mm.
 
 2026-11-11 owner decision on the shoulder_lift soft-limit conflict: option (b), re-measure the shoulder_lift travel (not raise the printing pose). Human procedure proposed as AA-46 (read-only sweep of shoulder_lift both arms + fold/start pose snapshots). Needed: about tick 1092 (left) / 1094 (right) for -91 deg; current EEPROM min 1216 / 1283.
+
+2026-11-11 owner: the animation poses look physically feasible; suspects wrong zeros. Agreed and evidence supports it: zeros for shoulder_lift/elbow_flex/wrist_flex/wrist_roll are sweep midpoints, never landmark-checked (only the pan has a landmark). The hand-posed real fold puts the model lower_arm inside the shoulder (0.0 mm, for every lift from -60 to -100 deg), and the shoulder sweep spans 142-153 deg vs the URDF's 200. So the soft-limit 'violations' are probably a zero offset, not a reach problem. AA-47 is proposed (supersedes AA-46): hand-place each arm at the URDF zero (out/zero_{left,right}.png), read ticks, then the lift sweep and a fold snapshot. Do not widen limits until the zeros are corrected.
 <!-- SECTION:NOTES:END -->
