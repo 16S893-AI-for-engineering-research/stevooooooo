@@ -1,11 +1,11 @@
 ---
 id: AA-45
 title: Inchworm cycle animation from the cell URDF (pre-hardware verification)
-status: To Do
+status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-10 21:49'
+updated_date: '2026-11-11 03:21'
 labels:
   - simulation
   - verification
