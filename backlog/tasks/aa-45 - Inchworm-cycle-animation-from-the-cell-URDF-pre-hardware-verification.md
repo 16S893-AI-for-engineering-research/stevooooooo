@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 19:24'
+updated_date: '2026-11-11 23:06'
 labels:
   - simulation
   - verification
@@ -67,4 +67,6 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 - Pan weight 1000 (joint 1 max 4.2 deg over the cycle, both arms identical); carry direction = the arms' own plane from FK.
 - NEW: src/inchworm/start_pose_check.py (compare measured vs plan first frame, per-joint tol 3 deg placeholder, fails closed); so101_pose_reader.ticks_to_q/read_arm_ticks; scripts/pose_snapshot.py (READ-ONLY both arms, refuses torque on, renders on the cell model, logs ticks + owner y/n to calibration_data/pose_snapshots.jsonl, optional --plan-start compare). Tests: tests/test_start_pose_check.py (10), test_inchworm_plan.py (10). Full suite passes.
 - Result now: 42 violations = 30 soft limit, 10 reach (regrip retract near the reach edge, 1-2.3 mm), 2 x2 start/end lower_arm-shoulder within 3 mm.
+
+2026-11-11 owner decision on the shoulder_lift soft-limit conflict: option (b), re-measure the shoulder_lift travel (not raise the printing pose). Human procedure proposed as AA-46 (read-only sweep of shoulder_lift both arms + fold/start pose snapshots). Needed: about tick 1092 (left) / 1094 (right) for -91 deg; current EEPROM min 1216 / 1283.
 <!-- SECTION:NOTES:END -->
