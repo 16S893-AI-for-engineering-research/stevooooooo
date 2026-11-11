@@ -44,25 +44,45 @@ def _read(raw, sid: int, addr: int, n: int) -> bytes:
     return payload[:n]
 
 
-def read_arm_pose(cfg, backend, arm: str) -> List[float]:
-    from inchworm.servo_bus import ArmServoBus, JOINT_NAMES
+def _calibration(cfg, arm: str):
     cal = getattr(cfg.motion_guard.servo_calibration, f"{arm}_arm")
     if cal is None or cal.unverified:
         raise PoseReadError(f"{arm} servo_calibration missing or unverified")
+    return cal
+
+
+def ticks_to_q(cfg, arm: str, ticks: List[int]) -> List[float]:
+    """Joints 1-5 servo ticks -> URDF radians with the verified calibration."""
+    cal = _calibration(cfg, arm)
+    if len(ticks) != len(J5):
+        raise PoseReadError(f"{arm}: need {len(J5)} tick values, got {len(ticks)}")
+    return [
+        getattr(cal, f"{j}_sign") * math.radians(t * 360 / 4096 - getattr(cal, f"{j}_zero_offset_deg"))
+        for j, t in zip(J5, ticks)
+    ]
+
+
+def read_arm_ticks(cfg, backend, arm: str) -> List[int]:
+    """Read-only: present position ticks of joints 1-5. Refuses if any torque is ON."""
+    from inchworm.servo_bus import ArmServoBus, JOINT_NAMES
+    _calibration(cfg, arm)
     t = backend.open_serial(f"arm_{arm}")
     try:
         bus = ArmServoBus(t, role=f"arm_{arm}", joint_id_map={n: i + 1 for i, n in enumerate(JOINT_NAMES)})
         raw = bus._bus
         if any(_read(raw, s, _REG_TORQUE_ENABLE, 1)[0] for s in range(1, 6)):
             raise PoseReadError(f"arm_{arm}: a joint has torque ON; pose snapshot refused")
-        q = []
-        for i, j in enumerate(J5):
+        out = []
+        for i in range(len(J5)):
             b = _read(raw, i + 1, 56, 2)
-            ticks = b[0] | (b[1] << 8)
-            q.append(getattr(cal, f"{j}_sign") * math.radians(ticks * 360 / 4096 - getattr(cal, f"{j}_zero_offset_deg")))
-        return q
+            out.append(b[0] | (b[1] << 8))
+        return out
     finally:
         t.close()
+
+
+def read_arm_pose(cfg, backend, arm: str) -> List[float]:
+    return ticks_to_q(cfg, arm, read_arm_ticks(cfg, backend, arm))
 
 
 def live_so101_pose_source(cfg, backend) -> Callable[[], Dict[str, List[float]]]:

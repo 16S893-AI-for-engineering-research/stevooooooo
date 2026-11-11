@@ -72,6 +72,13 @@ RIGID_TUBE_ORI_TOL_RAD = math.radians(0.5)
 GRIP_REACH_TOL_M = 1.0e-3
 GRIP_REACH_TOL_RAD = math.radians(0.5)
 
+#: A matching (shared) or given start pose may sit off the attachment points
+#: by the arm-spacing/pitch mismatch (~2 mm in the cell model). Above this the
+#: start pose is not on the tube at all and planning stops. The insertion
+#: policy absorbs the remainder (owner 2026-11-11).
+START_GRIP_TOL_M = 5.0e-3
+START_GRIP_TOL_RAD = math.radians(3.0)
+
 
 class PlanStopped(RuntimeError):
     """Planning stopped because a step is impossible to model honestly.
@@ -98,6 +105,10 @@ class CellKinematics:
     checker: object  # CellCollisionChecker
     lower_rad: np.ndarray
     upper_rad: np.ndarray
+    #: The robot's configured soft limits (hardware.yaml motion_guard.<arm>_arm_limits),
+    #: per arm. IK stays inside the URDF range (the physical model); frames are
+    #: additionally CHECKED against these, because the guard enforces them live.
+    soft_limits: Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]] = None
 
     def gripper_pose(self, arm: str, q: Sequence[float]) -> np.ndarray:
         cell_q = self.checker.mapping.to_cell(arm, q)
@@ -162,6 +173,38 @@ class CellKinematics:
             Js = np.vstack([J[1:3, 1:4], J[3:4, 1:4]])
             dq = Js.T @ np.linalg.solve(Js @ Js.T + 1e-6 * np.eye(3), e)
             q[1:4] = np.clip(q[1:4] + dq, self.lower_rad[1:4], self.upper_rad[1:4])
+        return q
+
+    def ik_shared(
+        self,
+        targets: Dict[str, np.ndarray],
+        q_seed: Sequence[float],
+        max_iter: int = 300,
+        ori_weight_m: float = 0.05,
+    ) -> np.ndarray:
+        """One joint vector for BOTH arms (owner 2026-11-11: at the start pose
+        the arms match each other). Least squares over both grippers' targets.
+
+        The arm bases (182.4 mm) and the attachment pitch (ATTACHMENT_PITCH_MM) differ,
+        so the shared pose leaves a small residual on each grip; callers report
+        it. Orientation error is weighted as ``ori_weight_m`` metres per radian.
+        """
+        q = np.clip(np.asarray(q_seed, dtype=float), self.lower_rad, self.upper_rad)
+        for _ in range(max_iter):
+            es, Js = [], []
+            for arm, T_target in targets.items():
+                T = self.gripper_pose(arm, q)
+                R = T_target[:3, :3] @ T[:3, :3].T
+                aa = np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]]) / 2.0
+                es.append(np.r_[T_target[:3, 3] - T[:3, 3], aa * ori_weight_m])
+                J = self._jacobian(arm, q, T)
+                J[3:] *= ori_weight_m
+                Js.append(J)
+            e, J = np.concatenate(es), np.vstack(Js)
+            dq = np.linalg.lstsq(J, e, rcond=None)[0]
+            q = np.clip(q + dq, self.lower_rad, self.upper_rad)
+            if float(np.linalg.norm(dq)) < 1e-10:
+                break
         return q
 
     def _jacobian(self, arm: str, q: np.ndarray, T: np.ndarray) -> np.ndarray:
@@ -304,6 +347,7 @@ class CyclePlan:
     repositions: List[RepositionLog]
     stopped_reason: Optional[str]
     report: str = ""
+    start_kind: str = ""
     lift_m: float = 0.0
     first_carry_m: float = 0.0
     regrip_standoff_m: float = 0.0
@@ -361,6 +405,18 @@ def validate_frame(
                     f"[{lo:.4f}, {hi:.4f}] rad"
                 )
 
+    # --- Configured soft limits (what the live guard enforces) ---
+    if kin.soft_limits is not None:
+        for arm, q in (("left", frame.left_q), ("right", frame.right_q)):
+            lo_s, hi_s = kin.soft_limits[arm]
+            for i, name in enumerate(JOINT_ORDER):
+                v = float(q[i])
+                if not (lo_s[i] - 1e-9 <= v <= hi_s[i] + 1e-9):
+                    reasons.append(
+                        f"soft limit: {arm} {name} {math.degrees(v):.1f} deg outside the "
+                        f"configured [{math.degrees(lo_s[i]):.1f}, {math.degrees(hi_s[i]):.1f}] deg"
+                    )
+
     # --- Mesh collision (exactly what the motion guard checks: pairs that
     #     involve a moving SO-101 link, for each arm) ---
     try:
@@ -413,7 +469,30 @@ def build_cell_kinematics(cfg, checker) -> CellKinematics:
     jl = {j.name: (j.limit_lower_rad, j.limit_upper_rad) for j in cfg.so101_kinematics.joints}
     lower = np.array([jl[n][0] for n in JOINT_ORDER], dtype=float)
     upper = np.array([jl[n][1] for n in JOINT_ORDER], dtype=float)
-    return CellKinematics(checker=checker, lower_rad=lower, upper_rad=upper)
+    return CellKinematics(checker=checker, lower_rad=lower, upper_rad=upper,
+                          soft_limits=configured_soft_limits(cfg))
+
+
+def configured_soft_limits(cfg) -> Optional[Dict[str, Tuple[np.ndarray, np.ndarray]]]:
+    """Per-arm (lower, upper) rad from motion_guard.<arm>_arm_limits; None if absent.
+
+    A null field falls back to the URDF limit, like the motion guard does.
+    """
+    mg = getattr(cfg, "motion_guard", None)
+    if mg is None:
+        return None
+    jl = {j.name: (j.limit_lower_rad, j.limit_upper_rad) for j in cfg.so101_kinematics.joints}
+    out: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
+    for arm in ("left", "right"):
+        blk = getattr(mg, f"{arm}_arm_limits", None)
+        lo, hi = [], []
+        for n in JOINT_ORDER:
+            a = getattr(blk, f"{n}_lower_rad", None) if blk is not None else None
+            b = getattr(blk, f"{n}_upper_rad", None) if blk is not None else None
+            lo.append(jl[n][0] if a is None else a)
+            hi.append(jl[n][1] if b is None else b)
+        out[arm] = (np.array(lo, dtype=float), np.array(hi, dtype=float))
+    return out
 
 
 def build_attachment_model(kin: CellKinematics, working_pose: np.ndarray) -> AttachmentModel:
@@ -452,7 +531,7 @@ DEFAULT_FIRST_CARRY_FRACTION = 0.5
 #: (2026-11-11): the crawl should not need joint 1; it is a planar motion of
 #: joints 2-4. Pan and roll are heavily penalised so they move only as much as
 #: the 1.1 deg CAD tube-axis tilt forces; the report prints how far they moved.
-IK_JOINT_WEIGHTS = np.array([50.0, 1.0, 1.0, 1.0, 50.0])
+IK_JOINT_WEIGHTS = np.array([1000.0, 1.0, 1.0, 1.0, 1000.0])
 
 UP = np.array([0.0, 0.0, 1.0])
 
@@ -462,6 +541,7 @@ def plan_cycle(
     checker,
     *,
     printing_pose: Optional[Sequence[float]] = None,
+    matching_start: bool = True,
     lift_m: float = DEFAULT_LIFT_M,
     first_carry_m: Optional[float] = None,
     regrip_standoff_m: Optional[float] = None,
@@ -485,6 +565,12 @@ def plan_cycle(
     ``printing_pose`` is the single input standing in for the owner's real
     pose; when ``None`` the planner solves it by IK (left on the middle point,
     right on the far point) seeded from the ``folded_transit`` placeholder.
+    With ``matching_start`` (default, owner 2026-11-11: "when returning to the
+    start position the arms should in general match each other") both arms
+    use ONE joint pose, solved for both grips together; the grip residual it
+    leaves (arm spacing vs pitch, ~2 mm) is reported, for the learned
+    insertion to absorb. An explicit ``printing_pose`` is used as given for
+    both arms.
     Raises :class:`PlanStopped` when a regrip target does not exist on the
     modelled tube or the printing-pose IK cannot reach.
     """
@@ -503,14 +589,32 @@ def plan_cycle(
     # --- Printing pose: IK left->middle, right->far, seeded from placeholder ---
     seed = np.asarray(printing_pose if printing_pose is not None
                       else FOLDED_TRANSIT_PLACEHOLDER, dtype=float)
-    qL, peL, aeL = kin.ik("left", att.point_pose(0, 0.0), seed)
-    qR, peR, aeR = kin.ik("right", att.point_pose(+1, 0.0), seed)
-    if peL > GRIP_REACH_TOL_M or aeL > GRIP_REACH_TOL_RAD:
+    T_mid, T_far = att.point_pose(0, 0.0), att.point_pose(+1, 0.0)
+    if printing_pose is not None:
+        qL = np.asarray(printing_pose, dtype=float).copy()
+        qR = qL.copy()
+        start_kind = "given (both arms)"
+    elif matching_start:
+        qL = kin.ik_shared({"left": T_mid, "right": T_far}, kin.ik("left", T_mid, seed)[0])
+        qR = qL.copy()
+        start_kind = "matching (one shared IK pose for both arms)"
+    else:
+        qL = kin.ik("left", T_mid, seed)[0]
+        qR = kin.ik("right", T_far, seed)[0]
+        start_kind = "per-arm IK"
+    peL, aeL = _pose_error(kin.gripper_pose("left", qL), T_mid)
+    peR, aeR = _pose_error(kin.gripper_pose("right", qR), T_far)
+    # The start grips are where the locked grippers really are: the cycle
+    # carries the tube from there, so the shared-pose residual is a start
+    # offset, not a reach failure. Only a gross miss stops planning.
+    start_tol_m = START_GRIP_TOL_M if printing_pose is not None or matching_start else GRIP_REACH_TOL_M
+    start_tol_rad = START_GRIP_TOL_RAD if printing_pose is not None or matching_start else GRIP_REACH_TOL_RAD
+    if peL > start_tol_m or aeL > start_tol_rad:
         raise PlanStopped(
             f"printing-pose IK (left on middle point) did not reach: residual "
             f"{peL * 1000:.2f} mm / {math.degrees(aeL):.2f} deg"
         )
-    if peR > GRIP_REACH_TOL_M or aeR > GRIP_REACH_TOL_RAD:
+    if peR > start_tol_m or aeR > start_tol_rad:
         raise PlanStopped(
             f"printing-pose IK (right on far point) did not reach: residual "
             f"{peR * 1000:.2f} mm / {math.degrees(aeR):.2f} deg"
@@ -534,7 +638,22 @@ def plan_cycle(
     # No yaw: rotating the tube would rotate the attachment frames out of the
     # arm plane (tried 2026-11-11, worse). The ~1 deg CAD axis tilt is left
     # for the small pan/roll the weighted IK adds.
-    Y = np.array([0.0, 1.0, 0.0])
+    # Carry direction = the arms' own plane (horizontal), measured from FK at
+    # the start pose: a shoulder_lift nudge moves the gripper in that plane.
+    # At pan 0 it is chassis +Y; with the matching start's small shared pan
+    # it turns with the arms, so the carry needs no joint 1 (owner).
+    def plane_dir(arm: str, q: np.ndarray) -> np.ndarray:
+        dq = np.zeros(5)
+        dq[1] = 1e-4
+        d = kin.gripper_pose(arm, q + dq)[:3, 3] - kin.gripper_pose(arm, q)[:3, 3]
+        d[2] = 0.0
+        n = float(np.linalg.norm(d))
+        return d / n if n > 0 else np.array([0.0, 1.0, 0.0])
+
+    Y = plane_dir("left", qL) + plane_dir("right", qR)
+    Y = Y / np.linalg.norm(Y)
+    if Y[1] < 0:
+        Y = -Y   # away from the DexArm
     ax = att.tube_axis
     yaw = 0.0
     pivot = att.point_pose(0, 0.0)[:3, 3]
@@ -546,8 +665,17 @@ def plan_cycle(
         G[:3, 3] = pivot - G[:3, :3] @ pivot + D
         return G
 
-    def point(index: int, M: np.ndarray) -> np.ndarray:
-        return M @ att.point_pose(index, 0.0)
+    # Per-arm grip offset: where each locked gripper actually sits relative
+    # to its attachment point at the start (identity for per-arm IK; ~2 mm
+    # for the matching start). A regrip lands with the same offset (the same
+    # arm inserting the same way), so the arms end in exactly the start pose.
+    G = {
+        "left": np.linalg.inv(T_mid) @ kin.gripper_pose("left", qL),
+        "right": np.linalg.inv(T_far) @ kin.gripper_pose("right", qR),
+    }
+
+    def point(index: int, M: np.ndarray, arm: str) -> np.ndarray:
+        return M @ att.point_pose(index, 0.0) @ G[arm]
 
     frames: List[CycleFrame] = []
     refs: List[np.ndarray] = []   # rigid-tube reference per frame (grip pair)
@@ -555,12 +683,21 @@ def plan_cycle(
     reach: List[Tuple[int, str, str, float, float]] = []  # frame, step, arm, mm, deg
     cur = {"left": qL.copy(), "right": qR.copy()}
 
+    q_start = {"left": qL, "right": qR}
+
     def solve(arm: str, T: np.ndarray) -> Tuple[float, float]:
         # Planar joints 2-4 first (owner: the crawl is a joint 2-4 motion),
         # then a full weighted solve that adds only the pan/roll the CAD tube
         # tilt forces. Seeded from the previous frame for continuity.
         q0 = kin.ik_planar(arm, T, cur[arm])
         q, pe, ae = kin.ik(arm, T, q0, weights=IK_JOINT_WEIGHTS)
+        # The heavily weighted pan converges slowly; where the start pose
+        # itself reaches the target (the end of the cycle) and lies close to
+        # the solve, use it, so the arms end exactly in the matching start.
+        ps, as_ = _pose_error(kin.gripper_pose(arm, q_start[arm]), T)
+        if (ps <= pe + 1e-6 and as_ <= max(ae, 1e-6) + 1e-6
+                and float(np.abs(q_start[arm] - q).max()) < math.radians(2.0)):
+            q, pe, ae = q_start[arm].copy(), ps, as_
         cur[arm] = q
         return pe, ae
 
@@ -575,8 +712,8 @@ def plan_cycle(
                                  ll, rl, adv, note, M.copy(), ax.copy()))
         # Rigid-tube reference for the CURRENT grip pair, from the attachment
         # geometry (it changes when a regrip relocks on a new point).
-        refs.append(np.linalg.inv(att.point_pose(grip["left"], 0.0))
-                    @ att.point_pose(grip["right"], 0.0))
+        refs.append(np.linalg.inv(att.point_pose(grip["left"], 0.0) @ G["left"])
+                    @ (att.point_pose(grip["right"], 0.0) @ G["right"]))
 
     # grip index per arm (changes at the regrips)
     grip = {"left": 0, "right": +1}
@@ -586,15 +723,15 @@ def plan_cycle(
         for v in _lerp(np.r_[s0[0], s0[1]], np.r_[s1[0], s1[1]], steps * 2):
             M = motion(v[:3], float(v[3]))
             emit(step, True, True, M, note,
-                 {arm: point(grip[arm], M) for arm in ("left", "right")})
+                 {arm: point(grip[arm], M, arm) for arm in ("left", "right")})
 
     def regrip(arm: str, new_index: int, s, step: str, note: str):
         M = motion(s[0], s[1])
         other = "right" if arm == "left" else "left"
         ll, rl = (False, True) if arm == "left" else (True, False)
         down = UP * (-regrip_standoff_m)
-        T_from = point(grip[arm], M)
-        T_to = point(new_index, M)
+        T_from = point(grip[arm], M, arm)
+        T_to = point(new_index, M, arm)
         p_from, p_to = T_from[:3, 3], T_to[:3, 3]
         legs = (("retract", p_from, p_from + down),
                 ("move under target", p_from + down, p_to + down),
@@ -665,6 +802,7 @@ def plan_cycle(
         violations=violations,
         repositions=repositions,
         stopped_reason=None,
+        start_kind=start_kind,
         lift_m=float(lift_m),
         first_carry_m=float(first_carry_m),
         regrip_standoff_m=float(regrip_standoff_m),
@@ -690,18 +828,20 @@ def build_report(plan: CyclePlan, att: AttachmentModel) -> str:
     lines.append("PLACEHOLDER FINDING (read first)")
     lines.append("-" * 60)
     lines.append(
-        "The printing pose used here is NOT a measured pose. It is the IK\n"
-        "solution that puts the LEFT gripper on the middle attachment point\n"
-        "and the RIGHT gripper on the far point, seeded from the hardware.yaml\n"
-        "folded_transit PLACEHOLDER. It is never written to hardware.yaml and\n"
-        "is a single input the owner's re-measured pose replaces later.\n"
+        "The printing pose used here is NOT a measured pose. It is solved on\n"
+        "the cell model with the LEFT gripper on the middle attachment point\n"
+        "and the RIGHT gripper on the far point (tube at its CAD placement,\n"
+        "accepted by the owner 2026-11-11), seeded from the hardware.yaml\n"
+        "folded_transit PLACEHOLDER. It is never written to hardware.yaml.\n"
         "Lift, first carry and regrip standoff are model-chosen, not measured."
     )
     lines.append("")
+    lines.append(f"  start pose kind : {plan.start_kind}")
+    lines.append("")
     lines.append(f"  stored folded_transit placeholder : {fmt(stored)} rad")
-    lines.append(f"  printing pose (IK) LEFT  on middle : {fmt(qL)} rad  "
+    lines.append(f"  printing pose LEFT  on middle : {fmt(qL)} rad  "
                  f"(residual {peL * 1000:.2f} mm / {math.degrees(aeL):.2f} deg)")
-    lines.append(f"  printing pose (IK) RIGHT on far    : {fmt(qR)} rad  "
+    lines.append(f"  printing pose RIGHT on far    : {fmt(qR)} rad  "
                  f"(residual {peR * 1000:.2f} mm / {math.degrees(aeR):.2f} deg)")
     lines.append("")
     lines.append("CYCLE (owner 2026-11-11)")

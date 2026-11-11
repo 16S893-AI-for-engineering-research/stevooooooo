@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-11 17:59'
+updated_date: '2026-11-11 19:24'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-11 (later). AA-43 In Progress (2/5 AC). AA-45 planner reworked to the owner's refined cycle (lift, carry right, left regrip, right regrip, lower); owner review of the new GIF pending. nono draft profile ready. Suite passes. Hardware: owner resuming AA-43 (direction checks, then a supervised powered move).
+**Last verified:** 2026-11-11 (evening). AA-43 In Progress (2/5 AC). AA-45 planner reworked to the owner's refined cycle (lift, carry right, left regrip, right regrip, lower); owner review of the new GIF pending. nono draft profile ready. Suite passes. Hardware: owner resuming AA-43 (direction checks, then a supervised powered move).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -41,8 +41,16 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **Result on the placeholder:** 87 frames, 11 violations. Left pan 2.5 deg, right pan 13.8 deg, elbows ~118 deg. Remaining:
   - start/end within ~3 mm of the shoulder (placeholder pose);
   - right gripper misses by up to 3.6 mm on 3 carry frames and 2.9 mm on 1 regrip frame. Likely cause: the CAD tube axis is ~1 deg off the arm plane, and the working-pose grip spacing is 182.4 mm against a 183.676 mm pitch.
-- **Owner 2026-11-11:** the new GIF "looks great". Skip the ~1 deg tube tilt for now. AC #6 waits for an explicit "motion matches" confirmation.
-- **Next:** measure the real printing pose (owner at the arms). AC #1-#6 are not checked.
+- **Owner 2026-11-11:** "the animation looks correct". AC #1-#6 are checked. The task stays In Progress for two new owner points:
+  - the tube placement in the URDF is good enough (insertion is learned);
+  - on return to the start, the two arms should match each other.
+- **Done since:** the matching start (one shared pose for both arms, about 2 mm grip residual, the cycle ends exactly in it). Frames are now checked against the configured soft limits.
+- **Open question for the owner:** the printing pose needs shoulder_lift about -91 deg, but the soft limits are -80.1 (L) / -74.4 (R) deg, from the EEPROM tick ranges. That gives 30 soft-limit violations, and nothing was widened. Raise the printing pose, or re-measure shoulder_lift travel?
+- **Verification plan (owner asked how the animation will match reality):**
+  1. Static pose match: `scripts/pose_snapshot.py --label X --live`. Read-only, torque off. It renders the reading and logs the owner's y/n. This also covers AA-40 #6 and most of AA-43 #4.
+  2. Start-pose check before motion: `inchworm.start_pose_check`, or `--plan-start out/inchworm/timeline.jsonl`.
+  3. Dry-run, then a supervised slow replay without the tube.
+  4. Then with the tube.
 
 ### nono sandbox profile (owner request 2026-11-10): draft ready, NOT promoted
 - Draft `~/.config/nono/profile-drafts/inchworm-893.json` (validated) extends mit-parley. It adds: python_runtime, linux_sysfs_read, git_config; rw on ~/893, ~/worktrees/893, the uv/hf/torch/matplotlib/fontconfig caches, /dev/serial, /dev/v4l, /dev/ttyACM0-4, ttyUSB0-1, video0-5; network for pypi, huggingface, github (HTTPS).

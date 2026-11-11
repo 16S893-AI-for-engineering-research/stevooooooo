@@ -151,9 +151,12 @@ def test_printing_pose_start_has_no_invariant_or_limit_failure(kin, checker):
 
 def test_plan_cycle_produces_labelled_timeline(cfg, checker, tmp_path):
     plan = plan_cycle(cfg, checker)
-    # Printing pose is reachable (decision: stop if it is not).
-    assert plan.printing_pose_ik_residual_m[0] < 1e-3
-    assert plan.printing_pose_ik_residual_m[1] < 1e-3
+    # Printing pose is reachable (decision: stop if it is not). With the
+    # owner's matching start (2026-11-11) the shared pose is off each point by
+    # the arm-spacing/pitch mismatch; the per-arm 1 mm check is kept in
+    # test_per_arm_start_reaches_each_point.
+    assert plan.printing_pose_ik_residual_m[0] < 3e-3
+    assert plan.printing_pose_ik_residual_m[1] < 3e-3
 
     # Timeline: every frame carries both arms, lock states, tube pose, step.
     assert len(plan.frames) > 10
@@ -252,3 +255,44 @@ def test_printing_pose_unreachable_stops(cfg, checker, monkeypatch):
     with pytest.raises(PlanStopped) as exc:
         ip.plan_cycle(cfg, checker)
     assert "did not reach" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# Owner 2026-11-11: matching start pose and the configured soft limits
+# ---------------------------------------------------------------------------
+
+
+def test_matching_start_pose_and_return(cfg, checker):
+    """Both arms start in ONE shared pose, and the cycle returns them to it."""
+    plan = plan_cycle(cfg, checker)
+    assert "matching" in plan.start_kind
+    np.testing.assert_allclose(plan.printing_pose_left, plan.printing_pose_right)
+    first, last = plan.frames[0], plan.frames[-1]
+    np.testing.assert_allclose(first.left_q, first.right_q)
+    # Back at the start pose within the IK tolerance (~0.1 deg).
+    np.testing.assert_allclose(last.left_q, plan.printing_pose_left, atol=2e-3)
+    np.testing.assert_allclose(last.right_q, plan.printing_pose_right, atol=2e-3)
+    # The shared pose sits off the attachment points only by the arm-spacing /
+    # pitch mismatch (a few mm), reported for the insertion policy to absorb.
+    assert max(plan.printing_pose_ik_residual_m) < 3e-3
+    assert "matching" in plan.report
+
+
+def test_soft_limit_violation_is_reported(kin):
+    """A frame inside the URDF range but outside the configured soft limit fails."""
+    assert kin.soft_limits is not None
+    lo, _ = kin.soft_limits["left"]
+    q = WORKING.copy()
+    q[1] = lo[1] - 0.05                  # shoulder_lift just below the soft limit
+    assert q[1] > kin.lower_rad[1]       # ...but still inside the URDF range
+    frame = CycleFrame("test soft", q, PARK, True, False, 0.0)
+    reasons = validate_frame(frame, kin, reference_relpose=None)
+    assert any(r.startswith("soft limit: left shoulder_lift") for r in reasons), reasons
+
+
+def test_per_arm_start_reaches_each_point(cfg, checker):
+    """Per-arm IK (matching_start=False) still puts each gripper on its point within 1 mm."""
+    plan = plan_cycle(cfg, checker, matching_start=False, steps=2)
+    assert plan.start_kind == "per-arm IK"
+    assert plan.printing_pose_ik_residual_m[0] < 1e-3
+    assert plan.printing_pose_ik_residual_m[1] < 1e-3

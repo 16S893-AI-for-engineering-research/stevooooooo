@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 18:26'
+updated_date: '2026-11-11 19:24'
 labels:
   - simulation
   - verification
@@ -60,4 +60,11 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 2026-11-11 owner on the reworked cycle.gif: 'this is really good', 'the animation looks great'. Owner decision: skip the ~1 deg CAD tube-tilt error for now (the right-gripper reach misses of up to 3.6 mm stay reported, not fixed). AC #6 NOT checked yet: awaiting the owner's explicit confirmation that the motion matches the intended cycle. Owner asked what the real printing pose means (explained; it is still the IK placeholder).
 
 2026-11-11 owner: 'the animation looks correct' (AC #6 evidence). AC #1-#5 evidence: tests/test_inchworm_plan.py 7 passed 2026-11-11 (timeline JSONL with both arms/locks/tube pose; per-frame rigid-tube check at 1 mm / 0.5 deg; colliding and both-unlocked frames fail; absent regrip target stops; unreachable printing pose stops); scripts/inchworm_animation.py writes report (exit 1 while violations remain) and cycle.gif with step/lock/advance/lift overlays, contacts red, placeholder label; owner watched it. Owner decisions 2026-11-11: (1) the tube is not exactly placed in the URDF; the current placement is good enough. Final insertion will be done by the trained policy, so mm-level grip mismatch in the model is accepted. (2) NEW REQUIREMENT, not yet implemented: on returning to the start position the two arms should in general match each other (same joint pose). Today the IK start differs: left [0,-90.1,90.0,-89.9,0] deg vs right [-3.6,-91.9,89.6,-87.7,3.6] deg. Hardware fact: arm bases are 182.4-182.5 mm apart, but the attachment pitch is 183.676 mm, so identical poses leave ~1.2 mm on one grip (for the policy to absorb). (3) Owner asked how the animation will be checked against the real robot; verification plan proposed (static pose match, then unpowered/powered replay without the tube, then with it). Task stays In Progress until the matching-arms start pose is in.
+
+2026-11-11 software for the owner's verification plan (orchestrator):
+- MATCHING START (owner requirement): plan_cycle(matching_start=True, default) solves ONE joint pose for both arms (CellKinematics.ik_shared, least squares over both grips): [-1.8, -91.0, 89.8, -88.8, 1.8] deg. Grip residual 1.91 mm each (arm bases 182.4 mm apart vs the attachment pitch), carried as a fixed per-arm grip offset through the cycle so regrips land the same way; the cycle ends exactly in the shared pose (test). Per-arm IK kept as matching_start=False (1 mm test kept).
+- SOFT LIMITS: frames are now also checked against hardware.yaml motion_guard.<arm>_arm_limits (what the live guard enforces); IK still bounded by the URDF range so violations are reported, not hidden. FINDING: the printing pose needs shoulder_lift ~-91 deg; the configured soft limit is -80.1 (left) / -74.4 (right), from the EEPROM tick range -76.7 / -70.8 deg. Even the measured fold (-79.2 / -73.5) sits at that edge. So 30 soft-limit violations (start, lift, regrip retracts). Nothing widened. Either the printing pose must be higher, or the shoulder_lift range must be re-measured (owner question).
+- Pan weight 1000 (joint 1 max 4.2 deg over the cycle, both arms identical); carry direction = the arms' own plane from FK.
+- NEW: src/inchworm/start_pose_check.py (compare measured vs plan first frame, per-joint tol 3 deg placeholder, fails closed); so101_pose_reader.ticks_to_q/read_arm_ticks; scripts/pose_snapshot.py (READ-ONLY both arms, refuses torque on, renders on the cell model, logs ticks + owner y/n to calibration_data/pose_snapshots.jsonl, optional --plan-start compare). Tests: tests/test_start_pose_check.py (10), test_inchworm_plan.py (10). Full suite passes.
+- Result now: 42 violations = 30 soft limit, 10 reach (regrip retract near the reach edge, 1-2.3 mm), 2 x2 start/end lower_arm-shoulder within 3 mm.
 <!-- SECTION:NOTES:END -->
