@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-11 23:06'
+updated_date: '2026-11-11 23:36'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -73,7 +73,8 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 
 ### Human-handoff queue
 - AA-41 (gripper lock probe): deferred; needs a fresh procedure after AA-43. The old 0x08 / encoder-only diagnosis no longer applies.
-- AA-42 (FD re-flash): moot after the root cause; paused in the walkthrough tab. The owner should close it there (`/human decline AA-42`); do not mark it verified. The left arm's IDs 4-6 were re-flashed (3.10 over 3.10) and still answer.
+- AA-42 (FD re-flash): moot. On 2026-11-11 the owner checked with FD at 1000000 baud (FD had fallen back to 115200): all 6 left servos answer, all on 3.9. That is the expected factory firmware of the replacement IDs 4-6 (census 2026-11-09); the earlier 3.10 was the removed servo. Owner to decline it (`/human decline AA-42`); do not mark it verified.
+- AA-46 (shoulder_lift re-measure + pose snapshots): accepted 2026-11-11. The tab auto-launch died (no credentials), so start the guide by hand with `tools/human-handoff/open-walkthrough.sh`.
 
 ### Not committed on purpose
 - `CAD/exports/wrist_gripper.stl` deleted and `CAD/exports/gripper_update.stl` added by the owner (superseded by `CAD/robot_urdf_new`). Ask before committing either.

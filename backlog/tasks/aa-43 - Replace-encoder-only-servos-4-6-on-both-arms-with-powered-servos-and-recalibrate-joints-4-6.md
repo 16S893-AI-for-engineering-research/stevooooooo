@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-10 15:15'
+updated_date: '2026-11-11 23:36'
 labels:
   - hardware
 dependencies: []
@@ -57,4 +57,6 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 2026-11-09 pan check: IDs 1-3 EEPROM (homing offset, limits) on BOTH arms are byte-identical to the pre-rebuild dumps (eeprom_after_*_2026-10-27T23-32-*_fw310_mask.json), i.e. kept, not re-measured; the owner did not re-run the motions after the rebuild. Whether the horns/mounting moved is unproven. Pan landmark: ticks L 1972 / R 2063 (arm pointing at the DexArm, poses_2026-10-25.jsonl); today at rest L 1947 (-2.2 deg), R 2091 (+2.5 deg), but the arms are not placed at the landmark. Verify by hand-placing both arms pointing at the DexArm (read_pose.py, read-only) and comparing with 1972/2063, and by hand-placing the fold and comparing joints 1-3 with the folded_transit record (L 2009/1226/3115, R 2061/1293/3071). New scripts/powered_move_check.py (dry-run default; one joint, wrist_flex/wrist_roll +-5 deg out-and-back at 150 ticks/s, torque limit 300, or the gripper to its open band via GripperLockSM.reset(); everything else torque-off; stop file /tmp/inchworm_stop_move; stall/timeout/error abort to torque off); 5 tests. gripper_lock_probe.py now restores the EEPROM Max_Torque_Limit (500) in cleanup instead of a hard-coded 1000, which would have undone the LeRobot cap. Pre-move mesh check at the current rest pose: both arms are in the accepted-fold state; +-5 deg of wrist_flex/wrist_roll creates no new model contacts except left wrist_flex +5 (B_Fix vs left_wrist), so use -5 for left wrist_flex.
 
 2026-11-10 wrist_flex direction (left arm), owner-observed during the powered move (calibration_data/powered_move_2026-11-09.jsonl): ticks DOWN moved the tip AWAY from the DexArm, ticks UP moved it TOWARD the DexArm, as predicted by the cell model (sign +1; scripts/view_joint_move.py, owner confirmed the render orientation, dark parts and DexArm side). Opposite-the-cable view: ticks DOWN = counter-clockwise, matching doc-1. Owner noted that the REST pose drawn by the viewer did not look like the real arm's starting pose, so absolute angles (zero offsets, esp. the wrists I set to mid-range) are NOT verified. Not yet checked: right arm wrist_flex, wrist_roll, joints 2-3 (use scripts/direction_check.py --live).
+
+2026-11-11 owner (FD, AA-42 walkthrough): FD had fallen back to 115200 baud, which explains the 'no servos found'. At 1000000, all 6 left-arm servos answer, all fw 3.9. This matches the 2026-11-09 census: the replacement IDs 4-6 ship with 3.9. The 3.10 seen on 2026-10-28 was the OLD, removed ID 4. No servo bricked, nothing reverted. AA-42 is moot; no flash needed.
 <!-- SECTION:NOTES:END -->

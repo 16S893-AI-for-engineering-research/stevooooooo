@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-10-28 13:35'
-updated_date: '2026-10-28 22:49'
+updated_date: '2026-11-11 23:34'
 labels:
   - human-action
   - human-key-8d8f686b9ed669e1
@@ -202,6 +202,38 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "Owner verbal reports in conversation transcript: progress reached 100%, no popup, no status text in FD, \"id4 answers\", \"all three servos were reflashed\"; no version readback or screenshot supplied",
       "advanced": false,
       "at": "2026-10-28T21:51:49.096Z"
+    },
+    {
+      "step": 4,
+      "note": "STOP CONDITION HIT at step 4 verification. Owner reports that after Open + Search in FD, NO servos are listed (previously 6 found on COM3 / BusId 9-3 before flashing; owner earlier said \"id4 answers\" after the ID 4 flash, and that IDs 4, 5, 6 were all reflashed). Now zero servos respond, so not even the unflashed IDs 1-3 appear. This points to a bus-level or connection/port/baud/power problem rather than one bricked servo, but the cause is unverified. Not advanced. Owner told to stop: do not cut 12 V, do not unplug USB, do not re-flash, do not change any FD or servo settings; leave everything connected and pause with /walk pause, then report to the orchestrator in the main Pi session. Asked for read-only observations only (FD port/baud shown, any FD error text, Device Manager CH343 ports, whether the 12 V supply indicator is lit). No writes, no motion.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: \"I can't see any of the servos when I open and then search and FD\"",
+      "advanced": false,
+      "at": "2026-11-11T23:27:33.128Z"
+    },
+    {
+      "step": 4,
+      "note": "Follow-up to the step-4 stop (zero servos found). Owner reports that FD's host-side baud dropdown \"was the issue\", meaning FD was not at 1000000. No details yet: the previous dropdown value, whether it was set to 1000000 and Search re-run, how many IDs were found, and the IDs 4-6 firmware readback are all still unknown. Key check still open: the servos must answer at 1000000. If they answer only at some other rate, the servo-side baud may have changed, which would be a real deviation. Not advanced. No writes reported.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: \"that was the issue\" (re: FD baud dropdown)",
+      "advanced": false,
+      "at": "2026-11-11T23:28:55.278Z"
+    },
+    {
+      "step": 4,
+      "note": "STOP CONDITION HIT: unexpected firmware version at step 4 verification. With the FD host baud dropdown corrected, owner reports Search on COM3 lists all 6 servos and ALL 6 show main 3 / secondary 9 (= 3.9). Pre-flash baseline (step 2, same COM3) was ID 1 = 3.9 and ID 4 = 3.10, and FD Online offered 3.10 (step 3). So IDs 4-6 now read 3.9 where 3.10 was expected. ID 4 apparently went from 3.10 to 3.9 after the flash. Possible explanations (none verified): the flashed image was not 3.10 despite FD's label, FD is showing stale or wrong fields, a different arm or port than in step 2, or a misread. Not yet confirmed: the baud value Search used (owner did not state 1000000 explicitly), exact ID list beyond \"all 6\", and the dropdown's earlier value. Not advanced. Owner told to stop: no re-flash, no right arm, no settings changes, leave power and USB as they are; /walk pause and report to the orchestrator. Requested an FD-window screenshot as evidence.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: \"All 6 of the servos show 3 and 9 for main and secondary on com 3\"; no screenshot supplied",
+      "advanced": false,
+      "at": "2026-11-11T23:30:59.671Z"
+    },
+    {
+      "step": 4,
+      "note": "Follow-up to the step-4 stops. Owner reports FD's host-side baud dropdown originally showed 115200 during the 2026-11-11 session (the zero-servos Search). Step 2 (2026-10-28) used 1000000, so the zero-servo result is explained by a host-side mismatch. Likely cause is FD reverting to its default after a relaunch, but that is unverified. Still not confirmed explicitly: that the dropdown was set to exactly 1000000 for the Search that found all 6 servos at 3.9. If the servos answer only at a rate other than 1000000, the servo-side baud may have changed, which would be a real deviation. The firmware discrepancy stays open and unresolved: all 6 left-arm servos read 3.9, IDs 4-6 were expected to be 3.10, and ID 4 read 3.10 before the flash. Not advanced. Owner remains told to stop: no re-flash, no right arm, no settings changes; /walk pause and report to the orchestrator.",
+      "type": "self-reported",
+      "reference": "Owner verbal report in conversation transcript: \"dropdown originaly showed 115200.\"",
+      "advanced": false,
+      "at": "2026-11-11T23:33:52.753Z"
     }
   ],
   "history": [

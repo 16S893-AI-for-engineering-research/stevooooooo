@@ -2,9 +2,10 @@
 id: AA-46
 title: 'Re-measure shoulder_lift travel (both arms) and take pose snapshots, read-only'
 status: To Do
-assignee: []
+assignee:
+  - '@human'
 created_date: '2026-11-11 23:06'
-updated_date: '2026-11-11 23:06'
+updated_date: '2026-11-11 23:21'
 labels:
   - human-action
   - human-key-b9a975d02991ba9c
@@ -142,12 +143,25 @@ Preparation: The robot is powered as in earlier sessions, with both arms limp (t
 {
   "version": 1,
   "key": "b9a975d02991ba9c472ec76332a48349ccdd36d56798f7edd84131943363f2f2",
-  "phase": "proposed",
+  "phase": "accepted",
   "createdAt": "2026-11-11T23:06:14.558Z",
   "origin": "01a1cb2b-5f23-70da-906d-dcbf45d889dd",
   "step": 0,
   "evidence": [],
-  "history": []
+  "history": [
+    {
+      "action": "accept",
+      "at": "2026-11-11T23:18:39.220Z",
+      "hash": "0005f8fe8b04757dbc3305d98e2aa6c30aa8ec4d799c7814a3012bf3f7bd136a"
+    },
+    {
+      "action": "accept",
+      "at": "2026-11-11T23:21:27.470Z",
+      "hash": "0005f8fe8b04757dbc3305d98e2aa6c30aa8ec4d799c7814a3012bf3f7bd136a"
+    }
+  ],
+  "acceptedHash": "0005f8fe8b04757dbc3305d98e2aa6c30aa8ec4d799c7814a3012bf3f7bd136a",
+  "acceptedAt": "2026-11-11T23:18:39.220Z"
 }
 ```
 <!-- /human-handoff-state -->
