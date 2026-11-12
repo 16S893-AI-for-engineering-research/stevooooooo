@@ -52,6 +52,7 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     "record_joint_ranges.py": ["--arm", "left"],
     "home_servos.py": ["homing", "--arm", "left"],
     "powered_move_check.py": ["--arm", "left", "--joint", "wrist_flex"],
+    "gripper_ends.py": ["--arm", "left", "--action", "close", "--no-tube"],
     "direction_check.py": ["--arm", "left"],
     "view_joint_move.py": ["--help"],
     "view_zero_pose.py": ["--arm", "left"],
