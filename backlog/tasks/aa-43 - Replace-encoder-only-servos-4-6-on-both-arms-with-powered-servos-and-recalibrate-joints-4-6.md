@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 14:53'
+updated_date: '2026-11-12 15:25'
 labels:
   - hardware
 dependencies: []
@@ -63,4 +63,10 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 2026-11-12 (orchestrator): owner reported the LEFT wrist_roll powered_move_check aborted with ServoTimeoutError on servo 5, reading reg 0x2A (goal read-back inside set_torque_enable). Read-only diagnostic afterwards: all 6 left servos answer, 300/300 reads each (incl. 0x2A) with no timeouts, p99 latency under 2 ms; status 0, 12.1-12.2 V, 29-33 C; servo 5 goal = present = 2000, so the goal write landed. A second probe found servo 5 Torque_Enable = 1 (it had read 0 minutes before; the probe wrote nothing before that read). Torque switched off on both arms and read back all 0. Cause of the torque-on reading is UNEXPLAINED (an earlier rerun by the owner, or the servo enabling torque when goal is written?). Asking the owner before more probes (AGENTS.md two-probe rule). No more powered moves until this is resolved.
 
 2026-11-12 supervised probe (owner at the power switch), scripts/autoenable_probe.py, log calibration_data/autoenable_probe_2026-11-12.jsonl: left ID 5, torque off on all 6; Goal_Speed write -> Torque_Enable stays 0; Goal_Position write (goal = present = 2000) -> Torque_Enable = 1 at 0 ms, held to 505 ms, present stayed 2000 (no motion); torque off afterwards, all 6 read back 0. So the goal write itself energises the servo. Fix in servo_bus.set_torque_enable: one retry of the goal read-back on a timeout (the equality check is unchanged), and torque OFF on any failure after the goal write; 2 new tests + the mismatch test now also asserts torque OFF. Full suite passes. doc-1 and doc-3 updated. Next: owner reruns AA-48 step 5.
+
+2026-11-12 AA-48 steps 5-7 (owner supervising, log robot/calibration_data/powered_move_2026-11-12.jsonl): left wrist_roll +5 deg out/back REACHED (err -5/+4 ticks, load 84); right wrist_flex REACHED (err -6/+5, load 104/120); right wrist_roll run twice, REACHED both (err -4/+5, -6/+5, load 120/76); 30-31 C. Owner confirmed all three directions as predicted (wrist_roll ticks UP = clockwise seen from the tip; right wrist_flex ticks UP = tip drops and swings toward the DexArm). This resolves the step-2 right wrist_roll conflict in favour of the doc-1 convention. Torque off on all 12 after each run (read back). Observation: every leg stops 4-6 ticks short of the goal on the approach side (tolerance 6); not loosened. Remaining for AC #4/#5: grippers (steps 8-9).
+
+2026-11-12 AA-48 step 8 (owner supervising): left gripper opened via GripperLockSM.reset() from 2516 to 1569 ticks (goal 1558, unlocked band 1506-1610, EEPROM 1521..2531), REACHED, load 92, 32 C; owner confirmed it opened fully as expected. Torque off, read back 1566. Owner asked how to return it to the closed rest (2516): no AA-17 state-machine transition closes an empty gripper (lock() without a key goes to the overtravel goal and ends in FAULT), and the servo cannot be back-driven by hand. Options put to the owner.
+
+2026-11-12 AA-48 step 9 (owner supervising): right gripper opened via reset() 2494 -> 1604 ticks (goal 1594 = middle of the unlocked band 1551-1636; EEPROM min 1563), REACHED (tol 12), load 76, 31 C; torque off, reads 1601. Owner: 'it should have traveled slightly farther'. Explanation given: reset() aims for the middle of the open band, not the open stop; the assumed open tick 1576 (old servo) and the EEPROM min 1563 are both beyond it. The true open end on the new servos is still unmeasured (AC #3/#4 open). No change made.
 <!-- SECTION:NOTES:END -->
