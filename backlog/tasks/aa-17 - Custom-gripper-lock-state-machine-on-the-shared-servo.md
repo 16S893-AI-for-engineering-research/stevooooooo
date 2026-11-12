@@ -1,11 +1,11 @@
 ---
 id: AA-17
 title: Custom gripper lock state machine on the shared servo
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:11'
-updated_date: '2026-10-28 22:46'
+updated_date: '2026-11-12 22:18'
 labels: []
 milestone: m-2
 dependencies:
@@ -33,7 +33,7 @@ See doc-1 sections 3 and 9.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The measured servo position bands for unlocked, engaged-but-unlocked and locked states are determined empirically and stored in the hardware config with the measurement method noted
+- [x] #1 The measured servo position bands for unlocked, engaged-but-unlocked and locked states are determined empirically and stored in the hardware config with the measurement method noted
 - [x] #2 An explicit state machine exposes unlock, approach-ready, lock and hold transitions, rejects illegal transitions, and is the only code path permitted to command the gripper servo
 - [x] #3 Locking verifies success from servo position plus current or load, distinguishing a true latch from a jam or a miss, and reports a typed failure instead of assuming success
 - [x] #4 Once locked the state is actively held until an explicit unlock, including re-asserting position if drift beyond a configured threshold is detected, and every hold correction is logged
@@ -66,4 +66,12 @@ Overtravel lock merged 2026-10-25 (orchestrator-reviewed). Lock commands lock_ov
 AA-41 finding 2026-10-27: gripper servo (and wrist_flex/wrist_roll) EEPROM drive config is zeroed on both arms (see AA-41 notes); powered lock testing is blocked until it is restored. gripper_lock_probe.py refuses in this state.
 
 ROOT CAUSE (owner, 2026-10-27): servos ID 4-6 on both arms are encoder-only leader-arm servos with no motor drive. That explains the zeroed drive EEPROM, temperature 0 C, constant ~950 current and the 0x08 flag; nothing was fried and no software fault. Powered wrist/gripper motion is impossible until they are replaced (AA-43). The EEPROM values written 2026-10-27 to IDs 4-6 are harmless on these parts (backups in calibration_data/eeprom_*2026-10-27T23-*); they are moot once the servos are swapped. AA-17 #1-style live lock work blocked on AA-43; gripper bands must be re-measured on the new gripper servo.
+
+2026-11-13: AC #1 on the new servos: unlocked/engaged bands from the measured open ends (gripper_ends_2026-11-12.jsonl, rule [open-25, open+60]), locked band = 45-degree position lock goal +-25 ticks (owner decision; AA-49 key-in trials in band, owner confirmed locked by eye). Method recorded in hardware.yaml gripper_lock comments; per-arm unverified: false. Lock mode 'position' added to GripperLockSM (tests in test_gripper_empty_moves.py).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Gripper lock state machine (GripperLockSM) is the only gripper command path, policy-blocked, with lock verification, active hold, safe unlock and tests (ACs 2-7). AC #1: bands measured on the new servos; lock redefined by the owner as a 45-degree position lock (the locking piece slips at its ends), confirmed by eye in AA-49 on both arms. Full test suite passes.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,11 @@
 ---
 id: AA-51
 title: Supervised live full-cycle replay without the tube (AA-50)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@human'
 created_date: '2026-11-12 21:48'
-updated_date: '2026-11-12 21:48'
+updated_date: '2026-11-12 22:10'
 labels:
   - human-action
   - human-key-56aeb9883b7721f9
@@ -141,6 +142,12 @@ Preparation: Robot powered as usual; both arms torque-off and placed by hand in 
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Follow the user-accepted procedure one step at a time, record evidence and stop on deviations. Submit the outcome for orchestrator verification; do not complete the originating project task.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -149,12 +156,29 @@ Preparation: Robot powered as usual; both arms torque-off and placed by hand in 
 {
   "version": 1,
   "key": "56aeb9883b7721f9ef1fb18840c1b55b0e96568fab5e904ac17fae201eef5845",
-  "phase": "proposed",
+  "phase": "active",
   "createdAt": "2026-11-12T21:48:39.439Z",
   "origin": "01a1d101-b8e5-7496-a5a0-f4e66bdd6498",
-  "step": 0,
-  "evidence": [],
-  "history": []
+  "step": 1,
+  "evidence": [
+    {
+      "step": 1,
+      "note": "Step 1 (attach USB) done for the arms. The owner pasted the output of `uv run python scripts/attach_usb.py`. arm_left: OK, already attached (BusId 10-4). arm_right: OK, already attached (BusId 9-3). Others OK: arm_leader, relay, cam_left, cam_scanner, and cam_right newly attached (10-2). dexarm: MISSING (\"not found in usbipd device list\", VID:PID 0483:5740). The script reported 7/8 devices OK. The step's expected result and verification concern only the two arm ports, which are attached with no errors. The step's stop line says \"Any device missing\", and I read it as meaning the arm devices. This is an interpretation. The DexArm is not visible to WSL (unplugged, off, or not enumerated on Windows is unknown). The procedure says the DexArm should be parked where it normally sits; I do not know whether the replay script needs a DexArm connection. The step 2 dry-run will show that without moving anything. The agent did not observe the robot.",
+      "type": "automated",
+      "reference": "Owner-pasted terminal output of scripts/attach_usb.py",
+      "advanced": true,
+      "at": "2026-11-12T22:10:09.197Z"
+    }
+  ],
+  "history": [
+    {
+      "action": "accept",
+      "at": "2026-11-12T22:09:08.899Z",
+      "hash": "eb37e669de424949fb34e0ad3a6fd492bfb387d0fc805debfdf6610788f97c94"
+    }
+  ],
+  "acceptedHash": "eb37e669de424949fb34e0ad3a6fd492bfb387d0fc805debfdf6610788f97c94",
+  "acceptedAt": "2026-11-12T22:09:08.899Z"
 }
 ```
 <!-- /human-handoff-state -->

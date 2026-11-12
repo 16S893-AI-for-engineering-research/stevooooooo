@@ -444,7 +444,10 @@ gripper_lock:
     # Verification: position only; the owner confirms the key is locked by eye.
     lock_mode: position
     lock_goal_deg: 179.12        # ticks 2038
-    unverified: true
+    # VERIFIED 2026-11-12 (AA-49, owner-supervised, calibration_data/gripper_lock_probe_new_servos.jsonl):
+    #   key-in position-lock trials at torque 300 all LATCHED, settled in band at 2032 ticks;
+    #   owner confirmed by eye the key was locked every time. Method: position lock + owner visual check.
+    unverified: false
   arm_right:
     # Derived from gripper_samples_2026-10-25.jsonl:
     #   open=1576, locked=[1792,1801], closed_empty=2494
@@ -480,7 +483,10 @@ gripper_lock:
     # Verification: position only; the owner confirms the key is locked by eye.
     lock_mode: position
     lock_goal_deg: 179.38        # ticks 2041
-    unverified: true
+    # VERIFIED 2026-11-12 (AA-49, owner-supervised, calibration_data/gripper_lock_probe_new_servos.jsonl):
+    #   key-in position-lock trials at torque 300 all LATCHED, settled in band at 2035 ticks;
+    #   owner confirmed by eye the key was locked every time. Method: position lock + owner visual check.
+    unverified: false
   # Drift threshold (degrees) for active hold-monitor. UNVERIFIED placeholder.
   drift_threshold_deg: null     # unverified: true
   # Lock-verification thresholds. UNVERIFIED placeholders.

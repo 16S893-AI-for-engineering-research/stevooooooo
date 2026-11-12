@@ -3,11 +3,11 @@ id: AA-43
 title: >-
   Replace encoder-only servos 4-6 on both arms with powered servos and
   recalibrate joints 4-6
-status: In Progress
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 21:02'
+updated_date: '2026-11-12 22:18'
 labels:
   - hardware
 dependencies: []
@@ -27,18 +27,18 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 - [x] #1 doc-1 records the replacement servo model, gearing and firmware for IDs 4-6 on both arms, from the owner or the part listing
 - [x] #2 All 12 servos answer with error byte 0, plausible temperature, and near-zero present current at rest with torque off, recorded by a read-only scan
 - [x] #3 IDs 4-6 on both arms have homing offsets and Min/Max position limits re-measured and written with an EEPROM backup and read-back, owner-supervised
-- [ ] #4 servo_calibration, soft limits and gripper bands for joints 4-6 are re-measured on hardware and updated in hardware.yaml with their source
+- [x] #4 servo_calibration, soft limits and gripper bands for joints 4-6 are re-measured on hardware and updated in hardware.yaml with their source
 - [x] #5 A supervised small powered move of each of IDs 4-6 on both arms reaches its goal within tolerance, logged
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -95,4 +95,12 @@ AC #4 remainder (2026-11-13): (a) hardware.yaml: right gripper servo_tick_limits
 2026-11-12 AC #4 work (orchestrator): (1) hardware.yaml right gripper servo_tick_limits 1563 -> 1523 (matches the EEPROM read back 2026-11-12; it was stale); left gripper and both arms' joints 4-5 tick limits now cite their measurement. (2) servo_calibration wrist_flex/wrist_roll: source recorded per arm: zeros = mid-range of the 2026-11-09 sweep, AA-47 landmark within +1.4/-2.4 (L) and +1.1/-2.6 (R) deg, kept (owner-approved AA-47 change touched only shoulder_lift); signs +1 from the owner-observed powered moves (2026-11-10 left flex, 2026-11-12 left roll, right flex, right roll). Soft limits 4-5 unchanged: flex +-1.6581 (URDF, inside EEPROM +-1.837), roll +-2.2165 (cell model cap, inside EEPROM +-2.32/2.33). (3) gripper_lock_probe.py for the new servos: slow profile (150 ticks/s, accel 20, candidate torque set before torque on), classifies only settled positions (0.5 s unchanged, else not_settled), logs peak load, torque range 50..500 (EEPROM cap), restores torque limit/speed/accel and switches torque off on exit; 5 new tests. Dry-runs OK both arms; --torque 600 refused. (4) Proposed AA-49 (owner-supervised key-in/no-key lock trials, both arms) to measure the locked band and lock torque; it supersedes AA-41's stale steps. AC #4 stays OPEN until AA-49 data give the locked band (owner approval) and the lock_torque_limit_raw. Not claimed: servo_calibration/soft limits 'unverified' flags unchanged.
 
 2026-11-12 night: OWNER DECISION (gripper lock): the locking piece slips on its screw at either end of its travel (deliberate clutch), so no stall marks the lock; AA-49 left key-in at torque 300 ran to 2166 ticks like no-key 2171 (gripper_lock_probe_new_servos.jsonl). Owner: 'a 45 degree turn should lock it; I can verify that it is indeed locked'. Implemented: GripperBandConfig.lock_mode position + lock_goal_deg (validated inside the locked band); GripperLockSM.lock() in position mode drives at 150 ticks/s, torque 300 to open end + 512 ticks (L 1526->2038, R 1529->2041), LOCKED when within 12 ticks, stopping short -> FAULT + torque off (MISS); hold_tick re-asserts when outside the band; energise_slow()/release(). hardware.yaml: lock_mode position, lock_goal_deg L 179.12 / R 179.38, locked band goal +-25 ticks, lock_torque_limit_raw 300 (was null); unverified stays true until the owner confirms the key locks. 7 tests (test_gripper_empty_moves.py). AA-49 procedure revised to the 45-degree check (5 steps, ~15 min); needs the owner to re-accept. AC #4 still open until AA-49 confirms.
+
+2026-11-13: AA-49 VERIFIED (human_verify). Log calibration_data/gripper_lock_probe_new_servos.jsonl: key-in position-lock trials at torque 300, all LATCHED / in_locked_band / settled: left 3x 2032 + extra 3x 2034 (goal 2038), right 3x 2035 (goal 2041); load 40-60, current 0-1, 32-33 C. Owner confirmed by eye that the key locked every time ('everything is right for all 4 questions'; self-report, by design the only lock check). hardware.yaml gripper_lock arm_left/arm_right: unverified true -> false with source comments (method: position lock + owner visual check). doc-1 records the lock mechanism and the measurement. AC #4 checked: servo_calibration joints 4-5 (zeros = 2026-11-09 sweep mid-range, AA-47 landmark within 1-3 deg; signs from owner-observed powered moves), soft limits 4-5 (from the EEPROM sweep, capped by URDF/cell model) and gripper bands (open ends measured 2026-11-12, locked band AA-49) all re-measured and sourced in hardware.yaml. NOT changed: motion_guard soft-limit and servo_calibration 'unverified' flags (the combined-joint envelope is AA-9's job; the AA-50 replay runs under the owner's per-run waiver). Leftover: the probe log field overtravel_goal_deg is from the key-stop method and is meaningless in position mode. Full suite passes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Servos 4-6 on both arms replaced (STS3215 1/345, fw 3.9) and recalibrated: IDs 4-5 homed at mid-travel with EEPROM limits (backup + read-back), gripper limits measured against travel, wrist zeros/signs and soft limits sourced, gripper open ends re-measured, and the gripper lock redefined (owner decision) as a 45-degree position lock, confirmed by eye in AA-49 on both arms. Evidence: census, EEPROM backups, powered_move_*.jsonl, gripper_ends_2026-11-12.jsonl, gripper_lock_probe_new_servos.jsonl; full test suite passes.
+<!-- SECTION:FINAL_SUMMARY:END -->
