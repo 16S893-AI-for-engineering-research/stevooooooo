@@ -3,11 +3,11 @@ id: AA-40
 title: >-
   Full-system robot model from CAD with model-based collision checking and pose
   viewer
-status: In Progress
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-10-27 14:12'
-updated_date: '2026-11-12 04:23'
+updated_date: '2026-11-12 04:49'
 labels: []
 dependencies: []
 priority: high
@@ -33,12 +33,12 @@ Build a full-system kinematic and geometric model of the as-built robot from CAD
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -85,6 +85,8 @@ Open: AC6 (owner compares rest + fold renders vs the real robot). Render with: c
 2026-11-12 AC6 progress: fold snapshot 21-24-38 (owner 'n the 3rd servo doesn't match'); cause = elbow zero (AA-47 landmark read elbow +5.8 L / +5.4 R). Elbow zero set from the AA-47 zero_landmark ticks (L 2081 -> 182.900 deg, R 2037 -> 179.033 deg; owner approved). Re-rendered the same reading (out/pose_snapshots/fold_2026-11-11T21-41-18.png, elbow 91.4/91.2 deg, no model contacts): owner 2026-11-12 'yes, now it looks correct' (fold). Rest pose comparison still outstanding for AC6 ('at least two poses'). Fold allowance centres and folded_transit re-expressed for the new zero (same ticks). Finding: at the corrected zero the real fold elbow (91.4) sits at the model's lower_arm/shoulder contact (91.7), so the model is not conservative there.
 
 AC6 evidence (2026-11-12): fold reading of 2026-11-11T21-24-38 (calibration_data/pose_snapshots.jsonl; logged owner answer 'n the 3rd servo doesn't match' was BEFORE the elbow zero fix) re-rendered with the landmark elbow zero as out/pose_snapshots/fold_2026-11-11T21-41-18.png (left [0.53, -89.82, 91.41, -90.13, -2.68] deg, right [0.79, -89.3, 91.23, -90.18, -2.81] deg, no model contacts). Owner, 2026-11-12, in session: 'yes, now it looks correct'. AC6 reworded to one pose by owner decision (see comment). motion_guard.collision.mesh.unverified left TRUE pending an explicit owner decision to lift it.
+
+2026-11-12 owner decision: motion_guard.collision.mesh.unverified set FALSE (hardware.yaml) after AC6. Caveat recorded: the model was compared with reality only near the fold; the first supervised slow replay without the tube is the check across the cycle. Remaining live gates unchanged: left/right_arm_limits unverified true (test test_configured_mesh_model_is_verified_but_soft_limits_still_block), AA-43 sign/gripper checks open, dry-run first. The unverified gate itself is still tested on a config marked unverified; live with missing cell-state inputs still refuses (test_dry_run_without_inputs_skips_but_never_live, now also asserts trajectory refusal). Deviations/deferred: margin 2.9 mm (owner, AA-45, revisitable); AC6 reworded to one pose (owner); callers (fold/cycle/approach/jog) still need other-arm/tube/DexArm sources wired, so live motion through them refuses until wired. Full suite passes (cd robot && uv run pytest, exit 0).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -96,3 +98,9 @@ created: 2026-11-12 04:23
 Owner decision 2026-11-12: a second pose comparison is not needed ('we don't need a second pose. that's silly.'). On this robot the rest pose IS the fold (and the printing pose); no separate rest pose exists anywhere in the project. AC #6 reworded accordingly. Original wording: 'The owner compares at least two rendered poses (rest, fold) against the real robot and confirms they match, with the result recorded in task notes'.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Full-system cell model (owner URDF CAD/robot_urdf_new) with python-fcl mesh collision checking wired into MotionGuard (fail closed), pose viewer and pose snapshots. Verified by tests/test_cell_collision.py and the full suite (exit 0), and by the owner's confirmation (2026-11-12) that the fold render matches the real robot after the landmark shoulder_lift and elbow zeros. AC6 reduced to one pose by owner decision. Mesh model marked verified by the owner; live motion still blocked by unverified soft limits, AA-43 and unwired cell-state sources.
+<!-- SECTION:FINAL_SUMMARY:END -->

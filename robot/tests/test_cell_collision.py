@@ -368,8 +368,14 @@ def test_live_without_tube_state_fails_closed(cfg):
 
 
 def test_live_blocked_while_mesh_model_unverified(cfg):
-    assert cfg.motion_guard.collision.mesh.unverified is True
-    g = build_motion_guard(cfg, "left", other_arm_pose_source=lambda: PARK,
+    # 2026-11-12: the configured model is verified (AA-40 #6, owner); the gate
+    # itself is still tested on a config marked unverified.
+    mesh = cfg.motion_guard.collision.mesh.model_copy(update={"unverified": True})
+    coll = cfg.motion_guard.collision.model_copy(update={"mesh": mesh})
+    mg = cfg.motion_guard.model_copy(update={"collision": coll})
+    c2 = cfg.model_copy(update={"motion_guard": mg})
+    assert c2.motion_guard.collision.mesh.unverified is True
+    g = build_motion_guard(c2, "left", other_arm_pose_source=lambda: PARK,
                            tube_source=lambda: None, dexarm_pose_source=lambda: DEX_AWAY)
     with pytest.raises(LiveMotionBlockedError):
         g.mesh.check_pose(np.zeros(5), live=True)
@@ -396,8 +402,19 @@ def test_live_blocked_when_mesh_layer_not_configured(cfg):
 def test_dry_run_without_inputs_skips_but_never_live(cfg):
     g = build_motion_guard(cfg, "left")  # no cell-state sources
     assert g.mesh.check_pose(np.array([0.0, 1.6, 0.0, 0.0, 0.0])) is None  # dry-run: skipped (warned)
+    # Live (model verified since 2026-11-12): missing cell-state inputs are a
+    # refusal (fail closed), never a pass.
+    v = g.mesh.check_pose(np.array([0.0, 1.6, 0.0, 0.0, 0.0]), live=True)
+    assert v is not None and "cell state incomplete" in v
+    assert "other arm pose" in v and "tube state" in v and "DexArm pose" in v
+    v = g.mesh.check_trajectory(np.zeros(5), np.array([0.0, 1.6, 0.0, 0.0, 0.0]), live=True)
+    assert v is not None and "cell state incomplete" in v
+    # And an unverified model still raises before any check.
+    mesh = cfg.motion_guard.collision.mesh.model_copy(update={"unverified": True})
+    mg = cfg.motion_guard.model_copy(update={"collision": cfg.motion_guard.collision.model_copy(update={"mesh": mesh})})
+    g2 = build_motion_guard(cfg.model_copy(update={"motion_guard": mg}), "left")
     with pytest.raises(LiveMotionBlockedError):
-        g.mesh.check_pose(np.array([0.0, 1.6, 0.0, 0.0, 0.0]), live=True)
+        g2.mesh.check_pose(np.array([0.0, 1.6, 0.0, 0.0, 0.0]), live=True)
 
 
 def test_table_is_not_modelled(checker):
@@ -421,3 +438,11 @@ def test_viewer_renders_trajectory_and_reports_contacts(tmp_path):
     assert len(pngs) == 3 and all(p.stat().st_size > 10_000 for p in pngs)
     rc = vp.main(["--presets", "--check-only"])
     assert rc == 1  # pan-zero reading / placeholder named poses are in contact; measured fold is not
+
+
+def test_configured_mesh_model_is_verified_but_soft_limits_still_block(cfg):
+    """2026-11-12 owner: mesh model verified (AA-40 #6). The other live gates stay."""
+    assert cfg.motion_guard.collision.mesh.unverified is False
+    assert cfg.motion_guard.left_arm_limits.unverified is True
+    assert cfg.motion_guard.right_arm_limits.unverified is True
+

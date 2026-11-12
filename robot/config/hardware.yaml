@@ -638,7 +638,11 @@ motion_guard:
       wrist_roll_cell_offset_rad: -2.216568
       # true blocks LIVE motion until the owner compares renders vs the real
       # robot (AA-40 #6). Dry-run still checks.
-      unverified: true
+      # 2026-11-12: set false by the owner after AA-40 #6 (fold render matches with
+      # the landmark lift/elbow zeros). Compared only near the fold; the first
+      # supervised slow replay (no tube) is the check across the cycle. Other live
+      # gates stay: soft limits unverified, AA-43 sign/gripper checks, dry-run first.
+      unverified: false
       # Owner 2026-10-27: "go with the real fold". Owner 2026-11-11 (AA-47, after the
       # shoulder_lift zero correction): the fold is now the one hand-placed on the NEW servos,
       # calibration_data/pose_snapshots.jsonl label fold, 2026-11-11T19-23-05 (owner: only
