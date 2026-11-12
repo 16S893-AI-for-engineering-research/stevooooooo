@@ -14,10 +14,11 @@ Live (owner present, hand on the power switch):
     uv run python scripts/replay_cycle.py --live \\
         --allow-unverified-soft-limits "owner 2026-11-13: AA-50 no-tube replay"
   1. refuses unless all 12 servos are torque-off and drive registers are sane;
-  2. checks the measured pose against frame 0 (3 deg per joint);
+  2. reads the pose; if every joint is within 10 deg of frame 0 and the straight move there
+     is clear in the cell model, the robot makes the final adjustment itself (step 5);
   3. asks you to confirm: no tube, DexArm parked, hands clear;
   4. slow profile on; both grippers lock (45-degree turn; look that they turn);
-  5. small move to frame 0, then the cycle, pausing before each phase
+  5. the final adjustment to frame 0, then the cycle, pausing before each phase
      (--no-pause to run straight through);
   6. at the end the arms are back at the fold: support them, press Enter, torque goes off.
   Abort any time: Ctrl-C or `touch /tmp/inchworm_stop_move`. The arms then HOLD in
@@ -170,11 +171,21 @@ def live(cfg, frames, a) -> int:
         grip = {arm: round(buses[arm].read_position_deg(6) * 4096 / 360) for arm in cr.ARMS}
         measured = {arm: ticks_to_q(cfg, arm, ticks[arm]) for arm in cr.ARMS}
         res = compare_start_pose(measured, {arm: list(frames[0].q[arm]) for arm in cr.ARMS})
-        print(res.summary())
+        from inchworm.motion_guard import build_mesh_collision_guard
+        mesh = build_mesh_collision_guard(cfg, "left")
+        appr = cr.approach_problems(cfg, measured, frames[0], None if mesh is None else mesh.checker)
         log({"event": "start", "ticks": ticks, "gripper_ticks": grip, "speed": a.speed,
-             "soft_limits_override": a.allow_unverified_soft_limits, "start_pose_ok": res.ok})
-        if not res.ok:
-            print("REFUSED: the arms are not at the plan's start pose (move them by hand, torque off)"); return 6
+             "soft_limits_override": a.allow_unverified_soft_limits,
+             "diff_to_start_deg": res.diff_deg, "approach_problems": appr})
+        if appr:
+            print("REFUSED: the robot will not adjust to the start pose from here:")
+            for p in appr:
+                print("  " + p)
+            return 6
+        print(f"Start pose: the robot will make the final adjustment itself (each joint within "
+              f"{cr.APPROACH_MAX_DEG:.0f} deg; move checked against the cell model). Degrees to move:")
+        for arm in cr.ARMS:
+            print(f"  {arm:5}: " + "  ".join(f"{j} {-d:+.1f}" for j, d in zip(cr.JOINTS, res.diff_deg[arm])))
 
         print("\nCONFIRM before anything moves:\n  - NO tube in the grippers or the cell\n"
               "  - DexArm parked where it is now and powered as usual\n  - hands and cables clear of both arms\n"
@@ -190,7 +201,7 @@ def live(cfg, frames, a) -> int:
             r.energise()
             print("locking both grippers (45-degree turn) ...")
             r.lock_both()
-            print("moving to frame 0 ...")
+            print("final adjustment to the start pose ...")
             r.move_to_start()
             r.run()
             log({"event": "done"})

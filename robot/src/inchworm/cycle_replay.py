@@ -194,6 +194,52 @@ def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SA
     return problems
 
 
+#: Owner request 2026-11-13: when the hand-placed arms are CLOSE to the start pose, the
+#: robot makes the final adjustment itself (guard- and collision-checked) instead of the
+#: owner placing them exactly. Further than this on any joint = refuse (not "close").
+#: UNVERIFIED placeholder; the measured fold is 3.5 deg off on the elbows.
+APPROACH_MAX_DEG = 10.0
+
+
+def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, checker,
+                      max_deg: float = APPROACH_MAX_DEG, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
+    """Check the automatic final adjustment from the measured pose to frame 0.
+
+    Refuses when any joint is more than ``max_deg`` away, or when the straight-line move
+    (both arms together, no tube) touches anything in the cell model. Fails closed.
+    """
+    from inchworm.system_model.collision import CellState
+
+    problems: List[str] = []
+    q0 = {}
+    for a in ARMS:
+        m = measured.get(a)
+        if m is None or len(m) != 5 or not all(math.isfinite(float(v)) for v in m):
+            problems.append(f"{a}: no valid measured pose")
+            continue
+        q0[a] = np.asarray(m, dtype=np.float64)
+        for j, d in zip(JOINTS, np.degrees(frame0.q[a] - q0[a])):
+            if abs(d) > max_deg:
+                problems.append(f"{a} {j}: {d:+.1f} deg to the start pose (more than {max_deg:.0f}; "
+                                f"place the arm closer by hand)")
+    if problems:
+        return problems
+    if checker is None:
+        return ["mesh collision model unavailable"]
+    for k in range(samples + 1):
+        t = k / samples
+        ql = (1 - t) * q0["left"] + t * frame0.q["left"]
+        qr = (1 - t) * q0["right"] + t * frame0.q["right"]
+        try:
+            hits = [c for a in ARMS for c in checker.check(
+                CellState(left_q=ql, right_q=qr, dexarm_q={}, tube_advance_m=None), arm=a)]
+        except Exception as exc:  # noqa: BLE001 - fail closed
+            return [f"adjustment move: collision check failed: {exc}"]
+        if hits:
+            return [f"adjustment move (t={t:.2f}): {hits[0]}"]
+    return []
+
+
 def summary(frames: Sequence[Frame], vmax_ticks_s: int) -> str:
     ev = gripper_events(frames)
     total = 0.0
@@ -351,7 +397,7 @@ class ReplayRunner:
         return {a: np.asarray(ticks_to_q(self.cfg, a, self._ticks(a))) for a in ARMS}
 
     def move_to_start(self):
-        """Small correction from the measured pose to frame 0 (after the start-pose check)."""
+        """Final adjustment from the measured pose to frame 0 (after :func:`approach_problems`)."""
         start = Frame(-1, "measured start", self.present_q(), dict(self.frames[0].locked))
         self._move(start, self.frames[0])
 

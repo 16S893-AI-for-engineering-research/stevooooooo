@@ -1,0 +1,1 @@
+{"utc": "2026-11-12T22:19:52Z", "event": "start", "ticks": {"left": [1979, 1402, 3121, 1014, 2002], "right": [2075, 1455, 3075, 970, 2017]}, "gripper_ticks": {"left": 1567, "right": 1556}, "speed": 150, "soft_limits_override": "owner 2026-11-13: AA-50 no-tube replay", "start_pose_ok": false}

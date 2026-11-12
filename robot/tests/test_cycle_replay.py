@@ -151,3 +151,38 @@ def test_stop_request_aborts_then_hold_and_release():
         assert not any(b.torque[s] for b in buses.values() for s in range(1, 7))   # released
     finally:
         logging.disable(logging.NOTSET)
+
+
+class _Checker:
+    def __init__(self, hit=False):
+        self.hit = hit
+
+    def check(self, state, arm):
+        return ["left_wrist vs chassis"] if self.hit else []
+
+
+def test_approach_adjusts_when_close_refuses_when_far_or_colliding():
+    cfg = load_config()
+    f0 = _short_plan(cfg)[0]
+    near = {a: f0.q[a] + np.radians([0.5, -0.3, 3.5, 0.0, -2.7]) for a in cr.ARMS}   # the measured fold offsets
+    assert cr.approach_problems(cfg, near, f0, _Checker()) == []
+    far = {a: f0.q[a] + np.radians([0, 0, 12.0, 0, 0]) for a in cr.ARMS}
+    p = cr.approach_problems(cfg, far, f0, _Checker())
+    assert p and "elbow_flex" in p[0] and "closer by hand" in p[0]
+    assert cr.approach_problems(cfg, near, f0, _Checker(hit=True))
+    assert cr.approach_problems(cfg, near, f0, None) == ["mesh collision model unavailable"]
+    assert cr.approach_problems(cfg, {"left": near["left"]}, f0, _Checker())       # missing arm
+
+
+def test_real_fold_is_close_enough_to_adjust():
+    """The last measured fold (2026-11-11) passes the approach check on the real timeline."""
+    from inchworm.motion_guard import build_mesh_collision_guard
+    from inchworm.so101_pose_reader import ticks_to_q
+    cfg = load_config()
+    path = pathlib.Path(__file__).parents[1] / "out" / "inchworm" / "timeline.jsonl"
+    if not path.exists():
+        pytest.skip("no planned timeline")
+    fr, _ = cr.clamp_to_eeprom(cfg, cr.load_timeline(path)[:1])
+    ticks = {"left": [1978, 1423, 3121, 1003, 2031], "right": [2072, 1493, 3075, 968, 2023]}
+    m = {a: ticks_to_q(cfg, a, ticks[a]) for a in cr.ARMS}
+    assert cr.approach_problems(cfg, m, fr[0], build_mesh_collision_guard(cfg, "left").checker) == []
