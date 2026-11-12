@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 15:44'
+updated_date: '2026-11-12 17:05'
 labels:
   - hardware
 dependencies: []
@@ -75,4 +75,14 @@ Gripper ends (owner approved 2026-11-12): 1. GripperLockSM.close_empty(tube_atta
 2026-11-12 AA-48 step 8 (owner supervising): left gripper opened via GripperLockSM.reset() from 2516 to 1569 ticks (goal 1558, unlocked band 1506-1610, EEPROM 1521..2531), REACHED, load 92, 32 C; owner confirmed it opened fully as expected. Torque off, read back 1566. Owner asked how to return it to the closed rest (2516): no AA-17 state-machine transition closes an empty gripper (lock() without a key goes to the overtravel goal and ends in FAULT), and the servo cannot be back-driven by hand. Options put to the owner.
 
 2026-11-12 AA-48 step 9 (owner supervising): right gripper opened via reset() 2494 -> 1604 ticks (goal 1594 = middle of the unlocked band 1551-1636; EEPROM min 1563), REACHED (tol 12), load 76, 31 C; torque off, reads 1601. Owner: 'it should have traveled slightly farther'. Explanation given: reset() aims for the middle of the open band, not the open stop; the assumed open tick 1576 (old servo) and the EEPROM min 1563 are both beyond it. The true open end on the new servos is still unmeasured (AC #3/#4 open). No change made.
+
+2026-11-12: close_empty/measure_end + scripts/gripper_ends.py committed (4bf9e31, 6a8e6c8). 14 tests in tests/test_gripper_empty_moves.py (sim servo: close reaches closed_empty, obstruction -> FAULT + torque off, tube/state/config refusals, abort, read failure -> FAULT + torque off, RAM settings restored, ends reach or stop short). Dry-runs of all 4 actions on both arms OK; refuses without --no-tube. Full suite passes. Note: 4bf9e31 was pushed with the script smoke test failing (gripper_ends.py needs args); fixed in 6a8e6c8. Torque off on both arms (read back). Next: owner-supervised live session.
+
+2026-11-12 gripper_ends LEFT (owner supervising, robot/calibration_data/gripper_ends_2026-11-12.jsonl), owner: all worked correctly. open-end: 1566 -> 1526 (EEPROM min 1521, not short, load 88). open: -> 1547 (goal 1558). close_empty: 1550 -> 2519 (goal 2521, CLOSED_EMPTY), peak load 300 = the torque cap during travel. closed-end: 2519 -> 2527 (EEPROM max 2531, not short, load 56). 32 C. Torque off on all 12 afterwards (read back); left gripper now closed at 2527. Next: same four on the right arm.
+
+2026-11-12 gripper_ends RIGHT (owner supervising): every open-end run (4x, from 1601/2499/2501/1586) settled at 1568 = EEPROM min 1563 + 5 (servo limit, not a hard stop); close_empty 1587 -> 2491 (goal 2494), closed-end -> 2499/2501 (max 2504). Peak load 300 (the cap) on one closed-end and one open-end run (full-travel runs), else 60-76. Owner: 'it can still open up slightly more' -> the right open end is set by the EEPROM Min_Position_Limit 1563, not by the mechanism. Torque off on all 12 (read back); right gripper now OPEN at 1568 (owner's last run was open-end). Proposed to the owner: lower right Min_Position_Limit (EEPROM, home_servos.py limits, backup + read-back), then re-measure. Left open end 1526 vs EEPROM 1521: owner reported correct.
+
+2026-11-12 (owner approved): right ID 6 Min_Position_Limit 1563 -> 1523 (max 2504 unchanged) via home_servos.py limits --live; backup calibration_data/eeprom_backup_right_2026-11-12T11-59-02_pre_limits.json; read back [1523, 2504]; nothing else changed. Next: owner re-runs open-end on the right.
+
+2026-11-12 right open-end after the limit change: 2497 -> 1529 (EEPROM min 1523, not short), peak load 300 (full travel), 31 C; owner: 'looks fully open'. Torque off. Measured gripper ends on the new servos: LEFT open 1526 (limit 1521), close_empty settles 2519, closed limit reached 2527 (limit 2531). RIGHT open 1529 (limit 1523), close_empty 2491, closed limit reached 2499-2501 (limit 2504). Config impact: right unlocked band 1551..1636 no longer contains the measured open end 1529; left band 1506..1610 does. Locked band (key) not re-measurable without the tube attachment (AA-41).
 <!-- SECTION:NOTES:END -->
