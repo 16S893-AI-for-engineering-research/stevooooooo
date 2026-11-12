@@ -3,11 +3,11 @@ id: AA-48
 title: >-
   AA-43: direction checks (read-only) then first supervised powered moves of IDs
   4-6, both arms
-status: In Progress
+status: Done
 assignee:
   - '@human'
 created_date: '2026-11-12 04:57'
-updated_date: '2026-11-12 18:07'
+updated_date: '2026-11-12 18:12'
 labels:
   - human-action
   - human-key-595ee182162ed361
@@ -164,7 +164,7 @@ Preparation: Robot powered (12 V on both arms), USB attached as now (/dev/ttyACM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Logged in robot/calibration_data/direction_check_2026-11-12.jsonl: right wrist_flex (with model y/n) and both wrist_roll directions. Logged in robot/calibration_data/powered_move_2026-11-12.jsonl: REACHED/NOT results for left wrist_roll, right wrist_flex, right wrist_roll, left gripper open, right gripper open, plus the owner's note of what each joint visibly did.
+- [x] #1 Logged in robot/calibration_data/direction_check_2026-11-12.jsonl: right wrist_flex (with model y/n) and both wrist_roll directions. Logged in robot/calibration_data/powered_move_2026-11-12.jsonl: REACHED/NOT results for left wrist_roll, right wrist_flex, right wrist_roll, left gripper open, right gripper open, plus the owner's note of what each joint visibly did.
 <!-- AC:END -->
 
 ## Definition of Done
@@ -191,7 +191,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "595ee182162ed361548b4fcb983e238fa012e84b5ec696681dc3ca23a3cf3cf0",
-  "phase": "ready",
+  "phase": "verified",
   "createdAt": "2026-11-12T04:57:31.029Z",
   "origin": "01a1cd6c-8447-706e-9869-03dd3b2da7aa",
   "step": 10,
@@ -311,8 +311,16 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
   "acceptedHash": "39f25bef180ebeba23a4a905c0598fee521c23e5bf68f7a1b513177df0963b53",
   "acceptedAt": "2026-11-12T04:59:43.684Z",
   "summary": "none",
-  "completedAt": "2026-11-12T18:07:02.053Z"
+  "completedAt": "2026-11-12T18:07:02.053Z",
+  "verifiedAt": "2026-11-12T18:12:57.812Z",
+  "verification": "Re-read both logs 2026-11-12. powered_move_2026-11-12.jsonl (14 records): every powered move REACHED. Wrists: left wrist_roll out/back err -5/+4 and rerun -4/+5; right wrist_flex -6/+5 and rerun -6/+5; right wrist_roll 2 runs -4/+5, -6/+5, all within the 6-tick tolerance. Grippers: left 2516->1569 (goal 1558), right 2494->1604 (goal 1594), both within the 12-tick gripper tolerance and inside the open band. No STALLED or TIMEOUT. direction_check_2026-11-12.jsonl: valid owner hand readings MATCH for right wrist_flex (-209, model tip y), right wrist_roll (-348) and left wrist_roll (-291). The earlier NO_MOVEMENT and +441 lines were practice runs, which the owner dismissed. Owner observations made live during steps 5-9 and recorded in AA-43 notes at the time: all three powered-move directions as predicted, which resolves the +441 conflict in favour of the doc-1 convention; left gripper opened fully; right gripper 'should have traveled slightly farther'. The last point was later explained and fixed: the EEPROM min was lowered to 1523 and the owner confirmed the right gripper fully open at 1529 (gripper_ends_2026-11-12.jsonl). The earlier servo 5 0x2A read timeout was diagnosed (the bus is healthy) and fixed with one retry, torque OFF on failure (commit cb8ecc3, tests). The left wrist_flex was verified 2026-11-10 and was not repeated, as planned. Bus read now: torque off on all 12 servos. Left present [1979,1402,3121,1014,2004,2526], right [2074,1456,3075,970,2016,2499]. Residual: the walkthrough tab recorded steps 5-9 from logs because they ran in the main session; the owner's observations exist only as the orchestrator's notes of what the owner said. The firmware question (AA-42 re-flash) was declined by the owner and is separate from this procedure."
 }
 ```
 <!-- /human-handoff-state -->
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Re-read both logs 2026-11-12. powered_move_2026-11-12.jsonl (14 records): every powered move REACHED. Wrists: left wrist_roll out/back err -5/+4 and rerun -4/+5; right wrist_flex -6/+5 and rerun -6/+5; right wrist_roll 2 runs -4/+5, -6/+5, all within the 6-tick tolerance. Grippers: left 2516->1569 (goal 1558), right 2494->1604 (goal 1594), both within the 12-tick gripper tolerance and inside the open band. No STALLED or TIMEOUT. direction_check_2026-11-12.jsonl: valid owner hand readings MATCH for right wrist_flex (-209, model tip y), right wrist_roll (-348) and left wrist_roll (-291). The earlier NO_MOVEMENT and +441 lines were practice runs, which the owner dismissed. Owner observations made live during steps 5-9 and recorded in AA-43 notes at the time: all three powered-move directions as predicted, which resolves the +441 conflict in favour of the doc-1 convention; left gripper opened fully; right gripper 'should have traveled slightly farther'. The last point was later explained and fixed: the EEPROM min was lowered to 1523 and the owner confirmed the right gripper fully open at 1529 (gripper_ends_2026-11-12.jsonl). The earlier servo 5 0x2A read timeout was diagnosed (the bus is healthy) and fixed with one retry, torque OFF on failure (commit cb8ecc3, tests). The left wrist_flex was verified 2026-11-10 and was not repeated, as planned. Bus read now: torque off on all 12 servos. Left present [1979,1402,3121,1014,2004,2526], right [2074,1456,3075,970,2016,2499]. Residual: the walkthrough tab recorded steps 5-9 from logs because they ran in the main session; the owner's observations exist only as the orchestrator's notes of what the owner said. The firmware question (AA-42 re-flash) was declined by the owner and is separate from this procedure.
+<!-- SECTION:FINAL_SUMMARY:END -->

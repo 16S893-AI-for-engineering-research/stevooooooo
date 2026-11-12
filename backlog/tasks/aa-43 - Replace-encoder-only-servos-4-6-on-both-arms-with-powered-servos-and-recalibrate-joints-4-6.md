@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 17:42'
+updated_date: '2026-11-12 18:13'
 labels:
   - hardware
 dependencies: []
@@ -87,4 +87,6 @@ Gripper ends (owner approved 2026-11-12): 1. GripperLockSM.close_empty(tube_atta
 2026-11-12 right open-end after the limit change: 2497 -> 1529 (EEPROM min 1523, not short), peak load 300 (full travel), 31 C; owner: 'looks fully open'. Torque off. Measured gripper ends on the new servos: LEFT open 1526 (limit 1521), close_empty settles 2519, closed limit reached 2527 (limit 2531). RIGHT open 1529 (limit 1523), close_empty 2491, closed limit reached 2499-2501 (limit 2504). Config impact: right unlocked band 1551..1636 no longer contains the measured open end 1529; left band 1506..1610 does. Locked band (key) not re-measurable without the tube attachment (AA-41).
 
 2026-11-12 (owner approved): hardware.yaml right gripper unlocked/engaged band 1551..1636 -> 1504..1589 ticks (132.19..139.66 deg) from the measured open end 1529 (same rule [open-25, open+60]); closed_empty kept (L 2521 / R 2494, closes settled within 2-3 ticks); left unchanged (open 1526 within 1506..1610); unverified stays true (locked band and lock torque need the key, AA-41). Suite passes. AC #5 checked: supervised small powered moves logged and REACHED for every ID 4-6 on both arms: left wrist_flex (powered_move_2026-11-09.jsonl), left wrist_roll, right wrist_flex, right wrist_roll, left and right gripper (powered_move_2026-11-12.jsonl, gripper_ends_2026-11-12.jsonl); owner confirmed directions. AC #3 checked (owner approved): IDs 4-5 homed and limits written with backup/read-back 2026-11-09; ID 6 closed stop homed 2026-11-09, limits measured against travel 2026-11-12 (both ends reach the limits; owner confirmed fully open/closed), right min re-written 1523 with backup + read-back. AC #4 stays open: gripper locked band (AA-41) and the wrist zero/servo_calibration pending (servo_calibration.unverified, fold re-measure).
+
+2026-11-12: AA-48 human handoff VERIFIED (human_verify), from both logs plus the owner observations recorded live in these notes during steps 5-9; the walkthrough tab recorded steps 5-9 from logs (they ran in the main session). Extra record in gripper_ends_2026-11-12.jsonl at 18:02:44Z: owner ran right closed-end from 1529 -> 2499 (limit 2504, not short, load 72). State now: torque off on all 12; both grippers closed (L 2526, R 2499).
 <!-- SECTION:NOTES:END -->

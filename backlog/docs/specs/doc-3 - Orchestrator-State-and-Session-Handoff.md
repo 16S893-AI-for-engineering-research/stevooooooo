@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 18:05'
+updated_date: '2026-11-12 18:13'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-12 (evening). AA-43: AC 1,2,3,5 checked, #4 open. Gripper ends measured; close_empty added. AA-48 walkthrough to be finished by the owner. AA-45 DONE (owner confirmed the final GIF). Suite passes.
+**Last verified:** 2026-11-12 (evening). AA-43: AC 1,2,3,5 checked, #4 open. Gripper ends measured; close_empty added. AA-48 handoff VERIFIED. AA-45 DONE (owner confirmed the final GIF). Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -25,7 +25,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)
-- **2026-11-12 AA-48 steps 5-9 done + gripper ends:** all powered moves of IDs 4-6 on both arms REACHED; owner confirmed every direction (doc-1 convention holds for both wrist_rolls and the right wrist_flex). New `GripperLockSM.close_empty` / `measure_end` + `scripts/gripper_ends.py`. Gripper ends measured (doc-1). Right gripper Min_Position_Limit 1563 -> 1523 (EEPROM, backup + read-back) and right open band -> 1504..1589 ticks (owner approved). **AA-43 AC #3, #5 checked; #4 open** (gripper locked band needs the key = AA-41; servo_calibration.unverified and the fold re-measure). AA-48 handoff: the walkthrough record stops at step 4 because steps 4-9 ran in the main session; owner to finish it in the walkthrough tab (`/human open`), then human_verify. State now: torque off on all 12; left gripper closed (2527), right gripper open (1529).
+- **2026-11-12 AA-48 steps 5-9 done + gripper ends:** all powered moves of IDs 4-6 on both arms REACHED; owner confirmed every direction (doc-1 convention holds for both wrist_rolls and the right wrist_flex). New `GripperLockSM.close_empty` / `measure_end` + `scripts/gripper_ends.py`. Gripper ends measured (doc-1). Right gripper Min_Position_Limit 1563 -> 1523 (EEPROM, backup + read-back) and right open band -> 1504..1589 ticks (owner approved). **AA-43 AC #3, #5 checked; #4 open** (gripper locked band needs the key = AA-41; servo_calibration.unverified and the fold re-measure). AA-48 handoff verified 2026-11-12. State now: torque off on all 12; both grippers closed (L 2526, R 2499).
 - **2026-11-12 AA-48 step 5 aborted, cause found:** left wrist_roll powered move hit a ServoTimeoutError on the goal read-back (reg 0x2A) in `set_torque_enable`. Read-only bus check: 300/300 reads per left servo, no timeouts. Supervised probe (`scripts/autoenable_probe.py`): the goal write itself sets Torque_Enable=1 (no motion, goal == present). Fix: one retry of the read-back on a timeout; torque OFF on any failure after the goal write (tests). Torque off on both arms, read back. **Next:** owner reruns AA-48 step 5 (left wrist_roll), then steps 6-9.
 - Done: IDs assigned by the owner with `lerobot-setup-motors`; read-only census `robot/calibration_data/servo_census_2026-11-08T20-15-27.json` (12/12 at IDs 1-6, fw 3.9, error 0, current 0). AC #1, #2 checked.
 - **Owner answers (2026-11-09):** IDs 1-3 on both arms are UNCHANGED (keep their 2026-10-25 offsets/limits and hardware.yaml calibration). Gripper caps are to be re-applied (done).
