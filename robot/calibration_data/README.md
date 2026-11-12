@@ -135,3 +135,16 @@ Soft limits: about -113..+121 deg around the landmark zero, clipped to the URDF 
 (the tighter bound applies). Combined-joint safety relies on the AA-40 collision model.
 Caveat: the recorder kept only the overall min/max, so end-stop repeatability across
 passes was not recorded.
+
+## Shoulder_lift zero from a URDF-zero landmark, 2026-11-11 (AA-47, owner, read-only)
+
+`poses_2026-11-11.jsonl`: each arm was hand-placed (by eye) in the URDF zero pose
+(`scripts/view_zero_pose.py` renders). Line 2 (left, 00:06:52Z) is a spurious re-read of the
+resting arm; exclude it. Valid: left ticks [1968, 2445, 2081, 2044, 2034], right
+[2083, 2509, 2037, 2006, 2025]. Shoulder_lift landmark zero: left 214.89, right 220.52 servo deg
+(the midpoint zeros were 186.99 / 187.12). The other joints lie within 1-6 deg of their zeros.
+`joint_ranges_{left,right}_lift_2026-11-11.json`: shoulder_lift swept to both stops (fold side =
+lower arm on the shoulder bracket, other side = hard stop): left 1224..3651, right 1291..3717,
+repeating the earlier sweep within 4 ticks. Around the landmark zero these are -107.3/+106.0 and
+-107.1/+106.2 deg. Pan and elbow also moved during the sweep.
+`pose_snapshots.jsonl`: fold snapshots. Owner, at 19-23-05: "shoulder lift wrong, everything else good".

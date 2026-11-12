@@ -2,10 +2,9 @@
 id: AA-46
 title: 'Re-measure shoulder_lift travel (both arms) and take pose snapshots, read-only'
 status: In Progress
-assignee:
-  - '@human'
+assignee: []
 created_date: '2026-11-11 23:06'
-updated_date: '2026-11-11 23:53'
+updated_date: '2026-11-11 23:58'
 labels:
   - human-action
   - human-key-b9a975d02991ba9c
@@ -149,10 +148,10 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "b9a975d02991ba9c472ec76332a48349ccdd36d56798f7edd84131943363f2f2",
-  "phase": "active",
+  "phase": "declined",
   "createdAt": "2026-11-11T23:06:14.558Z",
   "origin": "01a1cb2b-5f23-70da-906d-dcbf45d889dd",
-  "step": 2,
+  "step": 3,
   "evidence": [
     {
       "step": 1,
@@ -185,6 +184,22 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "Owner verbal reply in conversation: \"just mark the limits and lets move on\"; measured values from calibration_data/joint_ranges_left_lift_2026-11-11.json",
       "advanced": true,
       "at": "2026-11-11T23:53:09.414Z"
+    },
+    {
+      "step": 3,
+      "note": "Step 3 JSON checks pass. The agent read calibration_data/joint_ranges_right_lift_2026-11-11.json (recorded 2026-11-11T23:54:26Z, 469 samples per joint vs 827 on the left 90 s run, so the run probably ended early, e.g. via the stop file). shoulder_lift (servo 2): start 1490, min_ticks 1295 (113.82 servo deg), max_ticks 3719 (326.87 servo deg), span 213.05 deg, wrapped false, crosses_seam false. KEY RESULT: min 1295 is ~203 ticks (~17.8 deg) short of the ~1092 printing-pose target, and 12 ticks SHORT of the existing right soft limit 1283, so the sweep did not even reach the current limit. DEVIATION: as on the left, other joints moved: shoulder_pan 77.6 deg (2045-2928), elbow_flex 139.2 deg (1494-3078). Wrist and gripper did not move. Not advanced: the step's verification also requires a note on what stopped the arm on the fold side. The owner replied \"okay saved. move onto next\" without one. Asked once for a one-word cause, or an explicit skip.",
+      "type": "automated",
+      "reference": "read of /home/stevotimp/893/robot/calibration_data/joint_ranges_right_lift_2026-11-11.json; owner reply \"okay saved. move onto next\"",
+      "advanced": false,
+      "at": "2026-11-11T23:54:54.683Z"
+    },
+    {
+      "step": 3,
+      "note": "Step 3 completed WITH DEVIATION. JSON checks passed, as recorded earlier: right shoulder_lift min_ticks 1295, max 3719, wrapped false. When asked for the cause of the fold-side stop, the owner said \"move onto step 4\", taken as an explicit skip. So the cause of the right fold-side stop is NOT RECORDED, the same as the left (step 2). Neither arm's 'what physically stops it' note, which the outcome requires, was given. The orchestrator should not treat 1224 (left) or 1295 (right) as confirmed mechanical stops: they may be where the hand stopped. Right 1295 is short of even the current soft limit of 1283, which supports that. Advanced at the owner's request. No limit writes.",
+      "type": "self-reported",
+      "reference": "Owner verbal reply in conversation: \"move onto step 4\"; values from calibration_data/joint_ranges_right_lift_2026-11-11.json",
+      "advanced": true,
+      "at": "2026-11-11T23:55:46.220Z"
     }
   ],
   "history": [
@@ -196,6 +211,11 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
     {
       "action": "accept",
       "at": "2026-11-11T23:21:27.470Z",
+      "hash": "0005f8fe8b04757dbc3305d98e2aa6c30aa8ec4d799c7814a3012bf3f7bd136a"
+    },
+    {
+      "action": "decline",
+      "at": "2026-11-11T23:58:54.506Z",
       "hash": "0005f8fe8b04757dbc3305d98e2aa6c30aa8ec4d799c7814a3012bf3f7bd136a"
     }
   ],

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-11 23:54'
+updated_date: '2026-11-12 00:36'
 labels:
   - simulation
   - verification
@@ -71,4 +71,6 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 2026-11-11 owner decision on the shoulder_lift soft-limit conflict: option (b), re-measure the shoulder_lift travel (not raise the printing pose). Human procedure proposed as AA-46 (read-only sweep of shoulder_lift both arms + fold/start pose snapshots). Needed: about tick 1092 (left) / 1094 (right) for -91 deg; current EEPROM min 1216 / 1283.
 
 2026-11-11 owner: the animation poses look physically feasible; suspects wrong zeros. Agreed and evidence supports it: zeros for shoulder_lift/elbow_flex/wrist_flex/wrist_roll are sweep midpoints, never landmark-checked (only the pan has a landmark). The hand-posed real fold puts the model lower_arm inside the shoulder (0.0 mm, for every lift from -60 to -100 deg), and the shoulder sweep spans 142-153 deg vs the URDF's 200. So the soft-limit 'violations' are probably a zero offset, not a reach problem. AA-47 is proposed (supersedes AA-46): hand-place each arm at the URDF zero (out/zero_{left,right}.png), read ticks, then the lift sweep and a fold snapshot. Do not widen limits until the zeros are corrected.
+
+2026-11-11 AA-47 verified (orchestrator). The shoulder_lift zero was wrong; the other joints are fine. Landmark zeros, read with each arm hand-placed at the URDF zero: left 214.89 / right 220.52 servo deg (old midpoint 186.99 / 187.12, so +27.9 / +33.4). Elbow, wrist flex, roll and pan are within 1-6 deg. Cross-check: with the new zero, the swept stops (bracket on the fold side, hard stop on the other) are -107.3/+106.0 (L) and -107.1/+106.2 (R), symmetric and matching between arms; the old zero gave -79/+134 and -74/+140. So the printing pose's shoulder_lift of -91 deg is reachable; the soft-limit 'violations' were the zero error. Fold re-rendered with the corrected zero: out/pose_snapshots/fold_corrected_lift.png. Remaining model contact: lower_arm-shoulder only with the elbow at its ~97 deg URDF end stop. NOT applied yet; awaiting owner approval. The plan: (1) shoulder_lift_zero_offset_deg L 214.89 / R 220.52; (2) recompute the lift soft limits from the EEPROM ticks in the new frame (EEPROM lower already beyond -91; EEPROM upper becomes +48.8 L / +37.4 R, leave it unless the owner wants a widen write); (3) re-derive the stored rad poses (folded_transit, fold waypoints, fold_allowance centres) from their raw ticks; (4) re-plan + tests.
 <!-- SECTION:NOTES:END -->
