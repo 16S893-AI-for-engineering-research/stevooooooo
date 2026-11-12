@@ -101,3 +101,53 @@ def test_obstruction_aborts():
             sim.simulate(cfg, plan, stall={"left": {2: (start + lift) // 2}})
     finally:
         logging.disable(logging.NOTSET)
+
+
+def test_soft_limit_waiver_lifts_only_the_unverified_gate():
+    from inchworm.motion_guard import LiveMotionBlockedError, build_joint_limit_guard
+    cfg = load_config()
+    assert cfg.motion_guard.left_arm_limits.unverified        # premise of the waiver
+    g = build_joint_limit_guard(cfg, "left")
+    with pytest.raises(LiveMotionBlockedError):
+        g.check([0.0, 0.0, 0.0, 0.0, 0.0], live=True)
+    w = build_joint_limit_guard(cfg, "left", unverified_live_override="owner test")
+    assert w.check([0.0, 0.0, 0.0, 0.0, 0.0], live=True) is None
+    hi = cfg.motion_guard.left_arm_limits.wrist_flex_upper_rad
+    assert w.check([0.0, 0.0, 0.0, hi + 0.01, 0.0], live=True) is not None   # values still enforced
+
+
+def test_cli_live_refused_without_owner_waiver(capsys):
+    _s2 = importlib.util.spec_from_file_location(
+        "replay_cycle", pathlib.Path(__file__).parents[1] / "scripts" / "replay_cycle.py")
+    m = importlib.util.module_from_spec(_s2); _s2.loader.exec_module(m)
+    assert m.main(["--live"]) == 2
+    assert "allow-unverified-soft-limits" in capsys.readouterr().out
+    assert m.main(["--speed", "1000"]) == 2
+
+
+def test_stop_request_aborts_then_hold_and_release():
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        clock = sim.SimClock()
+        buses = {a: sim.SimArmBus(a, cr.q_to_ticks(cfg, a, plan[0].q[a]) + [2500], clock) for a in cr.ARMS}
+        stop = {"armed": False, "n": 0}
+
+        def should_abort():
+            if stop["armed"]:
+                stop["n"] += 1
+            return stop["n"] > 5           # a few polls into the first move
+
+        r = cr.build_runner(cfg, plan, buses, live=True, soft_limits_override="test",
+                            clock=clock, sleep=clock.sleep, should_abort=should_abort)
+        r.energise(); r.lock_both()
+        stop["armed"] = True
+        with pytest.raises(cr.ReplayAborted, match="stop requested"):
+            r.run()
+        assert all(v is None for v in r.hold().values())
+        assert all(b.torque[s] for b in buses.values() for s in range(1, 6))       # held
+        assert not any(v for v in r.release().values())
+        assert not any(b.torque[s] for b in buses.values() for s in range(1, 7))   # released
+    finally:
+        logging.disable(logging.NOTSET)

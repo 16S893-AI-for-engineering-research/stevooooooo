@@ -71,6 +71,9 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     # printing pose has violations; its behaviour is covered by
     # tests/test_inchworm_plan.py.
     "inchworm_animation.py": ["--help"],
+    # replay_cycle.py dry-run runs a ~1.5 min preflight plus a full simulated cycle
+    # (covered by tests/test_cycle_replay.py); smoke-test --help.
+    "replay_cycle.py": ["--help"],
 }
 
 #: Scripts that need special arguments to reach a clean dry-run exit.

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-11-12 21:02'
-updated_date: '2026-11-12 21:02'
+updated_date: '2026-11-12 21:47'
 labels:
   - hardware
 dependencies:
@@ -26,10 +26,10 @@ Owner request 2026-11-12: a full movement test of both arms, running the whole i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A replay script plays out/inchworm/timeline.jsonl through GuardedArm (arms) and GripperLockSM (grippers), dry-run by default, with a stop file, hold-on-abort and torque release at the end
-- [ ] #2 An offline preflight checks every frame-to-frame move with both arms together against the cell mesh model with no tube, the soft limits and the EEPROM tick limits, and refuses on any problem; it passes on the current timeline
-- [ ] #3 A simulated-servo run of the full cycle passes and is covered by tests (gripper unlock/lock order, speed never full, obstruction aborts)
-- [ ] #4 The owner approves clearing the soft-limit live gate for this no-tube replay, recorded with its scope
+- [x] #1 A replay script plays out/inchworm/timeline.jsonl through GuardedArm (arms) and GripperLockSM (grippers), dry-run by default, with a stop file, hold-on-abort and torque release at the end
+- [x] #2 An offline preflight checks every frame-to-frame move with both arms together against the cell mesh model with no tube, the soft limits and the EEPROM tick limits, and refuses on any problem; it passes on the current timeline
+- [x] #3 A simulated-servo run of the full cycle passes and is covered by tests (gripper unlock/lock order, speed never full, obstruction aborts)
+- [x] #4 The owner approves clearing the soft-limit live gate for this no-tube replay, recorded with its scope
 - [ ] #5 A supervised live replay of the full cycle without the tube completes, logged per frame (goal vs reached, load), with the owner's observations recorded
 <!-- AC:END -->
 
@@ -53,4 +53,6 @@ Owner request 2026-11-12: a full movement test of both arms, running the whole i
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-12 night (orchestrator): replay core written and tested (suite passes). Real timeline (87 frames): clamp_to_eeprom opens the fold elbow L 3120->3081, R 3076->3036 ticks (about -3.5 deg; the measured fold sits at the swept end stop, 30 ticks past the EEPROM limit); preflight with both arms interpolated together, no tube: 0 problems (85 s). Simulated full cycle: OK, all 87 frames reached within 20 ticks, grippers lock L 2027 / R 2031, unlock/relock order L(25,49) R(50,74), max speed 150 ticks/s, about 70 s simulated (41 s arm motion). Live guard path: GuardedArm(live=True) refuses while motion_guard.*_arm_limits.unverified is true (needs the owner's decision). The last measured fold is within 0.8 deg of frame 0 on joints 1-4; roll is -2.7/-2.8 deg off (inside the 3 deg start check).
+
+2026-11-13: OWNER DECISION (chat): 'lets do a move even though the joint soft limits are marked unverified' -> AC #4. Implemented as a per-run waiver, NOT a config change: JointLimitGuard/build_motion_guard/build_guarded_arm take unverified_soft_limits_override (owner approval text); it waives only the unverified=>refuse-live gate, logs a WARNING with the text, and still enforces the limit values, keep-out boxes, mesh collision and calibration gate. hardware.yaml soft limits stay unverified: true. scripts/replay_cycle.py: dry-run = EEPROM clamp + preflight (cached by timeline/config/code hash) + full simulated cycle; --live requires --allow-unverified-soft-limits TEXT, refuses on torque ON / zeroed drive registers / start pose >3 deg from frame 0, asks YES (no tube, DexArm parked, hands clear), lock both (45-deg), move to frame 0, cycle with a pause before each phase, overcurrent/overtemp/stall/timeout abort -> HOLD -> owner supports -> release; final torque-off sweep; log calibration_data/replay_cycle_<date>.jsonl. Evidence: dry-run on the real timeline 'preflight: 0 problem(s) in 98 s', 'simulation OK: 85 moves, 6 gripper actions, worst error 20 ticks, 70 s simulated'; '--live' without the waiver -> REFUSED rc=2. Tests: tests/test_cycle_replay.py 9 pass (waiver keeps values enforced, CLI refusal, stop->hold->release, obstruction abort, sequence/speeds); full suite passes. AC #5 (live run) waits on AA-49 (gripper lock confirmation) and a supervised session.
 <!-- SECTION:NOTES:END -->

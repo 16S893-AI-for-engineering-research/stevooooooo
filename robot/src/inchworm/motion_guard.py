@@ -303,9 +303,15 @@ class JointLimitGuard:
     when limits have not been measured.
     """
 
-    def __init__(self, limits: ResolvedLimits, arm_role: str) -> None:
+    def __init__(self, limits: ResolvedLimits, arm_role: str,
+                 unverified_live_override: Optional[str] = None) -> None:
         self._limits = limits
         self._arm_role = arm_role
+        # Owner-approved, per-run waiver of the "unverified => refuse live" gate ONLY.
+        # The limit VALUES are still enforced. Never set from config; a caller passes
+        # the owner's approval text explicitly, and every use is logged.
+        self._override = unverified_live_override
+        self._override_logged = False
 
     @property
     def limits(self) -> ResolvedLimits:
@@ -340,7 +346,13 @@ class JointLimitGuard:
             raise ValueError(f"q must have 5 elements, got {len(q)}")
 
         # Fail-closed: block live motion if unverified
-        if live and not self._limits.live_ok:
+        if live and not self._limits.live_ok and self._override:
+            if not self._override_logged:
+                logger.warning(
+                    "AA-9 %s arm: soft limits UNVERIFIED; live gate waived by owner approval: %s "
+                    "(limit values still enforced)", self._arm_role, self._override)
+                self._override_logged = True
+        elif live and not self._limits.live_ok:
             raise LiveMotionBlockedError(
                 f"AA-9 {self._arm_role} arm: soft limits are UNVERIFIED. "
                 "Run scripts/measure_limits.py --live, populate hardware.yaml "
@@ -1273,6 +1285,7 @@ def get_named_pose(
 def build_joint_limit_guard(
     cfg: HardwareConfig,
     arm_role: str,
+    unverified_live_override: Optional[str] = None,
 ) -> JointLimitGuard:
     """Build a :class:`JointLimitGuard` from a loaded :class:`HardwareConfig`.
 
@@ -1288,7 +1301,7 @@ def build_joint_limit_guard(
     if guard_cfg is not None:
         soft = guard_cfg.left_arm_limits if arm_role == "left" else guard_cfg.right_arm_limits
     limits = _resolve_limits_for_arm(soft, cfg.so101_kinematics, arm_role)
-    return JointLimitGuard(limits, arm_role)
+    return JointLimitGuard(limits, arm_role, unverified_live_override=unverified_live_override)
 
 
 def build_collision_model(
@@ -1311,6 +1324,7 @@ def build_motion_guard(
     other_arm_pose_source: Optional[Callable[[], JointVec]] = None,
     tube_source: Optional[Callable[[], object]] = None,
     dexarm_pose_source: Optional[Callable[[], dict]] = None,
+    unverified_soft_limits_override: Optional[str] = None,
 ) -> MotionGuard:
     """Build a :class:`MotionGuard` for one arm from a loaded config.
 
@@ -1326,7 +1340,7 @@ def build_motion_guard(
         mesh layer reports every pose as a violation (fail closed); set it
         later with ``guard.mesh.other_arm_pose_source = ...``.
     """
-    limit_guard = build_joint_limit_guard(cfg, arm_role)
+    limit_guard = build_joint_limit_guard(cfg, arm_role, unverified_soft_limits_override)
     collision_model = build_collision_model(cfg)
     return MotionGuard(
         limit_guard=limit_guard,
@@ -1348,6 +1362,7 @@ def build_guarded_arm(
     live: bool = False,
     session_logger: Optional[object] = None,
     present_pose_source: Optional[Callable[[], JointVec]] = None,
+    unverified_soft_limits_override: Optional[str] = None,
 ) -> GuardedArm:
     """Build a :class:`GuardedArm` for one arm from a loaded config.
 
@@ -1370,9 +1385,14 @@ def build_guarded_arm(
         Optional AA-7 session logger.
     present_pose_source:
         Optional callable returning the present 5-vector (radians).
+    unverified_soft_limits_override:
+        The owner's approval text for live motion while the soft limits are still
+        marked unverified (e.g. the AA-50 no-tube replay). Waives only that gate; the
+        limit values, collision checks and calibration gate stay enforced.
     """
     from inchworm.joint_calibration import build_arm_calibration
-    guard = build_motion_guard(cfg, arm_role)
+    guard = build_motion_guard(
+        cfg, arm_role, unverified_soft_limits_override=unverified_soft_limits_override)
     calib_block = None
     if cfg.motion_guard is not None and cfg.motion_guard.servo_calibration is not None:
         sc = cfg.motion_guard.servo_calibration

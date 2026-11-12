@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 21:02'
+updated_date: '2026-11-12 21:48'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-12 (night). AA-43 #4 waits on AA-49 (revised to the 45-deg position lock, owner must RE-ACCEPT). AA-50 (full-cycle replay, no tube) in progress: core + sim done, CLI next. Suite passes.
+**Last verified:** 2026-11-13. AA-50 software done (AC 1-4); live run = handoff AA-51 (proposed, needs `accept AA-51`). AA-49 (45-deg gripper lock check) needs re-acceptance. Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -25,8 +25,9 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
 ### In flight: AA-50 (full-cycle movement test, no tube, grippers moving; owner request 2026-11-12)
-- Done: `src/inchworm/cycle_replay.py` (timeline load, gripper events, per-joint speeds, EEPROM clamp, preflight with both arms together, ReplayRunner through GuardedArm + GripperLockSM, hold on abort, release); `scripts/replay_sim.py` (simulated servos); `tests/test_cycle_replay.py`. Real timeline: preflight 0 problems; simulated full cycle OK (87 frames, ~70 s, max 150 ticks/s). The fold elbow is 30 ticks past the EEPROM limit, so the replay opens it about 3.5 deg.
-- **Next:** `scripts/replay_cycle.py` CLI (dry-run = preflight + sim; `--live` = start-pose check, owner confirms no tube, lock both, move to start, pause at each phase, stop file `/tmp/inchworm_stop_move`, log `calibration_data/replay_cycle_<date>.jsonl`). Then ASK THE OWNER about the soft-limit live gate (`motion_guard.*_arm_limits.unverified: true` blocks GuardedArm live). Proposal: a replay-scoped sign-off, not a global flip. Then a supervised human_request.
+- Done (AC 1-4): `src/inchworm/cycle_replay.py`, `scripts/replay_sim.py` (simulated servos), `scripts/replay_cycle.py` (CLI), `tests/test_cycle_replay.py` (9). Dry-run on the real timeline: preflight 0 problems (98 s, cached afterwards), simulated full cycle OK (85 moves, 6 gripper actions, worst error 20 ticks). The fold elbow is 30 ticks past EEPROM, so goals are pulled 10 ticks inside it (about -3.5 deg).
+- **OWNER DECISION 2026-11-13:** live move allowed although the soft limits are marked unverified. Implemented as a per-run waiver `--allow-unverified-soft-limits "<text>"` (GuardedArm `unverified_soft_limits_override`); values, keep-out boxes, mesh collision and calibration stay enforced; `hardware.yaml` stays `unverified: true`.
+- **Next:** handoff AA-51 (supervised live run, 7 steps, ~20 min), proposed and not accepted. Order: AA-49 first (it confirms the 45-deg lock by eye), then AA-51. After the run: read `calibration_data/replay_cycle_<date>.jsonl`, record observations, check AA-50 AC #5.
 ### Gripper lock = 45-degree position lock (OWNER DECISION 2026-11-12)
 - The locking piece slips on its screw at both ends (deliberate clutch), so no stall marks the lock. Lock = slow drive (150 ticks/s, torque 300) to open end + 512 ticks: L 2038, R 2041; LOCKED within 12 ticks; stopping short = FAULT + torque off. The owner confirms by eye. `hardware.yaml gripper_lock.*.lock_mode: position`. AA-49 revised to that check (5 steps); **the owner must re-accept AA-49** (`accept AA-49`). AA-41 is superseded (owner may decline it).
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)

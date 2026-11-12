@@ -278,6 +278,8 @@ class ReplayRunner:
                     peak_load[a][k] = max(peak_load[a][k], abs(st.load_raw))
                     if st.temperature_c >= self.cfg.fault_thresholds.overtemperature_c:
                         raise ReplayAborted(f"{a} {j} at {st.temperature_c} C")
+                    if st.current_raw >= self.cfg.fault_thresholds.overcurrent_raw:
+                        raise ReplayAborted(f"{a} {j} current {st.current_raw} raw (overcurrent)")
                 cur[a] = ticks
                 if any(abs(t - gg) > REACH_TOL_TICKS for t, gg in zip(ticks, g)):
                     done = False
@@ -415,7 +417,8 @@ class ReplayRunner:
         return errs
 
 
-def build_runner(cfg, frames, buses: Dict[str, object], *, live: bool, **kw) -> ReplayRunner:
+def build_runner(cfg, frames, buses: Dict[str, object], *, live: bool,
+                 soft_limits_override: Optional[str] = None, **kw) -> ReplayRunner:
     """Wire GuardedArm + GripperLockSM around the given buses (real or simulated)."""
     from inchworm.gripper_lock import GripperLockSM, GripperState
     from inchworm.motion_guard import build_guarded_arm
@@ -423,7 +426,8 @@ def build_runner(cfg, frames, buses: Dict[str, object], *, live: bool, **kw) -> 
     arms: Dict[str, ArmHandles] = {}
     sms: Dict[str, object] = {}
     for a in ARMS:
-        g = build_guarded_arm(buses[a], cfg, a, live=live)
+        g = build_guarded_arm(buses[a], cfg, a, live=live,
+                              unverified_soft_limits_override=soft_limits_override)
         sm = GripperLockSM(bus=buses[a], role=f"arm_{a}", config=cfg.gripper_lock, dry_run=False)
         sms[a] = sm
         arms[a] = ArmHandles(buses[a], g, sm, {j: i + 1 for i, j in enumerate(JOINTS)})
