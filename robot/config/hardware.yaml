@@ -438,12 +438,15 @@ gripper_lock:
     # Derived from gripper_samples_2026-10-25.jsonl:
     #   open=1576, locked=[1792,1801], closed_empty=2494
     #   (no key_in_unlocked sample; using open+60 for unlocked_high)
-    # unlocked band: [open-25, open+60] -> ticks [1551,1636] -> deg
-    unlocked_low_deg: 136.32     # ticks 1551 (open_ticks-25)
-    unlocked_high_deg: 143.79    # ticks 1636 (open_ticks+60)
+    # 2026-11-12 (owner approved): open end RE-MEASURED on the new servo, 1529 ticks
+    #   (gripper_ends_2026-11-12.jsonl, owner: "looks fully open", after
+    #   Min_Position_Limit 1563 -> 1523). Old band 1551..1636 (old servo, open=1576)
+    #   did not contain it. Same rule as before: [open-25, open+60].
+    unlocked_low_deg: 132.19     # ticks 1504 (1529-25)
+    unlocked_high_deg: 139.66    # ticks 1589 (1529+60)
     # engaged band: same as unlocked (lock-and-key: engaged == open position)
-    engaged_low_deg: 136.32      # same as unlocked_low_deg
-    engaged_high_deg: 143.79     # same as unlocked_high_deg
+    engaged_low_deg: 132.19      # same as unlocked_low_deg
+    engaged_high_deg: 139.66     # same as unlocked_high_deg
     # locked band: [min_locked-25, max_locked+25] -> ticks [1767,1826]
     locked_low_deg: 155.30       # ticks 1767 (1792-25)
     locked_high_deg: 160.49      # ticks 1826 (1801+25)

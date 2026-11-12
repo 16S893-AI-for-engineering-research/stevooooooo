@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 17:05'
+updated_date: '2026-11-12 17:42'
 labels:
   - hardware
 dependencies: []
@@ -26,9 +26,9 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 <!-- AC:BEGIN -->
 - [x] #1 doc-1 records the replacement servo model, gearing and firmware for IDs 4-6 on both arms, from the owner or the part listing
 - [x] #2 All 12 servos answer with error byte 0, plausible temperature, and near-zero present current at rest with torque off, recorded by a read-only scan
-- [ ] #3 IDs 4-6 on both arms have homing offsets and Min/Max position limits re-measured and written with an EEPROM backup and read-back, owner-supervised
+- [x] #3 IDs 4-6 on both arms have homing offsets and Min/Max position limits re-measured and written with an EEPROM backup and read-back, owner-supervised
 - [ ] #4 servo_calibration, soft limits and gripper bands for joints 4-6 are re-measured on hardware and updated in hardware.yaml with their source
-- [ ] #5 A supervised small powered move of each of IDs 4-6 on both arms reaches its goal within tolerance, logged
+- [x] #5 A supervised small powered move of each of IDs 4-6 on both arms reaches its goal within tolerance, logged
 <!-- AC:END -->
 
 ## Definition of Done
@@ -85,4 +85,6 @@ Gripper ends (owner approved 2026-11-12): 1. GripperLockSM.close_empty(tube_atta
 2026-11-12 (owner approved): right ID 6 Min_Position_Limit 1563 -> 1523 (max 2504 unchanged) via home_servos.py limits --live; backup calibration_data/eeprom_backup_right_2026-11-12T11-59-02_pre_limits.json; read back [1523, 2504]; nothing else changed. Next: owner re-runs open-end on the right.
 
 2026-11-12 right open-end after the limit change: 2497 -> 1529 (EEPROM min 1523, not short), peak load 300 (full travel), 31 C; owner: 'looks fully open'. Torque off. Measured gripper ends on the new servos: LEFT open 1526 (limit 1521), close_empty settles 2519, closed limit reached 2527 (limit 2531). RIGHT open 1529 (limit 1523), close_empty 2491, closed limit reached 2499-2501 (limit 2504). Config impact: right unlocked band 1551..1636 no longer contains the measured open end 1529; left band 1506..1610 does. Locked band (key) not re-measurable without the tube attachment (AA-41).
+
+2026-11-12 (owner approved): hardware.yaml right gripper unlocked/engaged band 1551..1636 -> 1504..1589 ticks (132.19..139.66 deg) from the measured open end 1529 (same rule [open-25, open+60]); closed_empty kept (L 2521 / R 2494, closes settled within 2-3 ticks); left unchanged (open 1526 within 1506..1610); unverified stays true (locked band and lock torque need the key, AA-41). Suite passes. AC #5 checked: supervised small powered moves logged and REACHED for every ID 4-6 on both arms: left wrist_flex (powered_move_2026-11-09.jsonl), left wrist_roll, right wrist_flex, right wrist_roll, left and right gripper (powered_move_2026-11-12.jsonl, gripper_ends_2026-11-12.jsonl); owner confirmed directions. AC #3 checked (owner approved): IDs 4-5 homed and limits written with backup/read-back 2026-11-09; ID 6 closed stop homed 2026-11-09, limits measured against travel 2026-11-12 (both ends reach the limits; owner confirmed fully open/closed), right min re-written 1523 with backup + read-back. AC #4 stays open: gripper locked band (AA-41) and the wrist zero/servo_calibration pending (servo_calibration.unverified, fold re-measure).
 <!-- SECTION:NOTES:END -->
