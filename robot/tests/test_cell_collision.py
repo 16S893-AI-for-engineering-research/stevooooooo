@@ -40,7 +40,6 @@ from inchworm.system_model.urdf import URDFError, load_urdf  # noqa: E402
 
 _ROBOT = Path(__file__).resolve().parents[1]
 _VENDOR = _ROBOT / "vendor" / "so101" / "so101_new_calib.urdf"
-_POSES = _ROBOT / "calibration_data" / "poses_2026-10-25.jsonl"
 
 PITCH_M = 0.183676  # doc-1 attachment pitch (also in hardware.yaml geometry)
 
@@ -63,33 +62,19 @@ def checker(mesh_cfg):
     return g.checker
 
 
-# The fold in poses_2026-10-25.jsonl was read in the tick frame of the ORIGINAL servos.
-# AA-43 (2026-11-09) re-homed wrist_flex / wrist_roll on the replacement servos and moved
-# those zeros, so these ticks must be converted with the zeros that were valid when they
-# were read. Re-measure the fold on the new servos, then drop this pin.
-_FOLD_FRAME_WRIST_ZEROS_DEG = {
-    "left": {"wrist_flex": 180.879, "wrist_roll": 166.553},
-    "right": {"wrist_flex": 178.682, "wrist_roll": 175.254},
-}
+_SNAPSHOTS = _ROBOT / "calibration_data" / "pose_snapshots.jsonl"
+_FOLD_SNAPSHOT_TIME = "2026-11-11T19-23-05"   # owner-placed fold on the new servos (AA-47)
 
 
 def _measured_fold():
-    """Measured folded_transit, pan recomputed from ticks with the landmark zero."""
+    """Measured fold (2026-11-11, new servos), converted with the current calibration."""
+    from inchworm.so101_pose_reader import ticks_to_q
     cfg = load_config()
-    sc = cfg.motion_guard.servo_calibration
-    names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
-    out = {}
-    for line in _POSES.read_text().splitlines():
+    for line in _SNAPSHOTS.read_text().splitlines():
         d = json.loads(line)
-        if d.get("label") != "folded_transit":
-            continue
-        blk = sc.left_arm if d["arm"] == "left" else sc.right_arm
-        out[d["arm"]] = np.array([
-            math.radians(getattr(blk, f"{n}_sign") * (d["ticks"][i] * 360 / 4096
-                         - _FOLD_FRAME_WRIST_ZEROS_DEG[d["arm"]].get(n, getattr(blk, f"{n}_zero_offset_deg"))))
-            for i, n in enumerate(names)
-        ])
-    return out["left"], out["right"]
+        if d.get("label") == "fold" and d.get("time") == _FOLD_SNAPSHOT_TIME:
+            return tuple(np.array(ticks_to_q(cfg, a, d["ticks"][a])) for a in ("left", "right"))
+    raise AssertionError("measured fold snapshot missing")
 
 
 # Other arm parked away (pan 86 deg) and DexArm turned away: cell states for
@@ -229,7 +214,7 @@ def test_measured_fold_needs_the_owner_allowance(mesh_cfg):
     L, R = _measured_fold()
     found = {frozenset((x.link_a, x.link_b)) for x in c.check(CellState(L, R), first_only=False)}
     assert frozenset(("left_lower_arm", "left_shoulder")) in found
-    assert frozenset(("left_upper_arm", "right_wrist")) in found
+    assert frozenset(("right_lower_arm", "right_shoulder")) in found
     allowed = {frozenset(p) for p in mesh_cfg.fold_allowance_pairs}
     assert found <= allowed
 
@@ -239,7 +224,6 @@ def test_fold_allowance_is_pose_scoped(checker):
     L, R = _measured_fold()
     L2 = L + np.radians([5.0, 0, 0, 0, 0])
     found = {frozenset((x.link_a, x.link_b)) for x in checker.check(CellState(L2, R), first_only=False)}
-    assert frozenset(("left_upper_arm", "right_wrist")) in found
     assert frozenset(("left_lower_arm", "left_shoulder")) in found
 
 
@@ -328,7 +312,9 @@ def test_bad_joint_vector_fails_closed(checker):
 def test_guard_reports_mesh_collision(cfg):
     g = build_motion_guard(cfg, "left", other_arm_pose_source=lambda: np.array([0.0, -1.4, 1.4, -1.4, 0.0]),
                            dexarm_pose_source=lambda: DEX_AWAY)
-    q = np.array([1.9, 1.33, 1.5, 0.0, 0.0])  # inside the soft limits, into the base mount
+    # Inside the soft limits, into the base mount. Lift 0.8 (was 1.33): the AA-47
+    # corrected shoulder_lift zero leaves an upper soft limit of 0.85 rad.
+    q = np.array([1.9, 0.8, 1.5, 0.0, 0.0])
     assert g.limit_guard.check(q) is None
     v = g.check_pose(q)
     assert v is not None and "mesh collision" in v

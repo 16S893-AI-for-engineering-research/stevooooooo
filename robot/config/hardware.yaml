@@ -500,8 +500,10 @@ motion_guard:
     # limits = EEPROM range around the landmark zero, clipped to URDF +/-1.91986.
     shoulder_pan_lower_rad: -1.9199
     shoulder_pan_upper_rad: 1.9199
-    shoulder_lift_lower_rad: -1.3982
-    shoulder_lift_upper_rad: 1.3384
+    # AA-47 2026-11-11: re-derived for the corrected zero from the EEPROM ticks 1216..3000:
+    # -1.8853..0.8514 rad, lower clipped to the URDF -1.74533 (real bracket stop ~-107 deg).
+    shoulder_lift_lower_rad: -1.74533
+    shoulder_lift_upper_rad: 0.8514
     elbow_flex_lower_rad: -1.6506
     elbow_flex_upper_rad: 1.69
     wrist_flex_lower_rad: -1.6581
@@ -533,8 +535,10 @@ motion_guard:
   right_arm_limits:
     shoulder_pan_lower_rad: -1.9199
     shoulder_pan_upper_rad: 1.9199
-    shoulder_lift_lower_rad: -1.2977
-    shoulder_lift_upper_rad: 1.2364
+    # AA-47 2026-11-11: re-derived for the corrected zero from the EEPROM ticks 1283..2935:
+    # -1.8807..0.6535 rad, lower clipped to the URDF -1.74533 (real bracket stop ~-107 deg).
+    shoulder_lift_lower_rad: -1.74533
+    shoulder_lift_upper_rad: 0.6535
     elbow_flex_lower_rad: -1.6414
     elbow_flex_upper_rad: 1.69
     wrist_flex_lower_rad: -1.6581
@@ -629,29 +633,24 @@ motion_guard:
       # true blocks LIVE motion until the owner compares renders vs the real
       # robot (AA-40 #6). Dry-run still checks.
       unverified: true
-      # Owner 2026-10-27: "go with the real fold". The model reports these
-      # pairs in contact or under the margin at the hand-placed measured fold
-      # (calibration_data/poses_2026-10-25.jsonl, label folded_transit, pan
-      # recomputed from ticks with the landmark zero): the elbow folds about
-      # 6 deg past where the model's lower arm meets its shoulder, and the left
-      # upper/lower arm overlaps the right wrist/gripper by about 9-10 mm. The
-      # real robot sits there, so the model is wrong there. Accepted ONLY while
-      # each arm involved is within the radius (per joint, pan..wrist_flex) of
-      # its measured fold; everywhere else these pairs are checked normally.
+      # Owner 2026-10-27: "go with the real fold". Owner 2026-11-11 (AA-47, after the
+      # shoulder_lift zero correction): the fold is now the one hand-placed on the NEW servos,
+      # calibration_data/pose_snapshots.jsonl label fold, 2026-11-11T19-23-05 (owner: only
+      # the old lift zero looked wrong). At that pose the model puts each lower arm on its
+      # shoulder (the real elbow folds to ~97 deg, past the URDF 96.8) and the wrist 3-5 mm
+      # from the shoulder / upper arm. The real robot sits there, so the model is wrong
+      # there. Accepted ONLY while each arm involved is within the radius (per joint,
+      # pan..wrist_flex) of its measured fold; everywhere else these pairs are checked
+      # normally. The arm-to-arm pairs needed by the 2026-10-25 fold (old lift zero) are gone.
       fold_allowance_pairs:
-        - [baseforreal, left_wrist]
         - [left_lower_arm, left_shoulder]
-        - [left_lower_arm, right_gripper]
-        - [left_lower_arm, right_wrist]
         - [left_shoulder, left_wrist]
         - [left_upper_arm, left_wrist]
-        - [left_upper_arm, right_gripper]
-        - [left_upper_arm, right_wrist]
         - [right_lower_arm, right_shoulder]
         - [right_shoulder, right_wrist]
         - [right_upper_arm, right_wrist]
-      fold_allowance_centre_left_rad: [0.0576, -1.3823, 1.6877, -1.3055, 1.2828]
-      fold_allowance_centre_right_rad: [-0.0035, -1.2828, 1.6790, -1.3195, 1.4434]
+      fold_allowance_centre_left_rad: [0.0092, -1.5677, 1.6966, -1.5731, -0.0468]
+      fold_allowance_centre_right_rad: [0.0138, -1.5570, 1.6858, -1.5739, -0.0491]
       fold_allowance_radius_rad: 0.05
     # Keep-out capsules in the chassis fixed frame (metres).
     # ALL VALUES ARE UNVERIFIED CONSERVATIVE PLACEHOLDERS.
@@ -695,16 +694,14 @@ motion_guard:
         placeholder; measure safe folded pose on hardware and set unverified:
         false to satisfy AA-9 AC#4. Doc-1 s3 notes the configuration is tight;
         DO NOT run on hardware without owner supervision.
-      # MEASURED 2026-10-25 (owner hand-placed per pictures/robot.png, read-only;
-      # calibration_data/poses_2026-10-25.jsonl label folded_transit, 2nd reading).
-      # Measured L [~0, -1.383, 1.687, -1.305, 1.282], R [~0, -1.282, 1.680, -1.319, 1.444].
-      # pan = 0: owner says both arms point at the DexArm when folded.
-      # lift -1.25 / elbow 1.64: ~2-3 deg short of the mechanical end stops (both arms
-      # fold onto them) so a powered fold does not drive into the stop.
-      # wrist_roll 1.36 = mean of the arms (owner to confirm if roll matters).
-      # NOTE: the old placeholder had the lift/elbow SIGNS REVERSED (+1.2 / -1.57).
-      # Still unverified: AC#1 needs real collision geometry.
-      q_rad: [0.0, -1.25, 1.64, -1.31, 1.36]
+      # MEASURED 2026-11-11 on the NEW servos with the AA-47 shoulder_lift zero (owner
+      # hand-placed; calibration_data/pose_snapshots.jsonl label fold, 19-23-05):
+      # L [0.009, -1.568, 1.697, -1.573, -0.047], R [0.014, -1.557, 1.686, -1.574, -0.049].
+      # Target: pan 0 / roll 0 (both arms point at the DexArm), lift -89 deg, wrist -90 deg,
+      # elbow 95.1 deg = ~2 deg short of the real fold stop (and inside the URDF 96.8)
+      # so a powered fold does not drive into the stop; within the fold-allowance radius.
+      # Supersedes the 2026-10-25 fold (lift on the bracket stop at -107 deg in this frame).
+      q_rad: [0.0, -1.5533, 1.66, -1.5708, 0.0]
       unverified: true
 
   # Per-joint servo calibration: servo-degree ↔ joint-radian conversion.
@@ -720,7 +717,7 @@ motion_guard:
     left_arm:
       shoulder_pan_zero_offset_deg: 173.320  # 2026-10-25 LANDMARK: owner-confirmed arm pointing at the DexArm (was mid-range 140.669)
       shoulder_pan_sign: 1
-      shoulder_lift_zero_offset_deg: 186.987
+      shoulder_lift_zero_offset_deg: 214.893  # AA-47 2026-11-11 LANDMARK: arm hand-placed at the URDF zero pose, read-only (calibration_data/poses_2026-11-11.jsonl; was mid-range 186.987)
       shoulder_lift_sign: 1
       elbow_flex_zero_offset_deg: 177.1
       elbow_flex_sign: 1
@@ -748,13 +745,18 @@ motion_guard:
       #   obstructed range). Supporting evidence: in the hand-placed fold, both arms read
       #   within 0.5-6 deg of each other on lift/elbow/wrist_flex. That shows the arms
       #   agree with each other, not absolute accuracy; AA-11 #3 pose checks will test it.
+      # CORRECTED 2026-11-11 (AA-47, owner approved): the shoulder_lift mid-range zero was
+      #   27.9 (L) / 33.4 (R) deg off. Landmark = URDF zero pose placed by eye. Cross-check:
+      #   the swept stops (bracket / hard stop) then sit at -107.3/+106.0 (L) and
+      #   -107.1/+106.2 (R) deg, symmetric on both arms. Other joints were within 1-6 deg
+      #   of the landmark and keep their zeros.
       unverified: false
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
     right_arm:
       shoulder_pan_zero_offset_deg: 181.318  # 2026-10-25 LANDMARK: owner-confirmed arm pointing at the DexArm (was mid-range 186.108)
       shoulder_pan_sign: 1
-      shoulder_lift_zero_offset_deg: 187.119
+      shoulder_lift_zero_offset_deg: 220.518  # AA-47 2026-11-11 LANDMARK: arm hand-placed at the URDF zero pose, read-only (calibration_data/poses_2026-11-11.jsonl; was mid-range 187.119)
       shoulder_lift_sign: 1
       elbow_flex_zero_offset_deg: 173.672
       elbow_flex_sign: 1
@@ -782,6 +784,11 @@ motion_guard:
       #   obstructed range). Supporting evidence: in the hand-placed fold, both arms read
       #   within 0.5-6 deg of each other on lift/elbow/wrist_flex. That shows the arms
       #   agree with each other, not absolute accuracy; AA-11 #3 pose checks will test it.
+      # CORRECTED 2026-11-11 (AA-47, owner approved): the shoulder_lift mid-range zero was
+      #   27.9 (L) / 33.4 (R) deg off. Landmark = URDF zero pose placed by eye. Cross-check:
+      #   the swept stops (bracket / hard stop) then sit at -107.3/+106.0 (L) and
+      #   -107.1/+106.2 (R) deg, symmetric on both arms. Other joints were within 1-6 deg
+      #   of the landmark and keep their zeros.
       unverified: false
       method: "zero = measured mid-range after half-turn homing (2026-10-24); signs = owner cable-referenced direction test + URDF axis derivation, all +1"
       measured_date: "2026-10-24"
@@ -840,7 +847,7 @@ fold_sequence:
     # UNVERIFIED: placeholder; measure safe intermediate on hardware.
     # 2026-10-25: waypoint signs corrected to match the measured fold (lift -, elbow +,
     # wrist_flex -). The intermediate values are still interpolated placeholders.
-    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]
+    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]  # AA-47 2026-11-11: re-interpolated toward the new fold
       description: >-
         Raise shoulder_lift to clear chassis before elbow tuck.
         Proximal-first ordering: shoulder clear, elbow still extended.
@@ -848,7 +855,7 @@ fold_sequence:
       unverified: true
     # Step 2: Begin elbow tuck while shoulder_lift still raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, -1.0, 1.2, -1.0, 0.7]
+    - q_rad: [0.0, -1.1, 1.2, -1.1, 0.0]  # AA-47 2026-11-11: re-interpolated toward the new fold
       description: >-
         Partial elbow tuck. Shoulder raised, elbow beginning to fold.
         UNVERIFIED placeholder; verify on hardware before live use.
@@ -857,7 +864,7 @@ fold_sequence:
     # Matches folded_transit q_rad from AA-9 named_poses.
     # (FoldSequencer appends the folded_transit pose as the terminal waypoint.)
     # 2026-10-25: = measured folded_transit.
-    - q_rad: [0.0, -1.25, 1.64, -1.31, 1.36]
+    - q_rad: [0.0, -1.5533, 1.66, -1.5708, 0.0]  # AA-47 2026-11-11: = folded_transit
       description: >-
         Full fold: shoulder raised, elbow tucked. Matches folded_transit.
         UNVERIFIED placeholder; this is the terminal waypoint.
@@ -868,7 +875,7 @@ fold_sequence:
   unfold_waypoints:
     # Step 1: Relax elbow from full tuck to partial, shoulder still raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, -1.0, 1.2, -1.0, 0.7]
+    - q_rad: [0.0, -1.1, 1.2, -1.1, 0.0]  # AA-47 2026-11-11: re-interpolated toward the new fold
       description: >-
         Partial unfold: relax elbow tuck, shoulder still raised.
         Distal-first unfold order: release wrist/elbow before lowering shoulder.
@@ -876,7 +883,7 @@ fold_sequence:
       unverified: true
     # Step 2: Extend elbow to near-neutral while shoulder_lift is raised.
     # UNVERIFIED: placeholder.
-    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]
+    - q_rad: [0.0, -0.6, 0.6, -0.5, 0.0]  # AA-47 2026-11-11: re-interpolated toward the new fold
       description: >-
         Elbow extended, shoulder still raised. Prepare to lower shoulder.
         UNVERIFIED placeholder; verify on hardware before live use.

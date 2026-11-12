@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 00:36'
+updated_date: '2026-11-12 01:26'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -45,7 +45,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
   - the tube placement in the URDF is good enough (insertion is learned);
   - on return to the start, the two arms should match each other.
 - **Done since:** the matching start (one shared pose for both arms, about 2 mm grip residual, the cycle ends exactly in it). Frames are now checked against the configured soft limits.
-- **Zero error found (AA-47 verified 2026-11-11):** the shoulder_lift zero should be L 214.89 / R 220.52 servo deg (old 186.99 / 187.12). The other joints are within 1-6 deg. With the new zero, the swept stops are symmetric at about ±107 deg on both arms, so -91 deg is reachable. **Next, awaiting the owner's 'approve the zeros':** update the zeros, recompute the lift soft limits, re-derive the stored rad poses (folded_transit, fold waypoints, fold_allowance centres) from raw ticks, re-plan, and run the tests. Data: calibration_data/poses_2026-11-11.jsonl (line 2 spurious), joint_ranges_*_lift_2026-11-11.json, pose_snapshots.jsonl.
+- **Zeros applied 2026-11-11 (owner approved):** shoulder_lift zero L 214.893 / R 220.518 (AA-47 landmark); lift soft limits re-derived (lower = URDF -100 deg, upper 0.85 L / 0.65 R from the EEPROM). folded_transit, the fold waypoints and the fold allowance now use the fold hand-placed 2026-11-11 on the new servos. AA-45 re-plan: 14 violations (none soft-limit): 10 regrip reach misses of 1-2.7 mm and 4 start/end near misses (lower arm 3 mm from the shoulder, margin 5 mm). **Next for AA-45:** fix those two (e.g. a smaller regrip standoff or a different retract path; a printing pose slightly more open), then the owner reviews the GIF.
 - **Verification plan (owner asked how the animation will match reality):**
   1. Static pose match: `scripts/pose_snapshot.py --label X --live`. Read-only, torque off. It renders the reading and logs the owner's y/n. This also covers AA-40 #6 and most of AA-43 #4.
   2. Start-pose check before motion: `inchworm.start_pose_check`, or `--plan-start out/inchworm/timeline.jsonl`.

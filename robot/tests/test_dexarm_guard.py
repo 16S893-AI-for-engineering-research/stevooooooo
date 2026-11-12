@@ -18,8 +18,8 @@ from inchworm.system_model.urdf import load_urdf
 from inchworm.system_model.collision import DEFAULT_CELL_URDF
 
 SLOPES = (0.004, 0.147)  # this DexArm's M892, 2026-10-28
-FOLD_L = [0.0576, -1.3823, 1.6877, -1.3055, 1.2828]
-FOLD_R = [-0.0035, -1.2828, 1.679, -1.3195, 1.4434]
+FOLD_L = [0.0092, -1.5677, 1.6966, -1.5731, -0.0468]  # measured fold 2026-11-11 (AA-47 zero)
+FOLD_R = [0.0138, -1.557, 1.6858, -1.5739, -0.0491]  # measured fold 2026-11-11 (AA-47 zero)
 NOW = DexArmAngles(-2.0, 12.0, -79.0)  # live reading 2026-10-28
 
 

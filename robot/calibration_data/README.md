@@ -148,3 +148,7 @@ lower arm on the shoulder bracket, other side = hard stop): left 1224..3651, rig
 repeating the earlier sweep within 4 ticks. Around the landmark zero these are -107.3/+106.0 and
 -107.1/+106.2 deg. Pan and elbow also moved during the sweep.
 `pose_snapshots.jsonl`: fold snapshots. Owner, at 19-23-05: "shoulder lift wrong, everything else good".
+Applied to hardware.yaml on 2026-11-11 (owner approved): shoulder_lift zero L 214.893 / R 220.518. Lift soft
+limits were re-derived, and folded_transit, the fold waypoints and the fold allowance were moved to the fold at
+19-23-05. The 2026-10-25 fold (poses_2026-10-25.jsonl) puts shoulder_lift on the bracket stop (-107 deg) in
+this frame and is superseded. EEPROM is unchanged.

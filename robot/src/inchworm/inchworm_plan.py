@@ -58,7 +58,7 @@ JOINT_ORDER = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wri
 #: Printing pose joint seed = the hardware.yaml folded_transit placeholder.
 #: Stored here only so the planner can seed IK and the report can compare; the
 #: owner's real pose replaces this later.
-FOLDED_TRANSIT_PLACEHOLDER = np.array([0.0, -1.25, 1.64, -1.31, 1.36])
+FOLDED_TRANSIT_PLACEHOLDER = np.array([0.0, -1.5533, 1.66, -1.5708, 0.0])  # = hardware.yaml folded_transit (2026-11-11)
 
 #: Rigid-tube constraint tolerance: while both arms are locked they must keep a
 #: constant relative gripper pose (the tube is rigid). A locked gripper is

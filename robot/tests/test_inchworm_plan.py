@@ -281,10 +281,12 @@ def test_matching_start_pose_and_return(cfg, checker):
 def test_soft_limit_violation_is_reported(kin):
     """A frame inside the URDF range but outside the configured soft limit fails."""
     assert kin.soft_limits is not None
-    lo, _ = kin.soft_limits["left"]
+    _, hi = kin.soft_limits["left"]
     q = WORKING.copy()
-    q[1] = lo[1] - 0.05                  # shoulder_lift just below the soft limit
-    assert q[1] > kin.lower_rad[1]       # ...but still inside the URDF range
+    # Since the AA-47 zero correction the lift lower soft limit equals the URDF
+    # one; the upper (0.85 rad, from the EEPROM) is inside the URDF 1.745.
+    q[1] = hi[1] + 0.05                  # shoulder_lift just above the soft limit
+    assert q[1] < kin.upper_rad[1]       # ...but still inside the URDF range
     frame = CycleFrame("test soft", q, PARK, True, False, 0.0)
     reasons = validate_frame(frame, kin, reference_relpose=None)
     assert any(r.startswith("soft limit: left shoulder_lift") for r in reasons), reasons
