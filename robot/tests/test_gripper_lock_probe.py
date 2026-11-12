@@ -79,7 +79,7 @@ def test_cli_dry_run_touches_nothing(capsys):
     assert "DRY-RUN" in out and "191.07" in out
 
 
-@pytest.mark.parametrize("t", [0, 49, 601, 1000])
+@pytest.mark.parametrize("t", [0, 49, 501, 1000])
 def test_cli_refuses_out_of_range_torque(t):
     assert probe.main(["--arm", "left", "--torque", str(t), "--key"]) == 2
 
@@ -100,3 +100,56 @@ def test_probe_cleanup_restores_the_eeprom_cap_not_a_hardcoded_1000():
     """Owner 2026-11-09: grippers use LeRobot's lower torque cap (500); the probe must not undo it."""
     src = (Path(__file__).parents[1] / "scripts" / "gripper_lock_probe.py").read_text()
     assert "restore_torque" in src and "bus.set_torque_limit(sid, _TORQUE_LIMIT_FULL)" not in src
+
+
+class _TimedBus:
+    """Positions read in order; the clock advances 0.1 s per read."""
+
+    def __init__(self, ticks, loads=None):
+        self._t = list(ticks)
+        self._l = list(loads or [10] * len(ticks))
+        self.now = 0.0
+
+    def read_joint_state(self, sid):
+        self.now += 0.1
+        t = self._t.pop(0) if len(self._t) > 1 else self._t[0]
+        l = self._l.pop(0) if len(self._l) > 1 else self._l[0]
+        return SimpleNamespace(position_deg=t * 360 / 4096, load_raw=l, current_raw=0, speed_raw=0,
+                               temperature_c=30)
+
+
+def test_wait_settled_waits_for_the_slow_move_to_stop():
+    bus = _TimedBus([1600, 1700, 1790, 1800, 1801, 1801, 1801, 1801, 1801, 1801, 1801], [50, 80, 290, 120])
+    st, settled, peak = probe.wait_settled(bus, 6, settle_s=0.5, timeout_s=5, sleep=lambda _: None,
+                                           clock=lambda: bus.now)
+    assert settled and round(st.position_deg * 4096 / 360) == 1801 and peak == 290
+
+
+def test_wait_settled_times_out_while_moving():
+    bus = _TimedBus(list(range(1500, 2500, 5)))
+    st, settled, _ = probe.wait_settled(bus, 6, settle_s=0.5, timeout_s=2, sleep=lambda _: None,
+                                        clock=lambda: bus.now)
+    assert settled is False
+
+
+def test_unsettled_trial_is_not_classified():
+    sm, bus = _SM(), _Bus([])
+    calls = []
+
+    def settle(b, sid):
+        calls.append(sid)
+        return SimpleNamespace(position_deg=158.0, load_raw=0, current_raw=0, speed_raw=0, temperature_c=30), \
+            len(calls) != 2, 99
+
+    recs = probe.run_trials(bus, sm, _BANDS, role="arm_left", torque_raw=300, key=True, trials=1,
+                            prompt=lambda _: "", pause_s=0, settle=settle)
+    assert len(calls) == 3                      # after open, after lock, after re-open
+    assert recs[0]["classification"] == "not_settled" and recs[0]["settled"] is False
+
+
+def test_probe_sets_slow_speed_before_torque_and_restores_it():
+    src = (Path(__file__).parents[1] / "scripts" / "gripper_lock_probe.py").read_text()
+    i_speed = src.index("bus.set_goal_speed(sid, _PROBE_SPEED_TICKS_S)")
+    i_torque = src.index("bus.set_torque_enable(sid, True)")
+    assert i_speed < i_torque
+    assert "bus.set_goal_speed(sid, restore_speed)" in src and probe._TORQUE_MAX == 500

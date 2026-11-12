@@ -22,8 +22,11 @@ Safety
   band-sampling session).
 * No tube is attached; no other arm is involved.
 * The candidate torque limit is in memory only; hardware.yaml is not edited.
-* On every exit (normal, error, Ctrl-C) the gripper torque limit is restored
-  to 1000 and gripper torque is switched off.
+* Every gripper move (open, lock) runs at 150 ticks/s, acceleration 20 and the
+  candidate torque limit, set BEFORE torque is enabled. The probe classifies
+  only a settled position (unchanged 0.5 s).
+* On every exit (normal, error, Ctrl-C) gripper torque is switched off and the
+  torque limit (EEPROM Max_Torque_Limit), goal speed and acceleration are restored.
 * Dry-run (default) prints the plan and touches nothing.
 
 Usage::
@@ -46,7 +49,12 @@ ARM_JOINTS = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wris
 _REG_TORQUE_ENABLE = 40
 _TORQUE_LIMIT_FULL = 1000   # fallback only; the cleanup restores the servo's EEPROM Max_Torque_Limit (reg 16)
 _REG_MAX_TORQUE_LIMIT = 16
-_TORQUE_MIN, _TORQUE_MAX = 50, 600   # probe range; above 600 is not needed to seat a key
+_TORQUE_MIN, _TORQUE_MAX = 50, 500   # probe range; 500 = the gripper's EEPROM Max_Torque_Limit (LeRobot cap)
+# AA-43 2026-11-13: lock trials run at the slow empty-move profile that drove both new grippers
+# end to end on 2026-11-12 (Goal_Speed 0 in RAM = FULL speed on the STS3215).
+_PROBE_SPEED_TICKS_S, _PROBE_ACCEL = 150, 20
+_REG_GOAL_SPEED, _REG_ACCEL = 0x2E, 0x29
+_SETTLE_S, _SETTLE_TIMEOUT_S = 0.5, 12.0   # unchanged (<= 1 tick) this long = stopped
 
 
 # Drive-config registers that must be non-zero for the servo to produce torque
@@ -81,6 +89,30 @@ def classify(position_deg: float, bands) -> str:
     return "short_of_locked_band"
 
 
+def wait_settled(bus, sid: int, *, settle_s: float = _SETTLE_S, timeout_s: float = _SETTLE_TIMEOUT_S,
+                 sleep=time.sleep, clock=time.monotonic):
+    """Poll until the gripper position is unchanged (<= 1 tick) for ``settle_s``.
+
+    The slow lock move can still be travelling when ``lock()`` returns (its own settle check
+    is short), so the probe classifies only a settled position. Returns (state, settled, peak_load).
+    """
+    t0 = clock()
+    st = bus.read_joint_state(sid)
+    last, last_change, peak = round(st.position_deg * 4096 / 360), t0, abs(st.load_raw)
+    while True:
+        sleep(0.02)
+        st = bus.read_joint_state(sid)
+        now = clock()
+        peak = max(peak, abs(st.load_raw))
+        ticks = round(st.position_deg * 4096 / 360)
+        if abs(ticks - last) > 1:
+            last, last_change = ticks, now
+        elif now - last_change >= settle_s:
+            return st, True, peak
+        if now - t0 > timeout_s:
+            return st, False, peak
+
+
 def run_trials(
     bus,
     sm,
@@ -92,6 +124,7 @@ def run_trials(
     trials: int,
     prompt: Callable[[str], str] = input,
     pause_s: float = 0.5,
+    settle: Optional[Callable] = None,
 ) -> List[dict]:
     """Run ``trials`` lock attempts through the AA-17 state machine."""
     from inchworm.gripper_lock import GripperLockError
@@ -100,6 +133,8 @@ def run_trials(
     records: List[dict] = []
     for k in range(trials):
         sm.reset()                      # AA-17: command the open position
+        if settle is not None:
+            settle(bus, sid)
         time.sleep(pause_s)
         sm.set_approach_ready()         # engaged == open for this lock-and-key
         what = "INSERT the key into the open gripper" if key else "make sure NO key is in the gripper"
@@ -110,14 +145,18 @@ def run_trials(
             sm.lock()
         except GripperLockError as exc:          # UNVERIFIED expected (thresholds null)
             outcome = f"{type(exc).__name__}: {getattr(exc, 'verdict', '')}".strip()
-        st = bus.read_joint_state(sid)
+        if settle is not None:
+            st, settled, peak = settle(bus, sid)
+        else:
+            st, settled, peak = bus.read_joint_state(sid), None, None
         rec = {
             "arm": role, "servo_id": sid, "torque_limit_raw": torque_raw, "key": key,
             "trial": k + 1, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "sm_outcome": outcome,
             "position_deg": round(st.position_deg, 2),
             "position_ticks": round(st.position_deg * 4096 / 360),
-            "classification": classify(st.position_deg, bands),
+            "classification": classify(st.position_deg, bands) if settled is not False else "not_settled",
+            "settled": settled, "peak_abs_load": peak,
             "load_raw": st.load_raw, "current_raw": st.current_raw,
             "speed_raw": st.speed_raw, "temperature_c": st.temperature_c,
             "locked_band_deg": [bands.locked_low_deg, bands.locked_high_deg],
@@ -126,6 +165,8 @@ def run_trials(
         print(json.dumps(rec))
         records.append(rec)
         sm.reset()                      # re-open before the next trial / exit
+        if settle is not None:
+            settle(bus, sid)
         time.sleep(pause_s)
     return records
 
@@ -154,7 +195,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     print(f"Plan: {a.trials} trial(s) on {role}, torque_limit_raw={a.torque}, key={'in' if a.key else 'OUT'}; "
           f"lock goal {bands.lock_overtravel_goal_deg} deg, locked band "
-          f"[{bands.locked_low_deg}, {bands.locked_high_deg}] deg.")
+          f"[{bands.locked_low_deg}, {bands.locked_high_deg}] deg; {_PROBE_SPEED_TICKS_S} ticks/s, "
+          f"torque OFF afterwards.")
     if not a.live:
         print("DRY-RUN: nothing opened or moved. Add --live with the owner present.")
         return 0
@@ -174,6 +216,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sid = joint_map["gripper"]
     records: List[dict] = []
     restore_torque = _TORQUE_LIMIT_FULL
+    restore_speed = restore_accel = None
     try:
         on = [n for n in ARM_JOINTS if bus._bus.read_bytes(joint_map[n], _REG_TORQUE_ENABLE, 1)[0] != 0]
         if on:
@@ -190,13 +233,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         # lower gripper cap, 500). Restoring a hard-coded 1000 would silently undo that cap.
         mt = bus._bus.read_bytes(sid, _REG_MAX_TORQUE_LIMIT, 2)
         restore_torque = (mt[0] | (mt[1] << 8)) or _TORQUE_LIMIT_FULL
+        sp = bus._bus.read_bytes(sid, _REG_GOAL_SPEED, 2)
+        restore_speed, restore_accel = sp[0] | (sp[1] << 8), bus._bus.read_bytes(sid, _REG_ACCEL, 1)[0]
+        bus.set_goal_speed(sid, _PROBE_SPEED_TICKS_S)   # before torque: no full-speed move ever
+        bus.set_acceleration(sid, _PROBE_ACCEL)
+        bus.set_torque_limit(sid, a.torque)             # opening moves too; lock() re-applies it
         bus.set_torque_enable(sid, True)        # goal := present first (no jump)
         sm = GripperLockSM(bus=bus, role=role, config=probe_cfg,
                            opposite_arm_locked_fn=lambda: False, dry_run=False)
-        records = run_trials(bus, sm, bands, role=role, torque_raw=a.torque, key=a.key, trials=a.trials)
+        records = run_trials(bus, sm, bands, role=role, torque_raw=a.torque, key=a.key, trials=a.trials,
+                             settle=wait_settled)
     finally:
-        for step in (lambda: bus.set_torque_limit(sid, restore_torque),
-                     lambda: bus.set_torque_enable(sid, False)):
+        steps = [lambda: bus.set_torque_enable(sid, False), lambda: bus.set_torque_limit(sid, restore_torque)]
+        if restore_speed is not None:
+            steps += [lambda: bus.set_goal_speed(sid, restore_speed), lambda: bus.set_acceleration(sid, restore_accel)]
+        for step in steps:
             try:
                 step()
             except Exception as exc:  # noqa: BLE001

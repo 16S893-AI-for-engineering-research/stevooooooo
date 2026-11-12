@@ -531,7 +531,9 @@ motion_guard:
       shoulder_lift: [1255, 3000]
       elbow_flex: [939, 3091]
       # AA-43 2026-11-09: joints 4-6 re-measured on the REPLACEMENT servos (EEPROM, read back);
-      # gripper = previous values assumed (owner), see AA-43 notes.
+      # gripper: the previous values, written 2026-11-09; 2026-11-12 measured against the travel
+      # (gripper_ends_2026-11-12.jsonl): open end 1526, closed end 2527, both at the limits (owner:
+      # fully open / closed).
       wrist_flex: [831, 3226]
       wrist_roll: [550, 3573]
       gripper: [1521, 2531]
@@ -565,7 +567,10 @@ motion_guard:
       # AA-43 2026-11-09: see left_arm_limits.
       wrist_flex: [797, 3191]
       wrist_roll: [533, 3577]
-      gripper: [1563, 2504]
+      # AA-43 2026-11-12 (owner approved): EEPROM Min_Position_Limit 1563 -> 1523 so the jaw
+      # opens fully (measured open end 1529); backup eeprom_backup_right_2026-11-12T11-59-02_pre_limits.json,
+      # read back [1523, 2504].
+      gripper: [1523, 2504]
 
   # Collision model.
   # Dense sampling of straight-line joint interpolations: 50 samples.
@@ -742,6 +747,13 @@ motion_guard:
       wrist_flex_sign: 1
       wrist_roll_zero_offset_deg: 181.187  # AA-43 2026-11-09: mid-range of new limits 550..3573 (was 166.553)
       wrist_roll_sign: 1
+      # AA-43 joints 4-5 on the NEW servos (re-measured on hardware):
+      #   zeros: mid-range of the 2026-11-09 sweep (joint_ranges_left_ids45_2026-11-09.json, EEPROM
+      #     written + read back). Landmark check AA-47 (calibration_data/poses_2026-11-11.jsonl,
+      #     zero_landmark 2026-11-12T00:03:52Z): wrist_flex +1.4 deg, wrist_roll -2.4 deg from zero; kept by the
+      #     owner-approved AA-47 correction, which changed only shoulder_lift.
+      #   signs +1: owner-observed powered moves (wrist_flex powered_move_2026-11-09.jsonl, wrist_roll powered_move_2026-11-12.jsonl),
+      #     directions as predicted by the cell model and the doc-1 convention.
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
       # sign: DERIVED 2026-10-24 (no hardware motion). Higher reading = clockwise in
@@ -781,6 +793,13 @@ motion_guard:
       wrist_flex_sign: 1
       wrist_roll_zero_offset_deg: 180.615  # AA-43 2026-11-09: mid-range of new limits 533..3577 (was 175.254)
       wrist_roll_sign: 1
+      # AA-43 joints 4-5 on the NEW servos (re-measured on hardware):
+      #   zeros: mid-range of the 2026-11-09 sweep (joint_ranges_right_ids45_2026-11-09.json, EEPROM
+      #     written + read back). Landmark check AA-47 (calibration_data/poses_2026-11-11.jsonl,
+      #     zero_landmark 2026-11-12T00:09:53Z): wrist_flex +1.1 deg, wrist_roll -2.6 deg from zero; kept by the
+      #     owner-approved AA-47 correction, which changed only shoulder_lift.
+      #   signs +1: owner-observed powered moves (wrist_flex and wrist_roll, powered_move_2026-11-12.jsonl),
+      #     directions as predicted by the cell model and the doc-1 convention.
       # zero_offset_deg: MEASURED (midpoint of the servo range after half-turn homing,
       #   = so101_new_calib URDF zero, joint mid-range).
       # sign: DERIVED 2026-10-24 (no hardware motion). Higher reading = clockwise in
