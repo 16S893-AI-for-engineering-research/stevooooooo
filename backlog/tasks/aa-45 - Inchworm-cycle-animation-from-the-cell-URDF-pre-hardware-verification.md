@@ -1,11 +1,11 @@
 ---
 id: AA-45
 title: Inchworm cycle animation from the cell URDF (pre-hardware verification)
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-12 04:08'
+updated_date: '2026-11-12 18:05'
 labels:
   - simulation
   - verification
@@ -34,12 +34,12 @@ The owner cannot trust the agents' text descriptions of physical motion; rendere
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -83,4 +83,12 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 OWNER DECISION 2026-11-12 (revisitable): tolerances changed so the re-plan passes. (1) motion_guard.collision.mesh.margin_m 0.005 -> 0.0029 (hardware.yaml; GLOBAL: applies to all live mesh checks). Reason: the planned printing pose has the lower arm 3.0 mm from the shoulder in the model; the real fold sits ~6 deg past the model's contact, so that mesh pair is conservative. (2) inchworm_plan.GRIP_REACH_TOL_M 1.0 mm -> 2.7 mm (all frames). Reason: the regrip 'move under target' open-air frames missed by up to 2.68 mm. Result: 87 frames, 0 violations; full suite passes. Alternatives the owner may return to: restore 5 mm and open the start pose elbow ~1-2 deg (5 mm margin begins at elbow 88.8 deg, start pose is 89.8 deg); restore 1 mm and exempt only the transit frames. Next: owner reviews out/inchworm/cycle.gif.
 
 2026-11-12 owner: printing pose = the measured fold; pan must be 0 for BOTH arms in this movement (pan stays a free joint elsewhere; the learned insertion may pan). Implemented: plan_cycle(start_from_fold=True default): start = measured_fold_pose (mean of the two arms' measured fold, joints 2-4; pan 0, roll 0); the tube is re-placed rigidly onto the grippers (left grip = middle point, axis along left->right grip; stops if the left grip is > START_GRIP_TOL 5 mm / 3 deg off the CAD middle point or the axis turns > 2 deg); hold_pan_roll keeps pan and roll at 0 in every frame (joint limits unchanged). Result: 87 frames, 0 violations; pan 0.00 / roll 0.00 deg on both arms; start residual L 0.00 mm, R 1.24 mm, 2.39 deg (orientation offset absorbed by insertion). Owner kept margin 2.9 mm (note corrected: the model is not conservative at the fold with the landmark elbow zero). Tests: test_direction_check asserts only the observed AWAY direction (owner approved); test_working_pose_is_collision_free checks geometry without the fold allowance (the working pose is now within the allowance, as it is the fold); new tests test_fold_start_holds_pan_and_roll_at_zero and test_fold_start_stops_when_the_fold_misses_the_cad_tube. Suite passes. Next: owner reviews the new GIF.
+
+2026-11-12 OWNER REVIEW of the final cycle.gif (measured-fold start, pan/roll 0): 'AA-45 cycle looks good'. Verified before closing: out/inchworm/report.txt = measured fold start, 87 frames, violations 0, 'result: OK (no violations)'; cycle.gif 30 frames; tests/test_inchworm_plan.py + test_start_pose_check.py pass; full suite passes (2026-11-12). Deferred/open (not part of this task): the owner-approved tolerance changes (mesh margin 2.9 mm global, GRIP_REACH_TOL 2.7 mm) remain revisitable; the real-robot check of the animation (pose_snapshot --plan-start, then replay without/with the tube) is future work.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Planner (src/inchworm/inchworm_plan.py) + scripts/inchworm_animation.py produce the owner-specified inchworm cycle on the cell URDF: start at the measured fold (pan/roll 0, both arms the same pose), lift, carry, left regrip, right regrip, lower and return, one pitch net advance. Timeline JSONL, per-frame mesh collision / joint and soft limits / gripper invariants / rigid-tube checks, side-view GIF with overlays. Fixed the shoulder_lift zero along the way (AA-47). Owner-approved tolerance changes (mesh margin 2.9 mm, grip reach 2.7 mm) recorded in the notes. Verified: 87 frames, 0 violations; tests pass; owner watched the final GIF and confirmed ('AA-45 cycle looks good').
+<!-- SECTION:FINAL_SUMMARY:END -->

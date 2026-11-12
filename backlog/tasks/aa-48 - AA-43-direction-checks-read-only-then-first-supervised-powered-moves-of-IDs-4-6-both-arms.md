@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-11-12 04:57'
-updated_date: '2026-11-12 05:28'
+updated_date: '2026-11-12 18:07'
 labels:
   - human-action
   - human-key-595ee182162ed361
@@ -191,10 +191,10 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "595ee182162ed361548b4fcb983e238fa012e84b5ec696681dc3ca23a3cf3cf0",
-  "phase": "paused",
+  "phase": "ready",
   "createdAt": "2026-11-12T04:57:31.029Z",
   "origin": "01a1cd6c-8447-706e-9869-03dd3b2da7aa",
-  "step": 4,
+  "step": 10,
   "evidence": [
     {
       "step": 1,
@@ -251,6 +251,54 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "Owner-pasted terminal output of `uv run python scripts/powered_move_check.py --arm left --joint wrist_roll --live --out calibration_data/powered_move_2026-11-12.jsonl` (ServoTimeoutError servo 5, reg 0x2A); agent read of /home/stevotimp/893/robot/src/inchworm/servo_bus.py lines 820-890 and /home/stevotimp/893/robot/scripts/powered_move_check.py lines 110-190",
       "advanced": false,
       "at": "2026-11-12T05:27:53.668Z"
+    },
+    {
+      "step": 5,
+      "note": "Step 5 (left wrist_roll powered move) recorded from the log, not from an owner observation. powered_move_2026-11-12.jsonl has two runs after the earlier 05:27Z servo-5 read timeout: 14:57:41Z out goal 2057 final 2052 (err -5), back err +4; 15:20:34Z out goal 2059 final 2055 (err -4), back err +5. Both REACHED, tolerance 6, 29 C, peak current 1-2. The cause of the earlier timeout and the reason for the repeat run are not in the files. NOT VERIFIED: the direction the owner saw, and any noise/other-joint motion. The owner did not report them and instead directed that the orchestrator's logs be used and the steps marked done. Advanced on that owner instruction only; the visual half of the verification is unmet.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl (left wrist_roll records 14:57:41Z, 14:57:42Z, 15:20:34Z, 15:20:35Z); owner instruction in conversation",
+      "advanced": true,
+      "at": "2026-11-12T18:05:39.954Z"
+    },
+    {
+      "step": 6,
+      "note": "Step 6 (right wrist_flex powered move) recorded from the log, not from an owner observation. powered_move_2026-11-12.jsonl: 14:59:50Z out goal 1024 final 1018 (err -6, exactly at tolerance 6), back err +5; 15:21:08Z out goal 1026 final 1020 (err -6), back err +5. All REACHED, 30 C, peak current 2, peak load 84-120. Expected motion: ticks UP, tip drops and swings toward the DexArm. NOT VERIFIED: direction the owner saw, noise, other-joint motion. Reason for the repeat run is not in the files. Advanced on the owner's instruction to use the orchestrator logs; the visual half is unmet.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl (right wrist_flex records 14:59:50Z, 14:59:51Z, 15:21:08Z, 15:21:09Z); owner instruction in conversation",
+      "advanced": true,
+      "at": "2026-11-12T18:05:47.226Z"
+    },
+    {
+      "step": 7,
+      "note": "Step 7 (right wrist_roll powered move) recorded from the log, not from an owner observation. powered_move_2026-11-12.jsonl: 15:18:52Z out goal 2070 final 2066 (err -4), back err +5; 15:19:24Z out goal 2072 final 2066 (err -6), back err +5. All REACHED, 31 C, peak current 1-3. Expected: ticks UP, clockwise seen from the tip. NOT VERIFIED: direction the owner saw, noise, other-joint motion. Earlier hand-check readings for this joint conflicted (05:05:44Z +441 MISMATCH vs 05:09:11Z -348 MATCH, both from the cable side), so the powered move was the live direction check, and that visual observation is missing. Advanced on the owner's instruction only.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl (right wrist_roll records 15:18:52Z, 15:18:53Z, 15:19:24Z, 15:19:25Z); /home/stevotimp/893/robot/calibration_data/direction_check_2026-11-12.jsonl lines 4 and 7; owner instruction in conversation",
+      "advanced": true,
+      "at": "2026-11-12T18:05:53.780Z"
+    },
+    {
+      "step": 8,
+      "note": "Step 8 (left gripper open) recorded from the log, not from an owner observation. powered_move_2026-11-12.jsonl 15:21:53Z: start 2516, goal 1558, final 1569 (err +11), status REACHED, inside unlocked band 1506-1610 (EEPROM limits 1521-2531), 32 C, peak current 2, peak load 92. No STALLED/TIMEOUT. The 11-tick error exceeds the 6-tick wrist tolerance but is within the open band; the procedure only says near 1558. NOT VERIFIED: that the gripper looked fully open, whether it hit a mechanical stop, noise. Advanced on the owner's instruction only.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl (arm_left gripper record 15:21:53Z); owner instruction in conversation",
+      "advanced": true,
+      "at": "2026-11-12T18:05:58.837Z"
+    },
+    {
+      "step": 9,
+      "note": "Step 9 (right gripper open) recorded from the log, not from an owner observation. powered_move_2026-11-12.jsonl 15:24:58Z: start 2494, goal 1594, final 1604 (err +10), status REACHED, inside unlocked band 1551-1636 (EEPROM limits 1563-2504), 31 C, peak current 2, peak load 76. No STALLED/TIMEOUT. NOT VERIFIED: that the gripper looked fully open, mechanical stop, noise. Advanced on the owner's instruction only.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl (arm_right gripper record 15:24:58Z); owner instruction in conversation",
+      "advanced": true,
+      "at": "2026-11-12T18:06:03.536Z"
+    },
+    {
+      "step": 10,
+      "note": "Step 10 (agent check of both jsonl files) done. The agent read direction_check_2026-11-12.jsonl (10 lines) and powered_move_2026-11-12.jsonl (14 lines).\n\nREACHED, all within the 6-tick wrist tolerance or the gripper open band: left wrist_roll, right wrist_flex, right wrist_roll, left gripper (final 1569, goal 1558, band 1506-1610), right gripper (final 1604, goal 1594, band 1551-1636). No STALLED/TIMEOUT. Temperatures 29-32 C.\n\nValid hand-direction readings (viewed from the cable side, clockwise): right wrist_flex ticks DOWN, MATCH, model tip y; right wrist_roll ticks DOWN, MATCH; left wrist_roll ticks DOWN, MATCH. Earlier lines are NO_MOVEMENT or a conflicting right wrist_roll +441 (MISMATCH), dismissed by the owner as practice. That conflict was never resolved by an observation.\n\nNOT EVIDENCED, and not claimed: the owner's visual direction for any powered move, noise, mechanical stops, whether the grippers looked fully open, and why left wrist_roll, right wrist_flex and right wrist_roll each ran twice. The owner did not give these and directed that steps be marked done from the orchestrator logs. The agent did not determine which AA-43 criteria the evidence supports, because AA-43's criteria were not read. Open items for the orchestrator: the cause of the earlier servo 5 read timeout (left wrist_roll later succeeded), the unresolved right wrist_roll direction conflict, and the AA-42 firmware question. Steps 5-9 were advanced on the owner's instruction, not on observed completion. Ready for /walk finish.",
+      "type": "automated",
+      "reference": "/home/stevotimp/893/robot/calibration_data/direction_check_2026-11-12.jsonl; /home/stevotimp/893/robot/calibration_data/powered_move_2026-11-12.jsonl",
+      "advanced": true,
+      "at": "2026-11-12T18:06:13.980Z"
     }
   ],
   "history": [
@@ -261,7 +309,9 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
     }
   ],
   "acceptedHash": "39f25bef180ebeba23a4a905c0598fee521c23e5bf68f7a1b513177df0963b53",
-  "acceptedAt": "2026-11-12T04:59:43.684Z"
+  "acceptedAt": "2026-11-12T04:59:43.684Z",
+  "summary": "none",
+  "completedAt": "2026-11-12T18:07:02.053Z"
 }
 ```
 <!-- /human-handoff-state -->
