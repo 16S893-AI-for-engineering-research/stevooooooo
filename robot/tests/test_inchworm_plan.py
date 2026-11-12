@@ -263,8 +263,11 @@ def test_printing_pose_unreachable_stops(cfg, checker, monkeypatch):
 
 
 def test_matching_start_pose_and_return(cfg, checker):
-    """Both arms start in ONE shared pose, and the cycle returns them to it."""
-    plan = plan_cycle(cfg, checker)
+    """Both arms start in ONE shared pose, and the cycle returns them to it.
+
+    (IK matching start; since 2026-11-12 the default is the measured fold, see
+    test_fold_start_holds_pan_and_roll_at_zero.)"""
+    plan = plan_cycle(cfg, checker, start_from_fold=False)
     assert "matching" in plan.start_kind
     np.testing.assert_allclose(plan.printing_pose_left, plan.printing_pose_right)
     first, last = plan.frames[0], plan.frames[-1]
@@ -294,7 +297,45 @@ def test_soft_limit_violation_is_reported(kin):
 
 def test_per_arm_start_reaches_each_point(cfg, checker):
     """Per-arm IK (matching_start=False) still puts each gripper on its point within 1 mm."""
-    plan = plan_cycle(cfg, checker, matching_start=False, steps=2)
+    plan = plan_cycle(cfg, checker, start_from_fold=False, matching_start=False, steps=2)
     assert plan.start_kind == "per-arm IK"
     assert plan.printing_pose_ik_residual_m[0] < 1e-3
     assert plan.printing_pose_ik_residual_m[1] < 1e-3
+
+
+# ---------------------------------------------------------------------------
+# Owner 2026-11-12: printing pose = measured fold; pan 0 in this movement
+# ---------------------------------------------------------------------------
+
+
+def test_fold_start_holds_pan_and_roll_at_zero(cfg, checker):
+    """Default plan starts in the measured fold (both arms the same, pan 0,
+    roll 0), keeps pan and roll at 0 for both arms in every frame, and ends
+    back in the fold. Pan is NOT removed from the joint limits."""
+    from inchworm.inchworm_plan import measured_fold_pose
+    plan = plan_cycle(cfg, checker)
+    assert plan.start_kind.startswith("measured fold") and plan.hold_pan_roll
+    q0 = measured_fold_pose(cfg)
+    assert q0[0] == 0.0 and q0[4] == 0.0
+    np.testing.assert_allclose(plan.printing_pose_left, q0)
+    np.testing.assert_allclose(plan.printing_pose_right, q0)
+    for fr in plan.frames:
+        assert fr.left_q[0] == 0.0 and fr.right_q[0] == 0.0, fr.step
+        assert fr.left_q[4] == 0.0 and fr.right_q[4] == 0.0, fr.step
+    np.testing.assert_allclose(plan.frames[-1].left_q, q0, atol=2e-3)
+    np.testing.assert_allclose(plan.frames[-1].right_q, q0, atol=2e-3)
+    kin = build_cell_kinematics(cfg, checker)
+    assert kin.upper_rad[0] - kin.lower_rad[0] > 1.0   # pan still a free joint
+    assert plan.ok, plan.report
+
+
+def test_fold_start_stops_when_the_fold_misses_the_cad_tube(cfg, checker, monkeypatch):
+    """The tube is re-placed onto the grippers only within START_GRIP_TOL; a fold
+    that does not hold the CAD tube stops planning instead of moving the tube."""
+    import inchworm.inchworm_plan as ip
+    monkeypatch.setattr(ip, "measured_fold_pose",
+                        lambda cfg: np.array([0.0, -1.2, 1.2, -1.2, 0.0]))
+    with pytest.raises(PlanStopped) as exc:
+        ip.plan_cycle(cfg, checker)
+    assert "did not reach the CAD tube" in str(exc.value)
+

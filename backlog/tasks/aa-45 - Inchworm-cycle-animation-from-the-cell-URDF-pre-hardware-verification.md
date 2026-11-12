@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-12 02:20'
+updated_date: '2026-11-12 04:08'
 labels:
   - simulation
   - verification
@@ -81,4 +81,6 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 - Re-plan: 42 -> 14 violations; all 30 soft-limit violations are gone. Left: 10 regrip reach misses of 1.1-2.7 mm (tol 1 mm) at the retract/move-under edge, and 4 near misses at start/end (lower arm within 3.0 mm of the shoulder, margin 5 mm).
 
 OWNER DECISION 2026-11-12 (revisitable): tolerances changed so the re-plan passes. (1) motion_guard.collision.mesh.margin_m 0.005 -> 0.0029 (hardware.yaml; GLOBAL: applies to all live mesh checks). Reason: the planned printing pose has the lower arm 3.0 mm from the shoulder in the model; the real fold sits ~6 deg past the model's contact, so that mesh pair is conservative. (2) inchworm_plan.GRIP_REACH_TOL_M 1.0 mm -> 2.7 mm (all frames). Reason: the regrip 'move under target' open-air frames missed by up to 2.68 mm. Result: 87 frames, 0 violations; full suite passes. Alternatives the owner may return to: restore 5 mm and open the start pose elbow ~1-2 deg (5 mm margin begins at elbow 88.8 deg, start pose is 89.8 deg); restore 1 mm and exempt only the transit frames. Next: owner reviews out/inchworm/cycle.gif.
+
+2026-11-12 owner: printing pose = the measured fold; pan must be 0 for BOTH arms in this movement (pan stays a free joint elsewhere; the learned insertion may pan). Implemented: plan_cycle(start_from_fold=True default): start = measured_fold_pose (mean of the two arms' measured fold, joints 2-4; pan 0, roll 0); the tube is re-placed rigidly onto the grippers (left grip = middle point, axis along left->right grip; stops if the left grip is > START_GRIP_TOL 5 mm / 3 deg off the CAD middle point or the axis turns > 2 deg); hold_pan_roll keeps pan and roll at 0 in every frame (joint limits unchanged). Result: 87 frames, 0 violations; pan 0.00 / roll 0.00 deg on both arms; start residual L 0.00 mm, R 1.24 mm, 2.39 deg (orientation offset absorbed by insertion). Owner kept margin 2.9 mm (note corrected: the model is not conservative at the fold with the landmark elbow zero). Tests: test_direction_check asserts only the observed AWAY direction (owner approved); test_working_pose_is_collision_free checks geometry without the fold allowance (the working pose is now within the allowance, as it is the fold); new tests test_fold_start_holds_pan_and_roll_at_zero and test_fold_start_stops_when_the_fold_misses_the_cad_tube. Suite passes. Next: owner reviews the new GIF.
 <!-- SECTION:NOTES:END -->

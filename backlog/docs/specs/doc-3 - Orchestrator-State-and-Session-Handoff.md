@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 02:20'
+updated_date: '2026-11-12 04:08'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-12. AA-45 margin/tolerance changed by the owner (re-plan 0 violations). AA-43 In Progress (2/5 AC). AA-45 planner reworked to the owner's refined cycle (lift, carry right, left regrip, right regrip, lower); owner review of the new GIF pending. nono draft profile ready. Suite passes. Hardware: owner resuming AA-43 (direction checks, then a supervised powered move).
+**Last verified:** 2026-11-12. Elbow zero corrected; AA-45 starts from the measured fold with pan 0 (0 violations); AA-40 #6 needs only the rest snapshot. AA-43 In Progress (2/5 AC). AA-45 planner reworked to the owner's refined cycle (lift, carry right, left regrip, right regrip, lower); owner review of the new GIF pending. nono draft profile ready. Suite passes. Hardware: owner resuming AA-43 (direction checks, then a supervised powered move).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -47,7 +47,9 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **Done since:** the matching start (one shared pose for both arms, about 2 mm grip residual, the cycle ends exactly in it). Frames are now checked against the configured soft limits.
 - **Zeros applied 2026-11-11 (owner approved):** shoulder_lift zero L 214.893 / R 220.518 (AA-47 landmark); lift soft limits re-derived (lower = URDF -100 deg, upper 0.85 L / 0.65 R from the EEPROM). folded_transit, the fold waypoints and the fold allowance now use the fold hand-placed 2026-11-11 on the new servos. AA-45 re-plan: 14 violations (none soft-limit): 10 regrip reach misses of 1-2.7 mm and 4 start/end near misses (lower arm 3 mm from the shoulder, margin 5 mm). Previously planned: fix those two (e.g. a smaller regrip standoff or a different retract path; a printing pose slightly more open), then the owner reviews the GIF.
 - **Owner decision 2026-11-12 (REVISITABLE, see AA-45 notes):** tolerances changed instead. mesh `margin_m` 5 mm -> 2.9 mm (GLOBAL, hardware.yaml) and `GRIP_REACH_TOL_M` 1.0 -> 2.7 mm. Re-plan: 0 violations. To revert: restore 5 mm and open the start pose elbow ~1-2 deg; restore 1 mm and exempt only the regrip transit frames. **Next for AA-45:** owner reviews `robot/out/inchworm/cycle.gif`.
-- **AA-40 #6 is one step away:** the last fold snapshot (2026-11-11) said only shoulder_lift was wrong; zeros were corrected after. Re-run `scripts/pose_snapshot.py --label fold --live` (+ a rest pose) and record y/n.
+- **2026-11-12 elbow zero corrected (owner approved):** AA-47 landmark ticks (L 182.900, R 179.033 deg; was mid-range 177.1 / 173.672). Fold render now matches (owner 'yes'). Real fold elbow 91.4 deg = the model's contact (91.7), so the model is NOT conservative there; owner kept the 2.9 mm margin anyway.
+- **2026-11-12 AA-45 start = measured fold (owner):** both arms the same, pan 0 and roll 0 held in every frame of this movement (pan stays a free joint elsewhere; the learned insertion may pan). The tube is re-placed onto the grippers (stops if > 5 mm off the CAD point or the axis turns > 2 deg). 0 violations. **Next:** owner reviews the GIF.
+- **AA-40 #6:** fold confirmed 2026-11-12. Still needs a REST pose snapshot (`scripts/pose_snapshot.py --label rest --live`, answer y/n), then check AC6.
 - **Verification plan (owner asked how the animation will match reality):**
   1. Static pose match: `scripts/pose_snapshot.py --label X --live`. Read-only, torque off. It renders the reading and logs the owner's y/n. This also covers AA-40 #6 and most of AA-43 #4.
   2. Start-pose check before motion: `inchworm.start_pose_check`, or `--plan-start out/inchworm/timeline.jsonl`.

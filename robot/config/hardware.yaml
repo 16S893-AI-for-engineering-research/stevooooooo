@@ -623,9 +623,11 @@ motion_guard:
       # Minimum separation between checked parts. Unverified.
       # OWNER DECISION 2026-11-12 (AA-45, revisitable): lowered from 0.005 to
       # 0.0029 so the planned printing pose (lower arm 3.0 mm from the shoulder
-      # in the model) passes. The real fold sits past the model's contact, so
-      # this mesh pair is conservative. Alternative kept open: restore 0.005
-      # and open the start pose's elbow ~1-2 deg instead.
+      # in the model) passes. NOTE 2026-11-12: with the landmark elbow zero the
+      # real fold (elbow 91.4 deg) sits at the model's contact (91.7 deg), so the
+      # model is NOT conservative there; the 3 mm clearance is likely real. Owner
+      # kept 2.9 mm anyway. Alternative kept open: restore 0.005 and open the
+      # start pose's elbow ~1-2 deg instead.
       margin_m: 0.0029
       # Pan/lift/elbow/wrist_flex map 1:1 onto the cell URDF (verified against
       # the vendored chain, 0.015 mm). Wrist roll: the cell URDF range is
@@ -653,8 +655,9 @@ motion_guard:
         - [right_lower_arm, right_shoulder]
         - [right_shoulder, right_wrist]
         - [right_upper_arm, right_wrist]
-      fold_allowance_centre_left_rad: [0.0092, -1.5677, 1.6966, -1.5731, -0.0468]
-      fold_allowance_centre_right_rad: [0.0138, -1.5570, 1.6858, -1.5739, -0.0491]
+      # 2026-11-12: elbow re-expressed with the landmark elbow zero (same fold ticks).
+      fold_allowance_centre_left_rad: [0.0092, -1.5677, 1.5953, -1.5731, -0.0468]
+      fold_allowance_centre_right_rad: [0.0138, -1.5570, 1.5923, -1.5739, -0.0491]
       fold_allowance_radius_rad: 0.05
     # Keep-out capsules in the chassis fixed frame (metres).
     # ALL VALUES ARE UNVERIFIED CONSERVATIVE PLACEHOLDERS.
@@ -705,7 +708,10 @@ motion_guard:
       # elbow 95.1 deg = ~2 deg short of the real fold stop (and inside the URDF 96.8)
       # so a powered fold does not drive into the stop; within the fold-allowance radius.
       # Supersedes the 2026-10-25 fold (lift on the bracket stop at -107 deg in this frame).
-      q_rad: [0.0, -1.5533, 1.66, -1.5708, 0.0]
+      # 2026-11-12: elbow re-expressed for the landmark elbow zero (same physical pose:
+      # old 1.66 minus the left shift 0.1012 rad; the right shift is smaller, so this is the
+      # more open of the two) = 89.3 deg, ~2 deg short of the real fold (91.4 / 91.2 deg).
+      q_rad: [0.0, -1.5533, 1.5588, -1.5708, 0.0]
       unverified: true
 
   # Per-joint servo calibration: servo-degree ↔ joint-radian conversion.
@@ -723,7 +729,7 @@ motion_guard:
       shoulder_pan_sign: 1
       shoulder_lift_zero_offset_deg: 214.893  # AA-47 2026-11-11 LANDMARK: arm hand-placed at the URDF zero pose, read-only (calibration_data/poses_2026-11-11.jsonl; was mid-range 186.987)
       shoulder_lift_sign: 1
-      elbow_flex_zero_offset_deg: 177.1
+      elbow_flex_zero_offset_deg: 182.900  # AA-40 2026-11-12 LANDMARK (owner approved): AA-47 zero_landmark tick 2081 (calibration_data/poses_2026-11-11.jsonl); was mid-range 177.1 (+5.8). Owner: fold render showed the elbow more folded than the real arm.
       elbow_flex_sign: 1
       wrist_flex_zero_offset_deg: 178.286  # AA-43 2026-11-09: mid-range of new limits 831..3226 (was 180.879)
       wrist_flex_sign: 1
@@ -762,7 +768,7 @@ motion_guard:
       shoulder_pan_sign: 1
       shoulder_lift_zero_offset_deg: 220.518  # AA-47 2026-11-11 LANDMARK: arm hand-placed at the URDF zero pose, read-only (calibration_data/poses_2026-11-11.jsonl; was mid-range 187.119)
       shoulder_lift_sign: 1
-      elbow_flex_zero_offset_deg: 173.672
+      elbow_flex_zero_offset_deg: 179.033  # AA-40 2026-11-12 LANDMARK (owner approved): AA-47 zero_landmark tick 2037; was mid-range 173.672 (+5.36).
       elbow_flex_sign: 1
       wrist_flex_zero_offset_deg: 175.254  # AA-43 2026-11-09: mid-range of new limits 797..3191 (was 178.682)
       wrist_flex_sign: 1
@@ -868,7 +874,7 @@ fold_sequence:
     # Matches folded_transit q_rad from AA-9 named_poses.
     # (FoldSequencer appends the folded_transit pose as the terminal waypoint.)
     # 2026-10-25: = measured folded_transit.
-    - q_rad: [0.0, -1.5533, 1.66, -1.5708, 0.0]  # AA-47 2026-11-11: = folded_transit
+    - q_rad: [0.0, -1.5533, 1.5588, -1.5708, 0.0]  # 2026-11-12: = folded_transit (landmark elbow zero)
       description: >-
         Full fold: shoulder raised, elbow tucked. Matches folded_transit.
         UNVERIFIED placeholder; this is the terminal waypoint.

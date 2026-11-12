@@ -117,7 +117,7 @@ def animate(plan, checker, out_path: Path, every: int = 1, max_faces: int = 2000
         ax.set_axis_off()
         lk = lambda b: "LOCKED" if b else "unlocked"
         overlay = (
-            f"PLACEHOLDER printing pose (IK, seeded from folded_transit)\n"
+            f"start: {plan.start_kind}\n"
             f"step: {fr.step}\n"
             f"left gripper: {lk(fr.left_locked)}   right gripper: {lk(fr.right_locked)}\n"
             f"tube advance: {fr.tube_advance_m * 1000:.1f} mm "

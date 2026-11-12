@@ -58,7 +58,7 @@ JOINT_ORDER = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wri
 #: Printing pose joint seed = the hardware.yaml folded_transit placeholder.
 #: Stored here only so the planner can seed IK and the report can compare; the
 #: owner's real pose replaces this later.
-FOLDED_TRANSIT_PLACEHOLDER = np.array([0.0, -1.5533, 1.66, -1.5708, 0.0])  # = hardware.yaml folded_transit (2026-11-11)
+FOLDED_TRANSIT_PLACEHOLDER = np.array([0.0, -1.5533, 1.5588, -1.5708, 0.0])  # = hardware.yaml folded_transit (2026-11-12, landmark elbow zero)
 
 #: Rigid-tube constraint tolerance: while both arms are locked they must keep a
 #: constant relative gripper pose (the tube is rigid). A locked gripper is
@@ -82,6 +82,12 @@ GRIP_REACH_TOL_RAD = math.radians(0.5)
 #: policy absorbs the remainder (owner 2026-11-11).
 START_GRIP_TOL_M = 5.0e-3
 START_GRIP_TOL_RAD = math.radians(3.0)
+
+#: Fold start (owner 2026-11-12): the tube is re-placed onto the grippers at the
+#: measured fold. The re-placement may turn the CAD tube axis by at most this
+#: much (the CAD axis is ~1.1 deg off the arm plane); more means the fold does
+#: not hold the CAD tube at all and planning stops.
+TUBE_REALIGN_MAX_RAD = math.radians(2.0)
 
 
 class PlanStopped(RuntimeError):
@@ -294,6 +300,13 @@ class CycleFrame:
     #: (for display) and the checker gets the residual :meth:`tube_transform`.
     tube_motion: Optional[np.ndarray] = None
     tube_axis: Optional[np.ndarray] = None
+    #: Fold start (2026-11-12): rigid placement of the tube at the start, on the
+    #: grippers, relative to its CAD placement. ``tube_motion`` is then measured
+    #: from this start placement. None = the CAD placement.
+    tube_base: Optional[np.ndarray] = None
+    #: The checker's (CAD) tube axis, needed to undo its advance translation
+    #: when ``tube_axis`` is the re-aligned carry axis. None = ``tube_axis``.
+    cad_tube_axis: Optional[np.ndarray] = None
 
     @property
     def tube_lift_m(self) -> float:
@@ -304,8 +317,10 @@ class CycleFrame:
         if self.tube_motion is None:
             return None
         A = np.eye(4)
-        A[:3, 3] = -np.asarray(self.tube_axis, dtype=float) * float(self.tube_advance_m)
-        return np.asarray(self.tube_motion, dtype=float) @ A
+        cad = self.cad_tube_axis if self.cad_tube_axis is not None else self.tube_axis
+        A[:3, 3] = -np.asarray(cad, dtype=float) * float(self.tube_advance_m)
+        B = np.eye(4) if self.tube_base is None else np.asarray(self.tube_base, dtype=float)
+        return np.asarray(self.tube_motion, dtype=float) @ B @ A
 
     def to_json_obj(self) -> Dict[str, object]:
         return {
@@ -317,6 +332,8 @@ class CycleFrame:
             "tube_advance_m": float(self.tube_advance_m),
             "tube_motion": (None if self.tube_motion is None
                             else np.asarray(self.tube_motion, dtype=float).tolist()),
+            "tube_base": (None if self.tube_base is None
+                          else np.asarray(self.tube_base, dtype=float).tolist()),
             "note": self.note,
         }
 
@@ -355,6 +372,7 @@ class CyclePlan:
     lift_m: float = 0.0
     first_carry_m: float = 0.0
     regrip_standoff_m: float = 0.0
+    hold_pan_roll: bool = False
 
     @property
     def ok(self) -> bool:
@@ -540,12 +558,40 @@ IK_JOINT_WEIGHTS = np.array([1000.0, 1.0, 1.0, 1.0, 1000.0])
 UP = np.array([0.0, 0.0, 1.0])
 
 
+def measured_fold_pose(cfg) -> np.ndarray:
+    """Owner 2026-11-12: the printing pose IS the measured fold, the same for
+    both arms, with pan 0 and roll 0. Joints 2-4 = the mean of the two arms'
+    measured fold (the fold-allowance centres in hardware.yaml, which are the
+    hand-placed fold of 2026-11-11 with the landmark zeros)."""
+    mesh = cfg.motion_guard.collision.mesh
+    L, R = mesh.fold_allowance_centre_left_rad, mesh.fold_allowance_centre_right_rad
+    if L is None or R is None:
+        raise PlanStopped("no measured fold configured (motion_guard.collision.mesh.fold_allowance_centre_*)")
+    q = (np.asarray(L, dtype=float) + np.asarray(R, dtype=float)) / 2.0
+    q[0] = 0.0
+    q[4] = 0.0
+    return q
+
+
+def _align(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Smallest rotation taking unit vector a onto unit vector b."""
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    v, c = np.cross(a, b), float(a @ b)
+    if np.linalg.norm(v) < 1e-12:
+        return np.eye(3)
+    K = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + K + K @ K / (1.0 + c)
+
+
 def plan_cycle(
     cfg,
     checker,
     *,
     printing_pose: Optional[Sequence[float]] = None,
     matching_start: bool = True,
+    start_from_fold: bool = True,
+    hold_pan_roll: Optional[bool] = None,
     lift_m: float = DEFAULT_LIFT_M,
     first_carry_m: Optional[float] = None,
     regrip_standoff_m: Optional[float] = None,
@@ -575,6 +621,19 @@ def plan_cycle(
     leaves (arm spacing vs pitch, ~2 mm) is reported, for the learned
     insertion to absorb. An explicit ``printing_pose`` is used as given for
     both arms.
+    With ``start_from_fold`` (default, owner 2026-11-12: "the printing pose
+    and the folded pose should be the same"), the start is the measured fold
+    for both arms with pan 0 and roll 0 (:func:`measured_fold_pose`), and the
+    tube is re-placed rigidly onto the grippers (left grip = middle point, axis
+    along left->right grip) instead of its CAD placement (owner 2026-11-11: the
+    URDF placement is approximate). Planning stops if the left grip is more than
+    START_GRIP_TOL from the CAD middle point or the axis turns more than
+    TUBE_REALIGN_MAX_RAD.
+    ``hold_pan_roll`` (default: on with the fold start; owner 2026-11-12):
+    pan and roll stay at their start value (0) for BOTH arms in this planned
+    movement; only joints 2-4 move. This is a property of this plan only: pan
+    stays a free joint everywhere else (limits, motion guard, and the learned
+    insertion may pan).
     Raises :class:`PlanStopped` when a regrip target does not exist on the
     modelled tube or the printing-pose IK cannot reach.
     """
@@ -594,10 +653,47 @@ def plan_cycle(
     seed = np.asarray(printing_pose if printing_pose is not None
                       else FOLDED_TRANSIT_PLACEHOLDER, dtype=float)
     T_mid, T_far = att.point_pose(0, 0.0), att.point_pose(+1, 0.0)
+    if hold_pan_roll is None:
+        hold_pan_roll = bool(start_from_fold and printing_pose is None)
+    tube_base = None
+    cad_axis = np.asarray(att.tube_axis, dtype=float).copy()
     if printing_pose is not None:
         qL = np.asarray(printing_pose, dtype=float).copy()
         qR = qL.copy()
         start_kind = "given (both arms)"
+    elif start_from_fold:
+        qL = measured_fold_pose(cfg)
+        qR = qL.copy()
+        start_kind = "measured fold (both arms, pan 0, roll 0; tube placed on the grippers)"
+        TL, TR = kin.gripper_pose("left", qL), kin.gripper_pose("right", qR)
+        pe0, ae0 = _pose_error(TL, T_mid)
+        if pe0 > START_GRIP_TOL_M or ae0 > START_GRIP_TOL_RAD:
+            raise PlanStopped(
+                f"printing pose (measured fold) did not reach the CAD tube: left grip "
+                f"{pe0 * 1000:.2f} mm / {math.degrees(ae0):.2f} deg from the middle point "
+                f"(limit {START_GRIP_TOL_M * 1000:.1f} mm / {math.degrees(START_GRIP_TOL_RAD):.1f} deg)"
+            )
+        d = TR[:3, 3] - TL[:3, 3]
+        d = d / np.linalg.norm(d)
+        Rb = _align(cad_axis, d)
+        turn = math.acos(max(-1.0, min(1.0, float(cad_axis @ d))))
+        if turn > TUBE_REALIGN_MAX_RAD:
+            raise PlanStopped(
+                f"printing pose (measured fold) did not reach the CAD tube: the grips "
+                f"would turn the tube axis {math.degrees(turn):.2f} deg "
+                f"(limit {math.degrees(TUBE_REALIGN_MAX_RAD):.1f} deg)"
+            )
+        tube_base = np.eye(4)
+        tube_base[:3, :3] = Rb
+        tube_base[:3, 3] = TL[:3, 3] - Rb @ T_mid[:3, 3]
+        # Attachment points follow the re-placed tube; existence on the tube
+        # does not change (indices are in the tube's own frame).
+        att_cad = att
+        att = AttachmentModel(tube_axis=Rb @ cad_axis, pitch_m=att_cad.pitch_m,
+                              T0_middle=tube_base @ att_cad.T0_middle,
+                              axis_extent_m=att_cad.axis_extent_m)
+        att.exists_on_tube = att_cad.exists_on_tube  # type: ignore[method-assign]
+        T_mid, T_far = att.point_pose(0, 0.0), att.point_pose(+1, 0.0)
     elif matching_start:
         qL = kin.ik_shared({"left": T_mid, "right": T_far}, kin.ik("left", T_mid, seed)[0])
         qR = qL.copy()
@@ -611,8 +707,9 @@ def plan_cycle(
     # The start grips are where the locked grippers really are: the cycle
     # carries the tube from there, so the shared-pose residual is a start
     # offset, not a reach failure. Only a gross miss stops planning.
-    start_tol_m = START_GRIP_TOL_M if printing_pose is not None or matching_start else GRIP_REACH_TOL_M
-    start_tol_rad = START_GRIP_TOL_RAD if printing_pose is not None or matching_start else GRIP_REACH_TOL_RAD
+    loose = printing_pose is not None or matching_start or start_from_fold
+    start_tol_m = START_GRIP_TOL_M if loose else GRIP_REACH_TOL_M
+    start_tol_rad = START_GRIP_TOL_RAD if loose else GRIP_REACH_TOL_RAD
     if peL > start_tol_m or aeL > start_tol_rad:
         raise PlanStopped(
             f"printing-pose IK (left on middle point) did not reach: residual "
@@ -694,7 +791,14 @@ def plan_cycle(
         # then a full weighted solve that adds only the pan/roll the CAD tube
         # tilt forces. Seeded from the previous frame for continuity.
         q0 = kin.ik_planar(arm, T, cur[arm])
-        q, pe, ae = kin.ik(arm, T, q0, weights=IK_JOINT_WEIGHTS)
+        if hold_pan_roll:
+            # Owner 2026-11-12: pan and roll stay at the start value (0) in
+            # this movement; any out-of-plane error is reported, not fixed.
+            q = q0.copy()
+            q[0], q[4] = q_start[arm][0], q_start[arm][4]
+            pe, ae = _pose_error(kin.gripper_pose(arm, q), T)
+        else:
+            q, pe, ae = kin.ik(arm, T, q0, weights=IK_JOINT_WEIGHTS)
         # The heavily weighted pan converges slowly; where the start pose
         # itself reaches the target (the end of the cycle) and lies close to
         # the solve, use it, so the arms end exactly in the matching start.
@@ -713,7 +817,9 @@ def plan_cycle(
                 reach.append((len(frames), step, arm, pe * 1000, math.degrees(ae)))
         adv = float((M @ np.r_[pivot, 1.0])[:3] @ ax - pivot @ ax)
         frames.append(CycleFrame(step, cur["left"].copy(), cur["right"].copy(),
-                                 ll, rl, adv, note, M.copy(), ax.copy()))
+                                 ll, rl, adv, note, M.copy(), ax.copy(),
+                                 tube_base=None if tube_base is None else tube_base.copy(),
+                                 cad_tube_axis=cad_axis.copy()))
         # Rigid-tube reference for the CURRENT grip pair, from the attachment
         # geometry (it changes when a regrip relocks on a new point).
         refs.append(np.linalg.inv(att.point_pose(grip["left"], 0.0) @ G["left"])
@@ -754,7 +860,8 @@ def plan_cycle(
     S_carry = (UP * lift_m + Y * first_carry_m, yaw)
     S_end = (ax * pitch, 0.0)
     emit("printing pose (start)", True, True, motion(*S0),
-         "printing pose (IK, seeded from placeholder)", {})
+         ("printing pose (measured fold, pan 0, roll 0)" if start_from_fold and printing_pose is None
+          else "printing pose (IK, seeded from placeholder)"), {})
 
     repositions.append(RepositionLog(
         "lift tube (both locked)",
@@ -810,6 +917,7 @@ def plan_cycle(
         lift_m=float(lift_m),
         first_carry_m=float(first_carry_m),
         regrip_standoff_m=float(regrip_standoff_m),
+        hold_pan_roll=bool(hold_pan_roll),
     )
     plan.report = build_report(plan, att)
     return plan
@@ -831,7 +939,16 @@ def build_report(plan: CyclePlan, att: AttachmentModel) -> str:
     lines.append("")
     lines.append("PLACEHOLDER FINDING (read first)")
     lines.append("-" * 60)
-    lines.append(
+    if plan.start_kind.startswith("measured fold"):
+        lines.append(
+            "The printing pose is the owner's MEASURED fold (hand-placed 2026-11-11,\n"
+            "landmark zeros), one pose for both arms with pan 0 and roll 0. The tube\n"
+            "is re-placed onto the grippers (its CAD placement is approximate,\n"
+            "owner 2026-11-11). It is never written to hardware.yaml.\n"
+            "Lift, first carry and regrip standoff are model-chosen, not measured."
+        )
+    else:
+      lines.append(
         "The printing pose used here is NOT a measured pose. It is solved on\n"
         "the cell model with the LEFT gripper on the middle attachment point\n"
         "and the RIGHT gripper on the far point (tube at its CAD placement,\n"
@@ -841,6 +958,10 @@ def build_report(plan: CyclePlan, att: AttachmentModel) -> str:
     )
     lines.append("")
     lines.append(f"  start pose kind : {plan.start_kind}")
+    if plan.hold_pan_roll:
+        lines.append("  pan / roll      : held at the start value (0) for BOTH arms in this")
+        lines.append("                    movement (owner 2026-11-12); pan stays a free joint")
+        lines.append("                    elsewhere (the learned insertion may pan)")
     lines.append("")
     lines.append(f"  stored folded_transit placeholder : {fmt(stored)} rad")
     lines.append(f"  printing pose LEFT  on middle : {fmt(qL)} rad  "

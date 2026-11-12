@@ -24,10 +24,13 @@ def test_convention_rule():
 
 def test_model_says_fewer_wrist_flex_ticks_raise_the_tip_away_from_the_dexarm():
     d = dc.model_tip_motion(load_config(), "left", "wrist_flex", REST_L, REST_R, -57)
-    assert d[2] > 1.0 and d[1] > 1.0                      # up, away from the DexArm (+Y)
-    assert "UP" in dc.tip_words(d) and "AWAY" in dc.tip_words(d)
+    # Owner-observed direction (2026-11-10): ticks DOWN = tip AWAY from the DexArm (+Y).
+    # The vertical component depends on the pose and the elbow zero (2026-11-12 landmark
+    # zero: only ~0.6 mm up), so only the observed horizontal direction is asserted
+    # (owner approved 2026-11-12).
+    assert d[1] > 1.0 and "AWAY" in dc.tip_words(d)
     d2 = dc.model_tip_motion(load_config(), "left", "wrist_flex", REST_L, REST_R, +57)
-    assert d2[2] < -1.0 and "TOWARD" in dc.tip_words(d2)
+    assert d2[1] < -1.0 and "TOWARD" in dc.tip_words(d2)
 
 
 class _Raw:
@@ -57,7 +60,7 @@ def test_run_records_direction_and_never_writes(tmp_path):
     r = recs[0]
     assert r["delta_ticks"] == -60 and r["your_clockwise_is"] == "ticks DOWN"
     assert r["matches_doc1_convention"] is False         # stood opposite the cable, saw clockwise on ticks DOWN
-    assert "UP" in r["model_says_tip_goes"] and r["real_tip_matches_model"] is True
+    assert "AWAY" in r["model_says_tip_goes"] and r["real_tip_matches_model"] is True
     assert (tmp_path / "o.jsonl").read_text().count("\n") == 1
 
 

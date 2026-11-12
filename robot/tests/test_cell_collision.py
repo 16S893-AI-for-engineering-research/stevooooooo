@@ -227,16 +227,24 @@ def test_fold_allowance_is_pose_scoped(checker):
     assert frozenset(("left_lower_arm", "left_shoulder")) in found
 
 
-def test_working_pose_is_collision_free(checker):
+def test_working_pose_is_collision_free(checker, mesh_cfg):
     """Owner working pose (Pitch -90, Elbow 90, Wrist_Pitch -90, roll mid): no contact.
 
-    At the 5 mm margin each lower arm is reported 2.8 mm from its shoulder
-    (a near miss, not contact); a slightly opened pose is clear even with margin.
+    Each lower arm is 2.8 mm from its shoulder: inside the margin (a near miss,
+    not contact); a slightly opened pose is clear even with margin.
+    2026-11-12: with the landmark elbow zero the measured fold is ~1.4 deg from
+    this pose, so the configured checker's owner fold allowance covers it (the
+    printing pose IS the fold, owner). The geometry is therefore checked on a
+    checker WITHOUT the allowance, at the configured margin.
     """
+    raw = get_cell_checker(margin_m=mesh_cfg.margin_m, joint_mapping=JointMapping(
+        offset_rad=(0, 0, 0, 0, mesh_cfg.wrist_roll_cell_offset_rad)))
     q = np.array([0.0, -1.5708, 1.5708, -1.5708, 0.0])
-    got = checker.check(CellState(q, q, dexarm_q=DEX_AWAY), first_only=False)
+    got = raw.check(CellState(q, q, dexarm_q=DEX_AWAY), first_only=False)
     assert got and all(c.distance_m > 0.0 for c in got)
+    assert checker.check(CellState(q, q, dexarm_q=DEX_AWAY), first_only=False) == []  # allowance
     w = np.array([0.0, -1.4, 1.4, -1.4, 0.0])
+    assert raw.check(CellState(w, w, dexarm_q=DEX_AWAY), first_only=False) == []
     assert checker.check(CellState(w, w, dexarm_q=DEX_AWAY), first_only=False) == []
 
 

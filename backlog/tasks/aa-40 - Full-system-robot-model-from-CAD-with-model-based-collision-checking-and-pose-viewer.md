@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-27 14:12'
-updated_date: '2026-10-28 01:48'
+updated_date: '2026-11-12 04:08'
 labels: []
 dependencies: []
 priority: high
@@ -81,4 +81,6 @@ Evidence (tests/test_cell_collision.py, 37 tests; full suite 1617 passed):
 - Timing: ~45 ms per pose per arm; meshes load once per process (~11 s).
 Deviation: the named folded_transit placeholder in hardware.yaml [0,-1.25,1.64,-1.31,1.36] is NOT inside the fold allowance (lift 7.6 deg from the left measured fold) and is reported in contact; the fold waypoints need re-deriving from the measured fold (follow-up). Dry-run checks skip the mesh layer (with a warning) when the caller gives no other-arm pose; live never does. Callers (fold, cycle, approach, jog) do not yet wire other-arm/tube/DexArm sources, so LIVE motion through them refuses until wired (fail closed; mesh layer also unverified until AC6).
 Open: AC6 (owner compares rest + fold renders vs the real robot). Render with: cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0
+
+2026-11-12 AC6 progress: fold snapshot 21-24-38 (owner 'n the 3rd servo doesn't match'); cause = elbow zero (AA-47 landmark read elbow +5.8 L / +5.4 R). Elbow zero set from the AA-47 zero_landmark ticks (L 2081 -> 182.900 deg, R 2037 -> 179.033 deg; owner approved). Re-rendered the same reading (out/pose_snapshots/fold_2026-11-11T21-41-18.png, elbow 91.4/91.2 deg, no model contacts): owner 2026-11-12 'yes, now it looks correct' (fold). Rest pose comparison still outstanding for AC6 ('at least two poses'). Fold allowance centres and folded_transit re-expressed for the new zero (same ticks). Finding: at the corrected zero the real fold elbow (91.4) sits at the model's lower_arm/shoulder contact (91.7), so the model is not conservative there.
 <!-- SECTION:NOTES:END -->
