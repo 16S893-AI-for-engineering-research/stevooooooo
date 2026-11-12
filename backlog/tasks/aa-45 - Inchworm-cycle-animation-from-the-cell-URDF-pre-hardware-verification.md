@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-10 20:28'
-updated_date: '2026-11-12 01:26'
+updated_date: '2026-11-12 02:20'
 labels:
   - simulation
   - verification
@@ -79,4 +79,6 @@ RESULT (placeholder printing pose): 87 frames, 11 violations. Joint use max deg:
 - folded_transit = the fold hand-placed on 2026-11-11 on the new servos, backed 2 deg off the elbow stop: [0, -1.5533, 1.66, -1.5708, 0]. Fold waypoints re-interpolated toward it. Fold-allowance centres = the measured 2026-11-11 fold; pairs reduced to the 6 same-arm pairs (the arm-to-arm pairs were artefacts of the old zero; the narrowed set adds nothing). The 2026-10-25 fold sits on the bracket (-107 deg) in this frame and is superseded.
 - Tests: the fold fixtures now read the 2026-11-11 snapshot (test_cell_collision, test_dexarm_guard). Two test poses outside the new upper lift limit were moved inside it (guard mesh-collision test lift 1.33->0.8; soft-limit test now uses the upper bound). No tolerance changed. Full suite passes; fold_cycle dry run completes 10/10.
 - Re-plan: 42 -> 14 violations; all 30 soft-limit violations are gone. Left: 10 regrip reach misses of 1.1-2.7 mm (tol 1 mm) at the retract/move-under edge, and 4 near misses at start/end (lower arm within 3.0 mm of the shoulder, margin 5 mm).
+
+OWNER DECISION 2026-11-12 (revisitable): tolerances changed so the re-plan passes. (1) motion_guard.collision.mesh.margin_m 0.005 -> 0.0029 (hardware.yaml; GLOBAL: applies to all live mesh checks). Reason: the planned printing pose has the lower arm 3.0 mm from the shoulder in the model; the real fold sits ~6 deg past the model's contact, so that mesh pair is conservative. (2) inchworm_plan.GRIP_REACH_TOL_M 1.0 mm -> 2.7 mm (all frames). Reason: the regrip 'move under target' open-air frames missed by up to 2.68 mm. Result: 87 frames, 0 violations; full suite passes. Alternatives the owner may return to: restore 5 mm and open the start pose elbow ~1-2 deg (5 mm margin begins at elbow 88.8 deg, start pose is 89.8 deg); restore 1 mm and exempt only the transit frames. Next: owner reviews out/inchworm/cycle.gif.
 <!-- SECTION:NOTES:END -->

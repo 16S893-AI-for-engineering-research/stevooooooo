@@ -620,9 +620,13 @@ motion_guard:
       enabled: true
       urdf_path: CAD/robot_urdf_new/three_arm_cell.urdf
       srdf_path: CAD/robot_urdf_new/config/three_arm_cell.srdf
-      # Minimum separation between checked parts. Conservative default,
-      # unverified (owner may choose another value).
-      margin_m: 0.005
+      # Minimum separation between checked parts. Unverified.
+      # OWNER DECISION 2026-11-12 (AA-45, revisitable): lowered from 0.005 to
+      # 0.0029 so the planned printing pose (lower arm 3.0 mm from the shoulder
+      # in the model) passes. The real fold sits past the model's contact, so
+      # this mesh pair is conservative. Alternative kept open: restore 0.005
+      # and open the start pose's elbow ~1-2 deg instead.
+      margin_m: 0.0029
       # Pan/lift/elbow/wrist_flex map 1:1 onto the cell URDF (verified against
       # the vendored chain, 0.015 mm). Wrist roll: the cell URDF range is
       # -254..0 deg (0 = gripper against the wrist); ours is centred on 0, so

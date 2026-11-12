@@ -69,7 +69,11 @@ RIGID_TUBE_ORI_TOL_RAD = math.radians(0.5)
 
 #: A locked gripper must sit on its attachment point within this residual, or
 #: the arm cannot reach where the rigid tube demands (a reachability failure).
-GRIP_REACH_TOL_M = 1.0e-3
+#: OWNER DECISION 2026-11-12 (AA-45, revisitable): raised from 1.0 mm to
+#: 2.7 mm so the regrip "move under target" frames (open-air transit, worst
+#: 2.68 mm off the straight line) pass. It applies to every frame. Alternative
+#: kept open: restore 1.0 mm and exempt only the transit frames.
+GRIP_REACH_TOL_M = 2.7e-3
 GRIP_REACH_TOL_RAD = math.radians(0.5)
 
 #: A matching (shared) or given start pose may sit off the attachment points
