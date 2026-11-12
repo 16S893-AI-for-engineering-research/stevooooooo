@@ -688,6 +688,13 @@ motion_guard:
       # there. Accepted ONLY while each arm involved is within the radius (per joint,
       # pan..wrist_flex) of its measured fold; everywhere else these pairs are checked
       # normally. The arm-to-arm pairs needed by the 2026-10-25 fold (old lift zero) are gone.
+      # OWNER DECISION 2026-11-13 (AA-51): "I want those two to be able to touch! This gives the
+      # robot arm more stability when holding the cylinder." Each arm's lower arm may rest on its
+      # OWN shoulder at any pose. Every other pair (arm-arm, arm-chassis, arm-DexArm, arm-tube,
+      # wrist-shoulder outside the fold) is still checked.
+      always_allowed_pairs:
+        - [left_lower_arm, left_shoulder]
+        - [right_lower_arm, right_shoulder]
       fold_allowance_pairs:
         - [left_lower_arm, left_shoulder]
         - [left_shoulder, left_wrist]

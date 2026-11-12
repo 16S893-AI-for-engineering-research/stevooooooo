@@ -717,6 +717,13 @@ def build_mesh_collision_guard(
                             "right": mesh_cfg.fold_allowance_centre_right_rad},
                 radius_rad=mesh_cfg.fold_allowance_radius_rad,
             ))
+        if mesh_cfg.always_allowed_pairs:
+            allowances.append(PoseScopedAllowance(
+                label="always allowed (owner 2026-11-13: lower arm may rest on its shoulder)",
+                pairs=frozenset(frozenset(p) for p in mesh_cfg.always_allowed_pairs),
+                centre_rad={"left": [0.0] * 5, "right": [0.0] * 5},
+                radius_rad=float("inf"),
+            ))
         checker = get_cell_checker(urdf, srdf, margin_m=mesh_cfg.margin_m,
                                    joint_mapping=mapping, allowances=allowances)
     except Exception as exc:  # noqa: BLE001 - fail closed

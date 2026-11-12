@@ -113,6 +113,8 @@ class PoseScopedAllowance:
     def covers(self, a: str, b: str, driver: Mapping[str, Optional[str]], state: "CellState") -> bool:
         if frozenset((a, b)) not in self.pairs:
             return False
+        if math.isinf(self.radius_rad):
+            return True  # owner-allowed contact at every pose
         arms = {driver.get(a), driver.get(b)} - {None}
         if not arms:
             return False

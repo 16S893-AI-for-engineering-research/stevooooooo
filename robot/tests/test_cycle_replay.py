@@ -186,3 +186,18 @@ def test_real_fold_is_close_enough_to_adjust():
     ticks = {"left": [1978, 1423, 3121, 1003, 2031], "right": [2072, 1493, 3075, 968, 2023]}
     m = {a: ticks_to_q(cfg, a, ticks[a]) for a in cr.ARMS}
     assert cr.approach_problems(cfg, m, fr[0], build_mesh_collision_guard(cfg, "left").checker) == []
+
+
+def test_lower_arm_may_rest_on_its_own_shoulder_anywhere():
+    """Owner 2026-11-13: the lower arm touching its own shoulder is wanted (stability)."""
+    from inchworm.system_model.collision import PoseScopedAllowance, CellState
+    al = PoseScopedAllowance("always", frozenset({frozenset(("right_lower_arm", "right_shoulder"))}),
+                             {"left": [0.0] * 5, "right": [0.0] * 5}, float("inf"))
+    drv = {"right_lower_arm": "right", "right_shoulder": "right", "left_wrist": "left"}
+    st = CellState(left_q=[0.0] * 5, right_q=[1.0, -1.0, 1.5, 0.5, 0.0])
+    assert al.covers("right_shoulder", "right_lower_arm", drv, st)
+    assert not al.covers("right_shoulder", "left_wrist", drv, st)       # other pairs still checked
+    cfg = load_config()
+    pairs = {frozenset(p) for p in cfg.motion_guard.collision.mesh.always_allowed_pairs}
+    assert pairs == {frozenset(("left_lower_arm", "left_shoulder")),
+                     frozenset(("right_lower_arm", "right_shoulder"))}

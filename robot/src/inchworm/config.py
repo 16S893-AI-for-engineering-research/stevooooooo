@@ -714,6 +714,9 @@ class MeshCollisionConfig(_Strict):
     # Owner 2026-10-27 "go with the real fold": pairs the model reports in
     # contact at the measured fold, accepted only within fold_allowance_radius_rad
     # (per joint) of each arm's measured fold pose.
+    # Owner 2026-11-13: pairs that may touch ANYWHERE (by design, e.g. the lower arm
+    # resting on its own shoulder for stability while holding the tube).
+    always_allowed_pairs: List[List[str]] = Field(default_factory=list)
     fold_allowance_pairs: List[List[str]] = Field(default_factory=list)
     fold_allowance_centre_left_rad: Optional[List[float]] = None
     fold_allowance_centre_right_rad: Optional[List[float]] = None
@@ -721,9 +724,9 @@ class MeshCollisionConfig(_Strict):
 
     @model_validator(mode="after")
     def _fold_allowance(self) -> "MeshCollisionConfig":
-        for pr in self.fold_allowance_pairs:
+        for pr in (*self.fold_allowance_pairs, *self.always_allowed_pairs):
             if len(pr) != 2:
-                raise ValueError(f"fold_allowance_pairs entries must be [link, link], got {pr}")
+                raise ValueError(f"allowed pair entries must be [link, link], got {pr}")
         if self.fold_allowance_pairs:
             for c in (self.fold_allowance_centre_left_rad, self.fold_allowance_centre_right_rad):
                 if c is None or len(c) != 5:

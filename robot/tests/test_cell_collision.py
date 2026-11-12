@@ -220,11 +220,16 @@ def test_measured_fold_needs_the_owner_allowance(mesh_cfg):
 
 
 def test_fold_allowance_is_pose_scoped(checker):
-    """The same pairs are detected 5 deg of pan away from the measured fold."""
+    """Fold-only pairs (the wrist on its own shoulder / upper arm) are detected outside the fold.
+
+    Owner 2026-11-13: lower arm on its own shoulder is allowed at EVERY pose
+    (always_allowed_pairs), so that pair no longer shows the scoping; the wrist pairs do.
+    """
     L, R = _measured_fold()
-    L2 = L + np.radians([5.0, 0, 0, 0, 0])
+    L2 = L + np.radians([0, 0, 8.0, 0, 0])   # elbow folded 8 deg further, outside the 0.05 rad radius
     found = {frozenset((x.link_a, x.link_b)) for x in checker.check(CellState(L2, R), first_only=False)}
-    assert frozenset(("left_lower_arm", "left_shoulder")) in found
+    assert frozenset(("left_upper_arm", "left_wrist")) in found
+    assert frozenset(("left_lower_arm", "left_shoulder")) not in found   # always allowed (owner)
 
 
 def test_working_pose_is_collision_free(checker, mesh_cfg):

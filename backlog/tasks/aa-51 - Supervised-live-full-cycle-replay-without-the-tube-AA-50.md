@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-11-12 21:48'
-updated_date: '2026-11-12 22:24'
+updated_date: '2026-11-12 22:40'
 labels:
   - human-action
   - human-key-56aeb9883b7721f9
@@ -163,27 +163,27 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
   "evidence": [
     {
       "step": 1,
-      "note": "Step 1 (attach USB) done for the arms. The owner pasted the output of `uv run python scripts/attach_usb.py`. arm_left: OK, already attached (BusId 10-4). arm_right: OK, already attached (BusId 9-3). Others OK: arm_leader, relay, cam_left, cam_scanner, and cam_right newly attached (10-2). dexarm: MISSING (\"not found in usbipd device list\", VID:PID 0483:5740). The script reported 7/8 devices OK. The step's expected result and verification concern only the two arm ports, which are attached with no errors. The step's stop line says \"Any device missing\", and I read it as meaning the arm devices. This is an interpretation. The DexArm is not visible to WSL (unplugged, off, or not enumerated on Windows is unknown). The procedure says the DexArm should be parked where it normally sits; I do not know whether the replay script needs a DexArm connection. The step 2 dry-run will show that without moving anything. The agent did not observe the robot.",
+      "note": "Step 1 (attach USB, revised AA-51) done. The owner pasted the output of `uv run python scripts/attach_usb.py`. arm_left: OK, already attached (BusId 10-4). arm_right: OK, already attached (BusId 9-3). All other devices OK as well: arm_leader, relay, cam_left, cam_right, cam_scanner, and dexarm newly attached (BusId 11-3). The script reported 8/8 devices OK with no errors. The DexArm, which was MISSING in the earlier attempt, is now attached. The agent did not observe the robot.",
       "type": "automated",
       "reference": "Owner-pasted terminal output of scripts/attach_usb.py",
       "advanced": true,
-      "at": "2026-11-12T22:10:09.197Z"
+      "at": "2026-11-12T22:35:57.536Z"
     },
     {
       "step": 2,
-      "note": "Step 2 (dry-run) done. Owner pasted the output of `uv run python scripts/replay_cycle.py --skip-sim`. 4 'adjusted' elbow_flex lines: frame 0 and frame 86, left 3120->3081 (-3.4 deg, EEPROM [939, 3091]) and right 3076->3036 (-3.5 deg, EEPROM [906, 3046]). \"preflight: 0 problem(s) in 89 s\" (a fresh preflight, not the cached one; both are accepted). 87 frames, arm motion ~41 s at 150 ticks/s plus guard checks. Phase list: frame 1 lift tube, frame 13 carry tube right, frame 25 left regrip with left gripper UNLOCK at 25 and LOCK at 49, frame 50 right regrip with right gripper UNLOCK at 50 and LOCK at 74, frame 75 lower tube/arms return to start. That is 5 phases, and the step allows 4 or 5. Abort hint printed: Ctrl-C or touch /tmp/inchworm_stop_move. Last line: \"DRY-RUN: nothing opened or moved. Add --live with the owner present.\" No REFUSED. No DexArm complaint appeared, so the MISSING DexArm from step 1 did not block the dry-run; whether the live run needs it is still unknown. The owner did not explicitly say nothing moved; the script states it. The agent did not observe the robot.",
+      "note": "Step 2 (dry-run, revised AA-51) done. The owner pasted the output of `uv run python scripts/replay_cycle.py --skip-sim`. 4 'adjusted' elbow_flex lines: frame 0 and frame 86, left 3120->3081 (-3.4 deg, EEPROM [939, 3091]) and right 3076->3036 (-3.5 deg, EEPROM [906, 3046]). \"preflight: 0 problem(s) in 87 s\". 87 frames, arm motion ~41 s at 150 ticks/s plus guard checks. Phase list: frame 1 lift tube, frame 13 carry tube right, frame 25 left regrip with left gripper UNLOCK at 25 and LOCK at 49, frame 50 right regrip with right gripper UNLOCK at 50 and LOCK at 74, frame 75 lower tube/arms return to start. Abort hint: Ctrl-C or touch /tmp/inchworm_stop_move. Last line: \"DRY-RUN: nothing opened or moved. Add --live with the owner present.\" No REFUSED. All values match the step's expected output. The owner did not explicitly say nothing moved; the script states it. The agent did not observe the robot.",
       "type": "automated",
       "reference": "Owner-pasted terminal output of scripts/replay_cycle.py --skip-sim (dry-run)",
       "advanced": true,
-      "at": "2026-11-12T22:19:22.838Z"
+      "at": "2026-11-12T22:38:59.921Z"
     },
     {
       "step": 3,
-      "note": "Step 3 (live start) REFUSED, not advanced. Owner pasted the output of the live command. Preflight: cached pass (2026-11-12T22:12:03Z). Start-pose check (tol 3.0 deg per joint): MISMATCH. Five joints off (measured minus planned): left elbow_flex +91.4 vs +87.9 (+3.5), left wrist_roll -5.2 vs 0.0 (-5.2), right shoulder_lift -92.6 vs -89.5 (-3.1), right elbow_flex +91.2 vs +87.8 (+3.4), right wrist_roll -3.3 vs 0.0 (-3.3). Other joints within tolerance. The script logged an event \"start\" with start_pose_ok false (left ticks [1979,1402,3121,1014,2002], right ticks [2075,1455,3075,970,2017], gripper ticks left 1567, right 1556) and printed \"REFUSED: the arms are not at the plan's start pose (move them by hand, torque off)\". The CONFIRM list never appeared, nothing was opened and no arm moved or was torqued (the agent did not observe the robot; the script refused before the CONFIRM prompt). Agent's inference, not verified: the two elbow ticks (left 3121, right 3075) match the last fold snapshot, but the plan start was adjusted to 3081 / 3036 to stay inside the EEPROM limits (3091 / 3046), 3.4 to 3.5 deg away, just past the 3.0 deg tolerance. If so, re-placing by hand may not bring the elbows within tolerance and the cause is in the plan or tolerance, not in the owner's placement. The procedure allows one retry after re-placing the arms by hand. Owner decision pending: retry once or pause for the orchestrator.",
+      "note": "Step 3 (live start, revised AA-51) REFUSED, not advanced. The owner pasted the output of the live command. Preflight: cached pass (2026-11-12T22:37:38Z). The script logged a \"start\" event at 2026-11-12T22:39:24Z. Measured ticks: left [1979,1402,3121,1014,2002], right [2075,1455,3075,970,2017]; gripper ticks left 1567, right 1556. These are the same ticks as in the earlier refused attempt, so the arms were not moved between attempts. diff_to_start_deg (measured vs plan): left [+0.6, -2.2, +3.5, +1.0, -5.2], right [+1.1, -3.1, +3.4, +0.2, -3.3]. Every joint is well within the new 10 degree limit, so the placement itself is not the problem. The event listed \"approach_problems\": [\"adjustment move (t=0.00): right_lower_arm within 0.1 mm of right_shoulder\"]. The script then printed \"REFUSED: the robot will not adjust to the start pose from here: adjustment move (t=0.00): right_lower_arm within 0.1 mm of right_shoulder\". The \"Start pose: the robot will make the final adjustment itself\" lines and the CONFIRM list did not appear. Nothing was opened or moved and no torque was enabled, per the script's refusal before the CONFIRM prompt (the agent did not observe the robot). The refused item is the model's collision check on the adjustment move, which the step lists as a stop condition. Agent's reading, not verified: the t=0.00 flag means the model already sees the right lower arm touching the right shoulder at the measured pose, so the cause is in the model or the right-arm geometry at the fold, not a joint that is too far off. The step allows a retry only for a joint too far off; that does not apply here. Needs orchestrator input.",
       "type": "automated",
-      "reference": "Owner-pasted terminal output of scripts/replay_cycle.py --live --allow-unverified-soft-limits (REFUSED, start-pose MISMATCH)",
+      "reference": "Owner-pasted terminal output of scripts/replay_cycle.py --live --allow-unverified-soft-limits (REFUSED, approach problem: right_lower_arm within 0.1 mm of right_shoulder)",
       "advanced": false,
-      "at": "2026-11-12T22:20:48.574Z"
+      "at": "2026-11-12T22:39:49.703Z"
     }
   ],
   "history": [
@@ -191,10 +191,15 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "action": "accept",
       "at": "2026-11-12T22:09:08.899Z",
       "hash": "eb37e669de424949fb34e0ad3a6fd492bfb387d0fc805debfdf6610788f97c94"
+    },
+    {
+      "action": "accept",
+      "at": "2026-11-12T22:35:08.754Z",
+      "hash": "ff0e74c277109b038724b178aefb87b3a123ed98a8dfd113af59e0c2e2680779"
     }
   ],
-  "acceptedHash": "eb37e669de424949fb34e0ad3a6fd492bfb387d0fc805debfdf6610788f97c94",
-  "acceptedAt": "2026-11-12T22:09:08.899Z"
+  "acceptedHash": "ff0e74c277109b038724b178aefb87b3a123ed98a8dfd113af59e0c2e2680779",
+  "acceptedAt": "2026-11-12T22:35:08.754Z"
 }
 ```
 <!-- /human-handoff-state -->
