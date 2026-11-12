@@ -835,15 +835,36 @@ class ArmServoBus:
             # to the stale goal, so the joint would slam up to 275 deg. ALWAYS
             # set goal := present (read back and verified) before enabling
             # torque. There is no way to enable torque without this step.
+            #
+            # MEASURED 2026-11-12 (left servo 5, fw 3.9, owner supervising,
+            # calibration_data/autoenable_probe_2026-11-12.jsonl): the goal
+            # write ITSELF sets Torque_Enable=1 (the servo then holds still,
+            # because goal == present). So from here on the servo may be
+            # energised: on ANY failure below, switch torque off before
+            # re-raising. The read-back gets ONE retry on a timeout (a dropped
+            # reply aborted the 2026-11-12 left wrist_roll move); the value
+            # check itself is never relaxed.
             present = self._bus.read_bytes(servo_id, _REG_PRESENT_POSITION, 2)
-            self._bus.write_bytes(servo_id, _REG_GOAL_POSITION, present)
-            echo = self._bus.read_bytes(servo_id, _REG_GOAL_POSITION, 2)
-            if echo != present:
-                raise ServoRangeError(
-                    servo_id, echo.hex(),
-                    f"goal_position read-back {echo.hex()} != present {present.hex()}; "
-                    "refusing to enable torque",
-                )
+            try:
+                self._bus.write_bytes(servo_id, _REG_GOAL_POSITION, present)
+                try:
+                    echo = self._bus.read_bytes(servo_id, _REG_GOAL_POSITION, 2)
+                except ServoTimeoutError:
+                    self._emit("warning", "servo_goal_readback_retry", {"servo_id": servo_id})
+                    echo = self._bus.read_bytes(servo_id, _REG_GOAL_POSITION, 2)
+                if echo != present:
+                    raise ServoRangeError(
+                        servo_id, echo.hex(),
+                        f"goal_position read-back {echo.hex()} != present {present.hex()}; "
+                        "refusing to enable torque",
+                    )
+            except Exception:
+                try:
+                    self._bus.write_bytes(servo_id, _REG_TORQUE_ENABLE, b"\x00")
+                except Exception:  # noqa: BLE001 - the original error matters more
+                    self._emit("error", "servo_torque_off_after_failed_enable_failed",
+                               {"servo_id": servo_id})
+                raise
         data = bytes([1 if enable else 0])
         self._bus.write_bytes(servo_id, _REG_TORQUE_ENABLE, data)
         self._emit(

@@ -425,9 +425,37 @@ class TestTorqueEnable:
         transport.queue_reply(_read_response(1, struct.pack("<H", 1234)))
         transport.queue_reply(_write_response(1))
         transport.queue_reply(_read_response(1, struct.pack("<H", 0)))  # goal did not take
+        transport.queue_reply(_write_response(1))           # torque OFF after failure
         with pytest.raises(ServoRangeError, match="refusing to enable torque"):
             bus.set_torque_enable(servo_id=1, enable=True)
-        assert all(p[5] != _REG_TORQUE_ENABLE for p in transport.written)
+        # The goal write auto-enables torque on the STS3215 (measured 2026-11-12),
+        # so the only torque write allowed after a failed enable is torque OFF.
+        torque_writes = [p for p in transport.written if p[5] == _REG_TORQUE_ENABLE]
+        assert [p[6] for p in torque_writes] == [0]
+
+    def test_enable_retries_goal_readback_once_on_timeout(self, transport, bus):
+        present = struct.pack("<H", 1234)
+        transport.queue_reply(_read_response(1, present))   # read present
+        transport.queue_reply(_write_response(1))           # write goal
+        transport.queue_reply(b"")                          # read-back: no reply
+        transport.queue_reply(_read_response(1, present))   # retry succeeds
+        transport.queue_reply(_write_response(1))           # torque enable
+        bus.set_torque_enable(servo_id=1, enable=True)
+        assert len(transport.written) == 5
+        assert transport.written[4][5] == _REG_TORQUE_ENABLE and transport.written[4][6] == 1
+
+    def test_enable_two_readback_timeouts_switch_torque_off(self, transport, bus):
+        present = struct.pack("<H", 1234)
+        transport.queue_reply(_read_response(1, present))
+        transport.queue_reply(_write_response(1))
+        transport.queue_reply(b"")
+        transport.queue_reply(b"")
+        transport.queue_reply(_write_response(1))           # torque OFF
+        with pytest.raises(ServoTimeoutError):
+            bus.set_torque_enable(servo_id=1, enable=True)
+        last = transport.written[-1]
+        assert last[5] == _REG_TORQUE_ENABLE and last[6] == 0
+        assert sum(1 for p in transport.written if p[5] == _REG_TORQUE_ENABLE) == 1
 
     def test_disable_sends_correct_packet(self, transport, bus):
         transport.feed(_write_response(1))

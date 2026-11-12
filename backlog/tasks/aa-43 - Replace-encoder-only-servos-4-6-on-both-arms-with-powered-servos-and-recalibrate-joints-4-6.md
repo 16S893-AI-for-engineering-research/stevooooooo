@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-11 23:36'
+updated_date: '2026-11-12 14:53'
 labels:
   - hardware
 dependencies: []
@@ -59,4 +59,8 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 2026-11-10 wrist_flex direction (left arm), owner-observed during the powered move (calibration_data/powered_move_2026-11-09.jsonl): ticks DOWN moved the tip AWAY from the DexArm, ticks UP moved it TOWARD the DexArm, as predicted by the cell model (sign +1; scripts/view_joint_move.py, owner confirmed the render orientation, dark parts and DexArm side). Opposite-the-cable view: ticks DOWN = counter-clockwise, matching doc-1. Owner noted that the REST pose drawn by the viewer did not look like the real arm's starting pose, so absolute angles (zero offsets, esp. the wrists I set to mid-range) are NOT verified. Not yet checked: right arm wrist_flex, wrist_roll, joints 2-3 (use scripts/direction_check.py --live).
 
 2026-11-11 owner (FD, AA-42 walkthrough): FD had fallen back to 115200 baud, which explains the 'no servos found'. At 1000000, all 6 left-arm servos answer, all fw 3.9. This matches the 2026-11-09 census: the replacement IDs 4-6 ship with 3.9. The 3.10 seen on 2026-10-28 was the OLD, removed ID 4. No servo bricked, nothing reverted. AA-42 is moot; no flash needed.
+
+2026-11-12 (orchestrator): owner reported the LEFT wrist_roll powered_move_check aborted with ServoTimeoutError on servo 5, reading reg 0x2A (goal read-back inside set_torque_enable). Read-only diagnostic afterwards: all 6 left servos answer, 300/300 reads each (incl. 0x2A) with no timeouts, p99 latency under 2 ms; status 0, 12.1-12.2 V, 29-33 C; servo 5 goal = present = 2000, so the goal write landed. A second probe found servo 5 Torque_Enable = 1 (it had read 0 minutes before; the probe wrote nothing before that read). Torque switched off on both arms and read back all 0. Cause of the torque-on reading is UNEXPLAINED (an earlier rerun by the owner, or the servo enabling torque when goal is written?). Asking the owner before more probes (AGENTS.md two-probe rule). No more powered moves until this is resolved.
+
+2026-11-12 supervised probe (owner at the power switch), scripts/autoenable_probe.py, log calibration_data/autoenable_probe_2026-11-12.jsonl: left ID 5, torque off on all 6; Goal_Speed write -> Torque_Enable stays 0; Goal_Position write (goal = present = 2000) -> Torque_Enable = 1 at 0 ms, held to 505 ms, present stayed 2000 (no motion); torque off afterwards, all 6 read back 0. So the goal write itself energises the servo. Fix in servo_bus.set_torque_enable: one retry of the goal read-back on a timeout (the equality check is unchanged), and torque OFF on any failure after the goal write; 2 new tests + the mismatch test now also asserts torque OFF. Full suite passes. doc-1 and doc-3 updated. Next: owner reruns AA-48 step 5.
 <!-- SECTION:NOTES:END -->

@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 04:49'
+updated_date: '2026-11-12 14:53'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-12. Elbow zero corrected; AA-45 starts from the measured fold with pan 0 (0 violations); AA-40 Done (mesh model verified by the owner). AA-43 In Progress (2/5 AC). AA-45 planner reworked to the owner's refined cycle (lift, carry right, left regrip, right regrip, lower); owner review of the new GIF pending. nono draft profile ready. Suite passes. Hardware: owner resuming AA-43 (direction checks, then a supervised powered move).
+**Last verified:** 2026-11-12 (later). AA-48 at step 5: a goal write auto-enables torque (measured); set_torque_enable fixed (read-back retry, torque off on failure). AA-45 owner GIF review pending. Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -25,6 +25,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)
+- **2026-11-12 AA-48 step 5 aborted, cause found:** left wrist_roll powered move hit a ServoTimeoutError on the goal read-back (reg 0x2A) in `set_torque_enable`. Read-only bus check: 300/300 reads per left servo, no timeouts. Supervised probe (`scripts/autoenable_probe.py`): the goal write itself sets Torque_Enable=1 (no motion, goal == present). Fix: one retry of the read-back on a timeout; torque OFF on any failure after the goal write (tests). Torque off on both arms, read back. **Next:** owner reruns AA-48 step 5 (left wrist_roll), then steps 6-9.
 - Done: IDs assigned by the owner with `lerobot-setup-motors`; read-only census `robot/calibration_data/servo_census_2026-11-08T20-15-27.json` (12/12 at IDs 1-6, fw 3.9, error 0, current 0). AC #1, #2 checked.
 - **Owner answers (2026-11-09):** IDs 1-3 on both arms are UNCHANGED (keep their 2026-10-25 offsets/limits and hardware.yaml calibration). Gripper caps are to be re-applied (done).
 - **Grippers (ID 6) DONE 2026-11-09, both arms, torque off, nothing moved:** the owner cannot sweep them by hand (powered servo), both rest at the full clockwise stop = the old `closed_empty` stop. So the closed stop was homed to read the old closed_empty tick (left offset 1207 -> 2521, right offset -1914 -> 2494) and Min/Max_Position_Limit set to the previously written values (left 1521..2531, right 1563..2504). LeRobot gripper caps re-applied: Max_Torque_Limit 500, Protection_Current 250, Overload_Torque 25, P 16, D 32. Read back; nothing else changed. **ASSUMPTION, not measured:** the open end sits at the old open tick (L 1531, R 1576), so the hardware.yaml gripper bands stay valid. Verify with one supervised powered move before relying on them.
