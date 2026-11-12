@@ -139,6 +139,10 @@ _EMPTY_MOVE_SETTLE_S: float = 0.5        # position unchanged (<= 1 tick) this l
 _CLOSE_OBSTRUCTION_TICKS: int = 20
 #: measure_end: stopping more than this short of the EEPROM limit = mechanical stop first.
 _END_REACHED_TOL_TICKS: int = 12
+#: Position lock (owner 2026-11-12): reaching the lock goal within this many ticks = locked.
+_POSITION_LOCK_TOL_TICKS: int = 12
+_POSITION_LOCK_TIMEOUT_S: float = 12.0   # 512 ticks at 150 ticks/s = 3.4 s
+_POSITION_LOCK_STALL_S: float = 0.5      # unchanged (<= 1 tick) this long = stopped
 _REG_MIN_POSITION_LIMIT: int = 9
 _REG_MAX_POSITION_LIMIT: int = 11
 
@@ -524,6 +528,10 @@ class GripperLockSM:
         # Obtain the capability channel (only this module may hold it).
         self._channel = bus.gripper_channel(_GRIPPER_TOKEN)
 
+        # Injectable time source (tests); used by the position lock wait.
+        self._sleep = time.sleep
+        self._clock = time.monotonic
+
         # Internal state
         self._state: GripperState = GripperState.UNKNOWN
         self._last_commanded_pos_deg: Optional[float] = None
@@ -634,6 +642,8 @@ class GripperLockSM:
         in dry-run mode where the midpoint fallback is acceptable.
         """
         bands = self._bands_for_role()
+        if self._position_mode() and bands.lock_goal_deg is not None:
+            return bands.lock_goal_deg
         if bands is not None and bands.lock_overtravel_goal_deg is not None:
             return bands.lock_overtravel_goal_deg
         # Fallback: midpoint of locked band (used in dry-run or when not configured).
@@ -810,6 +820,8 @@ class GripperLockSM:
         if self._state != GripperState.APPROACH_READY:
             raise IllegalTransition(self._state, "lock")
         self._require_bands_or_dry_run("lock")
+        if self._position_mode():
+            return self._lock_to_position()
         self._require_overtravel_or_dry_run()
 
         prev_state = self._state
@@ -882,6 +894,119 @@ class GripperLockSM:
             {"verdict": verdict.name, "detail": detail},
         )
         raise LockVerificationFailed(verdict, detail)
+
+    def energise_slow(self) -> None:
+        """Slow drive profile + torque ON for the gripper (goal := present, no motion).
+
+        Used before reset()/unlock() moves in a sequence (cycle replay): without it a
+        goal write would move the jaw at full speed (Goal_Speed 0) and full torque.
+        Does not change the state.
+        """
+        if self._dry_run:
+            self._emit("info", "gripper_energise_slow", {"dry_run": True})
+            return
+        bands = self._bands_for_role()
+        limit = (bands.lock_torque_limit_raw if bands is not None and bands.lock_torque_limit_raw
+                 else _EMPTY_MOVE_TORQUE_LIMIT_RAW)
+        sid = self._bus._servo_id_for_joint("gripper")
+        self._bus.set_goal_speed(sid, _EMPTY_MOVE_SPEED_TICKS_S)
+        self._bus.set_acceleration(sid, _EMPTY_MOVE_ACCEL)
+        self._bus.set_torque_limit(sid, limit)
+        self._bus.set_torque_enable(sid, True)
+        self._emit("info", "gripper_energise_slow", {"torque_limit_raw": limit})
+
+    def release(self, *, tube_attached: bool) -> None:
+        """Torque OFF on the gripper; state -> UNKNOWN. Refused unless no tube is attached."""
+        if tube_attached is not False:
+            raise TubeAttachedRefused(self._role, "release")
+        if not self._dry_run:
+            self._bus.set_torque_enable(self._bus._servo_id_for_joint("gripper"), False)
+        self._state = GripperState.UNKNOWN
+        self._emit("info", "gripper_released", {"dry_run": self._dry_run})
+
+    def _position_mode(self) -> bool:
+        bands = self._bands_for_role()
+        return bands is not None and getattr(bands, "lock_mode", "key_stop") == "position"
+
+    def _lock_to_position(self) -> LockVerdict:
+        """Position lock (owner decision 2026-11-12, AA-43).
+
+        The locking piece slips on its screw at the ends of its travel, so a stall
+        cannot mark the lock. Drive to ``lock_goal_deg`` (45 deg past the open end)
+        at the caller's speed/acceleration and the configured lock torque limit; the
+        gripper is LOCKED when the servo stops within _POSITION_LOCK_TOL_TICKS of the
+        goal. Stopping short (an obstruction), a timeout or a read error -> FAULT and
+        a typed failure. The servo stays energised holding the goal on success. The
+        lock itself (key seated) is confirmed by the owner's eye, not by this check.
+        """
+        bands = self._bands_for_role()
+        if bands.lock_goal_deg is None and not self._dry_run:
+            raise OvertravelNotConfigured(self._role, "lock_goal_deg")
+        if not self._dry_run and bands.lock_torque_limit_raw is None:
+            raise OvertravelNotConfigured(self._role, "lock_torque_limit_raw")
+        prev_state = self._state
+        self._state = GripperState.LOCKING
+        self._emit("info", "gripper_locking_started", {"prev_state": prev_state.name, "mode": "position"})
+        goal_deg = self._goal_pos_locked()
+        if self._dry_run:
+            self._write_gripper(goal_deg, "lock_command")
+            self._state = GripperState.LOCKED
+            self._emit_gripper_lock_event(GripperState.UNLOCKED)
+            self._emit("info", "gripper_locked", {"position_deg": goal_deg, "verdict": "LATCHED",
+                                                  "mode": "position", "dry_run": True})
+            return LockVerdict.LATCHED
+        sid = self._bus._servo_id_for_joint("gripper")
+        goal = round(goal_deg * 4096 / 360)
+        try:
+            # Slow profile (as close_empty), set BEFORE torque is on; kept afterwards
+            # so the hold and the later unlock move at the same speed.
+            self._bus.set_goal_speed(sid, _EMPTY_MOVE_SPEED_TICKS_S)
+            self._bus.set_acceleration(sid, _EMPTY_MOVE_ACCEL)
+            self._apply_lock_torque_limit()
+            self._bus.set_torque_enable(sid, True)      # goal := present first (no jump)
+            self._write_gripper(goal_deg, "lock_command")
+            t0 = self._clock()
+            last, last_change = None, t0
+            while True:
+                st = self._bus.read_joint_state(sid)
+                ticks = round(st.position_deg * 4096 / 360)
+                now = self._clock()
+                if abs(ticks - goal) <= _POSITION_LOCK_TOL_TICKS:
+                    break
+                if last is None or abs(ticks - last) > 1:
+                    last, last_change = ticks, now
+                elif now - last_change >= _POSITION_LOCK_STALL_S:
+                    break
+                if now - t0 > _POSITION_LOCK_TIMEOUT_S:
+                    break
+                self._sleep(0.02)
+        except Exception:
+            self._state = GripperState.FAULT
+            try:
+                self._bus.set_torque_enable(sid, False)
+            except Exception:  # noqa: BLE001
+                pass
+            raise
+        err = ticks - goal
+        if abs(err) <= _POSITION_LOCK_TOL_TICKS:
+            self._state = GripperState.LOCKED
+            self._emit_gripper_lock_event(GripperState.UNLOCKED)
+            self._emit("info", "gripper_locked", {
+                "position_deg": st.position_deg, "goal_ticks": goal, "error_ticks": err,
+                "load_raw": st.load_raw, "verdict": "LATCHED", "mode": "position",
+                "verification": "position only; key seating confirmed by the owner by eye",
+            })
+            return LockVerdict.LATCHED
+        self._state = GripperState.FAULT
+        try:
+            self._bus.set_torque_enable(sid, False)     # never keep pushing on an obstruction
+        except Exception:  # noqa: BLE001
+            pass
+        detail = (f"position lock stopped {err:+d} ticks from goal {goal} "
+                  f"(tol {_POSITION_LOCK_TOL_TICKS}): obstruction, stall or timeout; "
+                  f"position={st.position_deg:.2f}deg load_raw={st.load_raw}")
+        self._emit("error", "gripper_lock_failed", {"verdict": LockVerdict.MISS.name, "detail": detail})
+        raise LockVerificationFailed(LockVerdict.MISS, detail)
 
     def _wait_for_settle(self, servo_id: int) -> "tuple[JointState, bool]":
         """Poll the gripper until it has stopped moving or the timeout expires.
@@ -1006,8 +1131,26 @@ class GripperLockSM:
             return False
         self._hold_read_failures = 0
 
-        # --- Overtravel-aware hold logic ---
+        # --- Position-lock hold logic (owner 2026-11-12) ---
         bands = self._bands_for_role()
+        if self._position_mode() and bands.lock_goal_deg is not None:
+            if _in_band(present_pos, bands.locked_low_deg, bands.locked_high_deg):
+                return False
+            # Out of the locked band either way: drive back to the lock goal and log it.
+            self._write_gripper(bands.lock_goal_deg, "hold_correction")
+            self._emit(
+                "warning",
+                "gripper_hold_correction",
+                {
+                    "present_deg": present_pos,
+                    "commanded_deg": bands.lock_goal_deg,
+                    "drift_deg": present_pos - bands.lock_goal_deg,
+                    "reason": "outside_locked_band_position_lock",
+                },
+            )
+            return True
+
+        # --- Overtravel-aware hold logic ---
         if (
             bands is not None
             and bands.lock_overtravel_goal_deg is not None

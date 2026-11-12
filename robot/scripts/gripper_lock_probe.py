@@ -193,8 +193,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if bands is None or bands.locked_low_deg is None or bands.lock_overtravel_goal_deg is None:
         print(f"REFUSED: gripper_lock.{role} bands / overtravel goal are not configured"); return 4
 
+    goal = bands.lock_goal_deg if getattr(bands, "lock_mode", "key_stop") == "position" else bands.lock_overtravel_goal_deg
     print(f"Plan: {a.trials} trial(s) on {role}, torque_limit_raw={a.torque}, key={'in' if a.key else 'OUT'}; "
-          f"lock goal {bands.lock_overtravel_goal_deg} deg, locked band "
+          f"lock mode {getattr(bands, 'lock_mode', 'key_stop')}, lock goal {goal} deg ({round(goal * 4096 / 360)} ticks), locked band "
           f"[{bands.locked_low_deg}, {bands.locked_high_deg}] deg; {_PROBE_SPEED_TICKS_S} ticks/s, "
           f"torque OFF afterwards.")
     if not a.live:

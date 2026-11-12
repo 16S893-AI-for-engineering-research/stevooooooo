@@ -76,7 +76,7 @@ def test_quit_before_lock_commands_nothing_further():
 def test_cli_dry_run_touches_nothing(capsys):
     assert probe.main(["--arm", "left", "--torque", "200", "--key"]) == 0
     out = capsys.readouterr().out
-    assert "DRY-RUN" in out and "191.07" in out
+    assert "DRY-RUN" in out and "179.12" in out and "position" in out
 
 
 @pytest.mark.parametrize("t", [0, 49, 501, 1000])

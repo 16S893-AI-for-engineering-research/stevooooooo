@@ -474,6 +474,17 @@ class GripperBandConfig(_Strict):
     # null = not yet measured; live lock refuses when null.
     lock_torque_limit_raw: Optional[int] = None          # unverified: true
     # --- AA-17 overtravel end ---
+    # --- AA-43 position lock (owner decision 2026-11-12) ---
+    # The locking piece slips on its screw at either end of its travel (a deliberate
+    # clutch), so the servo cannot stall on the key and the key-stop design above
+    # cannot tell where it locked. Owner: "a 45 degree turn should lock it; I can
+    # verify that it is indeed locked". "position": lock() drives slowly to
+    # ``lock_goal_deg`` (inside the locked band) and calls the gripper locked when
+    # the servo settles there; the owner confirms the lock by eye. "key_stop": the
+    # original overtravel/stall design.
+    lock_mode: Literal["key_stop", "position"] = "key_stop"
+    lock_goal_deg: Optional[Degrees] = None              # position mode only
+    # --- AA-43 position lock end ---
     # True when any value above is a placeholder (not yet measured).
     unverified: bool = True
 
@@ -488,6 +499,16 @@ class GripperBandConfig(_Strict):
             locked_high_deg < lock_overtravel_goal_deg
             lock_overtravel_goal_deg < closed_empty_deg
         """
+        if self.lock_mode == "position" and self.lock_goal_deg is not None:
+            g, ll0, lh0 = self.lock_goal_deg, self.locked_low_deg, self.locked_high_deg
+            if ll0 is None or lh0 is None or not (ll0 <= g <= lh0):
+                raise ValueError(
+                    f"lock_goal_deg ({g}) must lie inside the locked band [{ll0}, {lh0}]"
+                )
+            if self.closed_empty_deg is not None and not (g < self.closed_empty_deg):
+                raise ValueError(
+                    f"lock_goal_deg ({g}) must be < closed_empty_deg ({self.closed_empty_deg})"
+                )
         ot = self.lock_overtravel_goal_deg
         ce = self.closed_empty_deg
         lh = self.locked_high_deg

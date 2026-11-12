@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 19:14'
+updated_date: '2026-11-12 21:02'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-12 (late). AA-43: AC 1,2,3,5 checked, #4 open, waiting on AA-49 (proposed, not accepted). Suite passes.
+**Last verified:** 2026-11-12 (night). AA-43 #4 waits on AA-49 (revised to the 45-deg position lock, owner must RE-ACCEPT). AA-50 (full-cycle replay, no tube) in progress: core + sim done, CLI next. Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -24,6 +24,11 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
+### In flight: AA-50 (full-cycle movement test, no tube, grippers moving; owner request 2026-11-12)
+- Done: `src/inchworm/cycle_replay.py` (timeline load, gripper events, per-joint speeds, EEPROM clamp, preflight with both arms together, ReplayRunner through GuardedArm + GripperLockSM, hold on abort, release); `scripts/replay_sim.py` (simulated servos); `tests/test_cycle_replay.py`. Real timeline: preflight 0 problems; simulated full cycle OK (87 frames, ~70 s, max 150 ticks/s). The fold elbow is 30 ticks past the EEPROM limit, so the replay opens it about 3.5 deg.
+- **Next:** `scripts/replay_cycle.py` CLI (dry-run = preflight + sim; `--live` = start-pose check, owner confirms no tube, lock both, move to start, pause at each phase, stop file `/tmp/inchworm_stop_move`, log `calibration_data/replay_cycle_<date>.jsonl`). Then ASK THE OWNER about the soft-limit live gate (`motion_guard.*_arm_limits.unverified: true` blocks GuardedArm live). Proposal: a replay-scoped sign-off, not a global flip. Then a supervised human_request.
+### Gripper lock = 45-degree position lock (OWNER DECISION 2026-11-12)
+- The locking piece slips on its screw at both ends (deliberate clutch), so no stall marks the lock. Lock = slow drive (150 ticks/s, torque 300) to open end + 512 ticks: L 2038, R 2041; LOCKED within 12 ticks; stopping short = FAULT + torque off. The owner confirms by eye. `hardware.yaml gripper_lock.*.lock_mode: position`. AA-49 revised to that check (5 steps); **the owner must re-accept AA-49** (`accept AA-49`). AA-41 is superseded (owner may decline it).
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)
 - **2026-11-12 late, AC #4 remainder:** hardware.yaml right gripper tick limits 1563 -> 1523 (was stale vs EEPROM); wrist zeros/signs and tick limits now cite their new-servo evidence (AA-47 landmark within 1-3 deg, owner-observed powered moves). `gripper_lock_probe.py` reworked for the new servos (150 ticks/s, settled-only classification, torque 50..500, restores speed/accel/torque, tests). **Proposed AA-49** (owner-supervised key-in/no-key lock trials, both arms, ~30 min) replaces AA-41's stale steps. **Next:** owner accepts and runs AA-49 (`accept AA-49`); then the agent proposes locked band + lock_torque_limit_raw per arm for owner approval, then checks AC #4. AA-41 stays deferred (ask the owner to decline it once AA-49 is accepted).
 - **2026-11-12 AA-48 steps 5-9 done + gripper ends:** all powered moves of IDs 4-6 on both arms REACHED; owner confirmed every direction (doc-1 convention holds for both wrist_rolls and the right wrist_flex). New `GripperLockSM.close_empty` / `measure_end` + `scripts/gripper_ends.py`. Gripper ends measured (doc-1). Right gripper Min_Position_Limit 1563 -> 1523 (EEPROM, backup + read-back) and right open band -> 1504..1589 ticks (owner approved). **AA-43 AC #3, #5 checked; #4 open** (gripper locked band needs the key = AA-41; servo_calibration.unverified and the fold re-measure). AA-48 handoff verified 2026-11-12. State now: torque off on all 12; both grippers closed (L 2526, R 2499).

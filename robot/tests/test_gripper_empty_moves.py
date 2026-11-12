@@ -257,3 +257,85 @@ def test_close_empty_read_failure_faults_with_torque_off():
     with pytest.raises(RuntimeError):
         sm.close_empty(tube_attached=False, sleep=c.sleep, clock=c)
     assert sm.state == GripperState.FAULT and s.torque is False
+
+
+# ---------------------------------------------------------------------------
+# Position lock (owner decision 2026-11-12): 45 deg past the open end
+# ---------------------------------------------------------------------------
+
+from inchworm.gripper_lock import LockVerdict, LockVerificationFailed  # noqa: E402
+
+_PBANDS = _BANDS.model_copy(update={
+    "locked_low_deg": T(2013), "locked_high_deg": T(2063),
+    "lock_overtravel_goal_deg": T(2174), "lock_mode": "position",
+    "lock_goal_deg": T(2038), "lock_torque_limit_raw": 300,
+})
+_PCFG = GripperLockConfig(arm_left=_PBANDS, arm_right=_PBANDS)
+
+
+def _psm(servo, clock, dry_run=False, other_locked=True):
+    sm = GripperLockSM(bus=_FakeBus(servo), role="arm_left", config=_PCFG,
+                       opposite_arm_locked_fn=lambda: other_locked, dry_run=dry_run)
+    sm._sleep, sm._clock = clock.sleep, clock
+    return sm
+
+
+class TestPositionLock:
+    def test_locks_at_the_goal_and_holds_torque(self):
+        c = _Clock(); s = _SimServo(c, pos=1569)
+        sm = _psm(s, c)
+        sm._state = GripperState.APPROACH_READY
+        assert sm.lock() == LockVerdict.LATCHED
+        assert sm.state == GripperState.LOCKED
+        assert abs(s.pos - 2038) <= 12 and s.torque is True        # holds the lock
+        assert s.regs[0x2E] == 150 and s.regs[0x29] == 20 and s.regs[0x30] == 300
+        assert s.torque_log[0] is True                              # enabled once, goal := present
+
+    def test_obstruction_faults_and_switches_torque_off(self):
+        c = _Clock(); s = _SimServo(c, pos=1569, obstruction=1800)
+        sm = _psm(s, c)
+        sm._state = GripperState.APPROACH_READY
+        with pytest.raises(LockVerificationFailed) as ei:
+            sm.lock()
+        assert ei.value.verdict == LockVerdict.MISS
+        assert sm.state == GripperState.FAULT and s.torque is False
+
+    def test_config_rejects_goal_outside_band(self):
+        with pytest.raises(ValueError):
+            _PBANDS.model_copy(update={"lock_goal_deg": T(2100)}).model_validate(
+                {**_PBANDS.model_dump(), "lock_goal_deg": T(2100)})
+
+    def test_hold_reasserts_when_out_of_band(self):
+        c = _Clock(); s = _SimServo(c, pos=1569)
+        sm = _psm(s, c)
+        sm._state = GripperState.APPROACH_READY
+        sm.lock()
+        assert sm.hold_tick() is False
+        s.pos = 1950.0; s.goal = 1950          # piece slipped / pushed open
+        assert sm.hold_tick() is True and s.goal == 2038
+
+    def test_unlock_needs_the_other_arm_locked(self):
+        from inchworm.gripper_lock import UnlockRefused
+        c = _Clock(); s = _SimServo(c, pos=1569)
+        sm = _psm(s, c, other_locked=False)
+        sm._state = GripperState.APPROACH_READY
+        sm.lock()
+        with pytest.raises(UnlockRefused):
+            sm.unlock()
+        assert sm.state == GripperState.LOCKED
+
+    def test_dry_run_sends_nothing(self):
+        c = _Clock(); s = _SimServo(c, pos=1569)
+        sm = _psm(s, c, dry_run=True)
+        sm._state = GripperState.APPROACH_READY
+        assert sm.lock() == LockVerdict.LATCHED
+        assert s.torque_log == [] and s.goal == 1569
+
+    def test_hardware_yaml_uses_the_45_degree_position_lock(self):
+        from inchworm.config import load_config
+        gl = load_config().gripper_lock
+        for arm, open_end in (("arm_left", 1526), ("arm_right", 1529)):
+            b = getattr(gl, arm)
+            assert b.lock_mode == "position"
+            assert round(b.lock_goal_deg * 4096 / 360) == open_end + 512   # 45 deg
+            assert b.locked_low_deg <= b.lock_goal_deg <= b.locked_high_deg
