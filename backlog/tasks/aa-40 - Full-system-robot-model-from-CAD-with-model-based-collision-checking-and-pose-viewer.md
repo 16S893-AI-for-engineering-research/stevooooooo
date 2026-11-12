@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-27 14:12'
-updated_date: '2026-11-12 04:08'
+updated_date: '2026-11-12 04:23'
 labels: []
 dependencies: []
 priority: high
@@ -28,7 +28,7 @@ Build a full-system kinematic and geometric model of the as-built robot from CAD
 - [x] #3 Collision checking uses part shapes for arm-arm, arm-chassis, arm-DexArm and arm-tube contact plus self-collision, with a configured margin, and is wired into motion_guard so it fails closed on any contact or a missing model
 - [x] #4 The owner-measured rest and folded poses of both arms are collision-free in the model, and a known colliding pose is detected, verified by tests
 - [x] #5 A pose viewer renders any logged or planned joint state of both arms, and a planned trajectory, for owner review, without per-pose manual setup
-- [ ] #6 The owner compares at least two rendered poses (rest, fold) against the real robot and confirms they match, with the result recorded in task notes
+- [x] #6 The owner compares the rendered fold pose (the arms' rest and printing pose) against the real robot and confirms it matches, with the result recorded in task notes
 <!-- AC:END -->
 
 ## Definition of Done
@@ -83,4 +83,16 @@ Deviation: the named folded_transit placeholder in hardware.yaml [0,-1.25,1.64,-
 Open: AC6 (owner compares rest + fold renders vs the real robot). Render with: cd robot && uv run python scripts/view_pose.py --presets --tube-pitches 0
 
 2026-11-12 AC6 progress: fold snapshot 21-24-38 (owner 'n the 3rd servo doesn't match'); cause = elbow zero (AA-47 landmark read elbow +5.8 L / +5.4 R). Elbow zero set from the AA-47 zero_landmark ticks (L 2081 -> 182.900 deg, R 2037 -> 179.033 deg; owner approved). Re-rendered the same reading (out/pose_snapshots/fold_2026-11-11T21-41-18.png, elbow 91.4/91.2 deg, no model contacts): owner 2026-11-12 'yes, now it looks correct' (fold). Rest pose comparison still outstanding for AC6 ('at least two poses'). Fold allowance centres and folded_transit re-expressed for the new zero (same ticks). Finding: at the corrected zero the real fold elbow (91.4) sits at the model's lower_arm/shoulder contact (91.7), so the model is not conservative there.
+
+AC6 evidence (2026-11-12): fold reading of 2026-11-11T21-24-38 (calibration_data/pose_snapshots.jsonl; logged owner answer 'n the 3rd servo doesn't match' was BEFORE the elbow zero fix) re-rendered with the landmark elbow zero as out/pose_snapshots/fold_2026-11-11T21-41-18.png (left [0.53, -89.82, 91.41, -90.13, -2.68] deg, right [0.79, -89.3, 91.23, -90.18, -2.81] deg, no model contacts). Owner, 2026-11-12, in session: 'yes, now it looks correct'. AC6 reworded to one pose by owner decision (see comment). motion_guard.collision.mesh.unverified left TRUE pending an explicit owner decision to lift it.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @orchestrator
+created: 2026-11-12 04:23
+---
+Owner decision 2026-11-12: a second pose comparison is not needed ('we don't need a second pose. that's silly.'). On this robot the rest pose IS the fold (and the printing pose); no separate rest pose exists anywhere in the project. AC #6 reworded accordingly. Original wording: 'The owner compares at least two rendered poses (rest, fold) against the real robot and confirms they match, with the result recorded in task notes'.
+---
+<!-- COMMENTS:END -->
