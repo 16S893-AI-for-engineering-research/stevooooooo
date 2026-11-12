@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@orchestrator'
 created_date: '2026-10-28 22:45'
-updated_date: '2026-11-12 15:25'
+updated_date: '2026-11-12 15:44'
 labels:
   - hardware
 dependencies: []
@@ -40,6 +40,12 @@ Owner finding 2026-10-27: servos ID 4-6 (wrist_flex, wrist_roll, gripper) on bot
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Gripper ends (owner approved 2026-11-12): 1. GripperLockSM.close_empty(tube_attached=False): UNLOCKED -> CLOSED_EMPTY, slow low-torque close to closed_empty_deg; an early stall (> 20 ticks short) = something in the jaws -> torque off, FAULT, raise. 2. GripperLockSM.measure_end('open'|'closed', tube_attached=False): calibration only, goal = the servo's EEPROM Min/Max limit, slow, low torque, records where it settles and whether it stopped short; state -> UNKNOWN. 3. Tests; scripts/gripper_ends.py (dry-run default). 4. Owner-supervised session per arm: open end, reset, close_empty, closed end. Then propose measured bands (owner approves).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

@@ -30,6 +30,10 @@ Transition table
 - ``lock()``              : APPROACH_READY → LOCKING → LOCKED  (or FAULT)
 - ``hold_tick()``         : LOCKED → LOCKED  (re-asserts if drift detected)
 - ``unlock()``            : LOCKED → UNLOCKING → UNLOCKED  (or FAULT)
+- ``close_empty()``       : UNLOCKED → CLOSED_EMPTY  (tube NOT attached; or FAULT
+                            if the jaws stop early = something between them)
+- ``measure_end()``       : UNKNOWN/UNLOCKED/CLOSED_EMPTY → UNKNOWN  (calibration
+                            only, tube NOT attached; drives to an EEPROM limit)
 
 Illegal transitions raise :class:`IllegalTransition`.
 
@@ -124,6 +128,20 @@ _HOLD_MAX_READ_FAILURES: int = 3
 #: Conservative placeholder; replace with a measured value.
 _DEFAULT_DRIFT_THRESHOLD_DEG: float = 2.0
 
+#: Empty-gripper close and end measurement (owner 2026-11-12). Same slow, low-torque
+#: drive as scripts/powered_move_check.py, which opened both grippers without fault.
+_EMPTY_MOVE_SPEED_TICKS_S: int = 150
+_EMPTY_MOVE_ACCEL: int = 20
+_EMPTY_MOVE_TORQUE_LIMIT_RAW: int = 300
+_EMPTY_MOVE_TIMEOUT_S: float = 12.0      # ~1000 ticks of travel at 150 ticks/s = 6.7 s
+_EMPTY_MOVE_SETTLE_S: float = 0.5        # position unchanged (<= 1 tick) this long = stopped
+#: close_empty: stopping more than this many ticks short of closed_empty = obstruction.
+_CLOSE_OBSTRUCTION_TICKS: int = 20
+#: measure_end: stopping more than this short of the EEPROM limit = mechanical stop first.
+_END_REACHED_TOL_TICKS: int = 12
+_REG_MIN_POSITION_LIMIT: int = 9
+_REG_MAX_POSITION_LIMIT: int = 11
+
 #: Goal position for the locked state (degrees).  UNVERIFIED placeholder.
 #: Used only in dry-run mode or when config bands are null; must be replaced
 #: by the owner after the measurement session.
@@ -211,6 +229,24 @@ class UnlockRefused(GripperLockError):
         )
 
 
+class GripperObstructed(GripperLockError):
+    """close_empty() stopped well short of closed_empty: something is in the jaws."""
+
+    def __init__(self, role: str, final_ticks: int, goal_ticks: int) -> None:
+        self.role, self.final_ticks, self.goal_ticks = role, final_ticks, goal_ticks
+        super().__init__(
+            f"{role}: close_empty stopped at {final_ticks} ticks, {abs(goal_ticks - final_ticks)} "
+            f"short of closed_empty {goal_ticks}; something is between the jaws (torque off, FAULT)"
+        )
+
+
+class TubeAttachedRefused(GripperLockError):
+    """close_empty()/measure_end() are refused unless the caller states the tube is NOT attached."""
+
+    def __init__(self, role: str, operation: str) -> None:
+        super().__init__(f"{role}: {operation} refused: tube_attached must be False")
+
+
 # ---------------------------------------------------------------------------
 # State enum
 # ---------------------------------------------------------------------------
@@ -225,6 +261,7 @@ class GripperState(enum.Enum):
     LOCKING = "LOCKING"
     LOCKED = "LOCKED"
     UNLOCKING = "UNLOCKING"
+    CLOSED_EMPTY = "CLOSED_EMPTY"   # jaws closed on nothing (owner 2026-11-12)
     FAULT = "FAULT"
 
 
@@ -1147,3 +1184,143 @@ class GripperLockSM:
             "gripper_unlocked",
             {"position_deg": pos, "dry_run": self._dry_run},
         )
+
+    # ------------------------------------------------------------------
+    # Empty-gripper moves (owner-approved 2026-11-12, AA-43)
+    # ------------------------------------------------------------------
+
+    def _gripper_ticks(self) -> int:
+        sid = self._bus._servo_id_for_joint("gripper")
+        return round(self._bus.read_position_deg(sid) * 4096 / 360)
+
+    def _drive_and_settle(self, goal_ticks: int, context: str, *, should_abort=None,
+                          sleep=time.sleep, clock=time.monotonic) -> dict:
+        """Slow, low-torque drive of the gripper to ``goal_ticks``; wait until it stops.
+
+        Torque is enabled here (goal := present first, in ArmServoBus) and is ALWAYS
+        switched off again, with the previous torque limit, speed and acceleration
+        restored, on every exit path.
+        """
+        sid = self._bus._servo_id_for_joint("gripper")
+        raw = self._bus._bus
+        u16 = lambda b: b[0] | (b[1] << 8)  # noqa: E731
+        prev = (u16(raw.read_bytes(sid, 0x30, 2)), u16(raw.read_bytes(sid, 0x2E, 2)),
+                raw.read_bytes(sid, 0x29, 1)[0])
+        start = self._gripper_ticks()
+        trace = []
+        status = "TIMEOUT"
+        try:
+            self._bus.set_goal_speed(sid, _EMPTY_MOVE_SPEED_TICKS_S)
+            self._bus.set_acceleration(sid, _EMPTY_MOVE_ACCEL)
+            self._bus.set_torque_limit(sid, _EMPTY_MOVE_TORQUE_LIMIT_RAW)
+            self._bus.set_torque_enable(sid, True)
+            self._write_gripper(goal_ticks * 360.0 / 4096, context)
+            t0 = clock()
+            last_ticks, last_change = None, t0
+            while True:
+                st = self._bus.read_joint_state(sid)
+                ticks = round(st.position_deg * 4096 / 360)
+                now = clock()
+                trace.append({"t": round(now - t0, 3), "ticks": ticks, "load": st.load_raw,
+                              "current": st.current_raw, "temp_c": st.temperature_c})
+                if should_abort is not None and should_abort():
+                    status = "ABORTED"
+                    break
+                if last_ticks is None or abs(ticks - last_ticks) > 1:
+                    last_ticks, last_change = ticks, now
+                elif now - last_change >= _EMPTY_MOVE_SETTLE_S:
+                    status = "SETTLED"
+                    break
+                if now - t0 > _EMPTY_MOVE_TIMEOUT_S:
+                    break
+                sleep(0.02)
+        finally:
+            for step in (lambda: self._bus.set_torque_enable(sid, False),
+                         lambda: self._bus.set_torque_limit(sid, prev[0]),
+                         lambda: self._bus.set_goal_speed(sid, prev[1]),
+                         lambda: self._bus.set_acceleration(sid, prev[2])):
+                try:
+                    step()
+                except Exception as exc:  # noqa: BLE001
+                    self._emit("error", "gripper_cleanup_failed", {"context": context, "error": str(exc)})
+        final = trace[-1]["ticks"] if trace else start
+        return {"role": self._role, "context": context, "status": status, "start_ticks": start,
+                "goal_ticks": goal_ticks, "final_ticks": final, "error_ticks": final - goal_ticks,
+                "peak_abs_load": max((abs(p["load"]) for p in trace), default=None),
+                "temp_c": trace[-1]["temp_c"] if trace else None, "samples": len(trace)}
+
+    def close_empty(self, *, tube_attached: bool, should_abort=None,
+                    sleep=time.sleep, clock=time.monotonic) -> dict:
+        """UNLOCKED -> CLOSED_EMPTY: close the EMPTY gripper slowly to closed_empty_deg.
+
+        Refused unless ``tube_attached is False`` (the caller states it) and the
+        state is UNLOCKED. If the jaws stop more than _CLOSE_OBSTRUCTION_TICKS short
+        of closed_empty, something is between them: FAULT and GripperObstructed.
+        Torque is off afterwards in every case.
+        """
+        if tube_attached is not False:
+            raise TubeAttachedRefused(self._role, "close_empty")
+        if self._state != GripperState.UNLOCKED:
+            raise IllegalTransition(self._state, "close_empty")
+        bands = self._bands_for_role()
+        if bands is None or bands.closed_empty_deg is None:
+            raise BandsNotConfigured(self._role, "close_empty")
+        goal = round(bands.closed_empty_deg * 4096 / 360)
+        if self._dry_run:
+            self._write_gripper(bands.closed_empty_deg, "close_empty")
+            self._state = GripperState.CLOSED_EMPTY
+            return {"role": self._role, "context": "close_empty", "status": "DRY_RUN", "goal_ticks": goal}
+        try:
+            res = self._drive_and_settle(goal, "close_empty", should_abort=should_abort, sleep=sleep, clock=clock)
+        except Exception:
+            self._state = GripperState.FAULT   # position unknown; torque already off
+            raise
+        if res["status"] != "SETTLED":
+            self._state = GripperState.FAULT
+            self._emit("error", "gripper_close_empty_not_settled", res)
+            return res
+        if abs(res["error_ticks"]) > _CLOSE_OBSTRUCTION_TICKS:
+            self._state = GripperState.FAULT
+            self._emit("error", "gripper_close_empty_obstructed", res)
+            raise GripperObstructed(self._role, res["final_ticks"], goal)
+        self._state = GripperState.CLOSED_EMPTY
+        self._emit("info", "gripper_closed_empty", res)
+        return res
+
+    def measure_end(self, end: str, *, tube_attached: bool, should_abort=None,
+                    sleep=time.sleep, clock=time.monotonic) -> dict:
+        """Calibration only: drive the EMPTY gripper to the EEPROM limit at one end.
+
+        ``end`` is "open" or "closed". Which EEPROM limit is which comes from the
+        configured bands (the open band lies on one side of closed_empty). Returns
+        where the gripper stopped and whether it stopped short of the limit
+        (``stopped_short``: a mechanical stop before the servo's own limit).
+        State afterwards: UNKNOWN (call reset() or close_empty() next).
+        """
+        if end not in ("open", "closed"):
+            raise ValueError(f"end must be 'open' or 'closed', got {end!r}")
+        if tube_attached is not False:
+            raise TubeAttachedRefused(self._role, "measure_end")
+        if self._state not in (GripperState.UNKNOWN, GripperState.UNLOCKED, GripperState.CLOSED_EMPTY):
+            raise IllegalTransition(self._state, "measure_end")
+        bands = self._bands_for_role()
+        if bands is None or bands.closed_empty_deg is None or not _bands_configured(bands):
+            raise BandsNotConfigured(self._role, "measure_end")
+        open_below = _mid(bands.unlocked_low_deg, bands.unlocked_high_deg) < bands.closed_empty_deg
+        if self._dry_run:
+            self._state = GripperState.UNKNOWN
+            return {"role": self._role, "context": f"measure_end_{end}", "status": "DRY_RUN",
+                    "limit": "min" if (end == "open") == open_below else "max"}
+        sid = self._bus._servo_id_for_joint("gripper")
+        raw = self._bus._bus
+        lo = raw.read_bytes(sid, _REG_MIN_POSITION_LIMIT, 2)
+        hi = raw.read_bytes(sid, _REG_MAX_POSITION_LIMIT, 2)
+        lo, hi = lo[0] | (lo[1] << 8), hi[0] | (hi[1] << 8)
+        goal = lo if (end == "open") == open_below else hi
+        self._state = GripperState.UNKNOWN
+        res = self._drive_and_settle(goal, f"measure_end_{end}", should_abort=should_abort,
+                                     sleep=sleep, clock=clock)
+        res["eeprom_limits"] = [lo, hi]
+        res["stopped_short"] = abs(res["error_ticks"]) > _END_REACHED_TOL_TICKS
+        self._emit("info", "gripper_end_measured", res)
+        return res
