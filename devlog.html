@@ -25,7 +25,7 @@
 
   <main>
     <div class="container page-head">
-      <p class="eyebrow">Progress &middot; updated Nov 10, 2026</p>
+      <p class="eyebrow">Progress &middot; updated Nov 13, 2026</p>
       <h1 class="page-title">Dev Log</h1>
       <p class="subtitle">
         Where the inchworm robot stands, what is finished, and dated notes on
@@ -42,18 +42,18 @@
         <div class="glance-top">
           <div class="panel overall">
             <h3>Overall progress</h3>
-            <div class="pct">67%<small>of 239 milestone acceptance criteria met</small></div>
-            <div class="progress lg" role="img" aria-label="13 of 35 milestone tasks done, 15 in progress, 7 to do">
-              <span class="done" style="width:37.1%"></span>
-              <span class="doing" style="width:42.9%"></span>
-              <span class="todo" style="width:20%"></span>
+            <div class="pct">69%<small>of 245 milestone acceptance criteria met</small></div>
+            <div class="progress lg" role="img" aria-label="15 of 36 milestone tasks done, 14 in progress, 7 to do">
+              <span class="done" style="width:41.7%"></span>
+              <span class="doing" style="width:38.9%"></span>
+              <span class="todo" style="width:19.4%"></span>
             </div>
             <ul class="legend">
-              <li><i class="key-done"></i>13 tasks done</li>
-              <li><i class="key-doing"></i>15 in progress</li>
+              <li><i class="key-done"></i>15 tasks done</li>
+              <li><i class="key-doing"></i>14 in progress</li>
               <li><i class="key-todo"></i>7 to do</li>
             </ul>
-            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by 1,701 passing tests. Most remaining criteria need measurements on the real robot.</p>
+            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by 1,792 automated tests. Both real arms have now run the full crawl cycle without the tube. Most remaining criteria need the tube, the DexArm or the cameras on the real robot.</p>
           </div>
           <div class="panel">
             <h3>Phases</h3>
@@ -61,7 +61,8 @@
               <li><strong>Sep</strong> &mdash; Website, agent skills, paper simulation</li>
               <li><strong>Mid Oct</strong> &mdash; Robot designed, ordered and built</li>
               <li><strong>Late Oct</strong> &mdash; Robot software planned and written by agents</li>
-              <li><strong>Now</strong> &mdash; Rebuilt arms moving under supervision, checked against the model</li>
+              <li><strong>Early Nov</strong> &mdash; Arms rebuilt; model checked against reality with an animation</li>
+              <li><strong>Now</strong> &mdash; Full crawl cycle runs on the real arms, without the tube</li>
               <li><strong>Next</strong> &mdash; Learned insertion, then full autonomous print-crawl</li>
             </ul>
           </div>
@@ -77,8 +78,8 @@
               <div class="progress"><span class="done" style="width:37.5%"></span><span class="doing" style="width:37.5%"></span></div>
               <span class="ms-count"><b>3/8</b> tasks<br>33/48 criteria</span></li>
             <li><span class="ms-name"><span class="ms-id">M2</span>Geometry &amp; coarse motion<span class="ms-desc">Frames, gripper lock, approach, fold, dry crawl</span></span>
-              <div class="progress"><span class="done" style="width:28.6%"></span><span class="doing" style="width:71.4%"></span></div>
-              <span class="ms-count"><b>2/7</b> tasks<br>38/48 criteria</span></li>
+              <div class="progress"><span class="done" style="width:50%"></span><span class="doing" style="width:50%"></span></div>
+              <span class="ms-count"><b>4/8</b> tasks<br>45/54 criteria</span></li>
             <li><span class="ms-name"><span class="ms-id">M3</span>Learned insertion<span class="ms-desc">Demonstrations, training, seating detection</span></span>
               <div class="progress"><span class="done" style="width:16.7%"></span><span class="doing" style="width:50%"></span></div>
               <span class="ms-count"><b>1/6</b> tasks<br>27/46 criteria</span></li>
@@ -102,15 +103,16 @@
         <div class="status-cards">
           <div class="card blocker">
             <h3>Current blocker</h3>
-            <p>No software blocker. Hardware progress waits on supervised sessions: checking the remaining joint directions and which end of the gripper travel is open on both arms <span class="task-id">AA-43</span>, and homing the leader arm <span class="task-id">AA-44</span>.</p>
+            <p>No blocker. The full cycle and the touching fold both ran on the real arms. The next hardware step is my choice of what to test next, in a supervised session.</p>
           </div>
           <div class="card">
             <h3>Up next</h3>
             <ul>
-              <li>Finish the joint direction checks and first powered wrist and gripper moves <span class="task-id">AA-43</span></li>
-              <li>Home and map the leader arm <span class="task-id">AA-44</span></li>
-              <li>Calibrate the scanner camera with the chessboard <span class="task-id">AA-30</span></li>
+              <li>I pick the next step from the list below</li>
               <li>Supervised first DexArm move against the robot model</li>
+              <li>Measure how repeatable the DexArm is <span class="task-id">AA-13</span></li>
+              <li>Calibrate the scanner camera with the chessboard <span class="task-id">AA-30</span></li>
+              <li>Home and map the leader arm <span class="task-id">AA-44</span></li>
             </ul>
           </div>
           <div class="card">
@@ -147,10 +149,12 @@
             </ul>
           </div>
           <div class="panel done-group">
-            <h3>M2 Geometry &amp; coarse motion <small>2 of 7</small></h3>
+            <h3>M2 Geometry &amp; coarse motion <small>4 of 8</small></h3>
             <ul class="done-list">
               <li><b>A map of where everything is</b>: the chassis stays still and the tube moves, so every attachment point is tracked as the tube advances. <span class="task-id">AA-15</span></li>
               <li><b>Safe handover between code and AI</b>: scripted motion hands control to the learned policy only inside strict limits, and always takes it back. <span class="task-id">AA-20</span></li>
+              <li><b>A gripper lock that holds</b>: the gripper turns to a fixed 45&deg; position to lock onto an attachment point, checked by eye on both arms. <span class="task-id">AA-17</span></li>
+              <li><b>The whole crawl cycle as an animation</b>: both arms carry and regrip the tube on the robot model, so mistakes show up in pictures before the real arms move. <span class="task-id">AA-45</span></li>
             </ul>
           </div>
           <div class="panel done-group">
@@ -160,6 +164,17 @@
               <li><b>Recovering from bad cycles</b>: detects a missed insertion, a latch that won't hold or a shifted tube, and gets back to a safe state. <span class="task-id">AA-28</span></li>
               <li><b>Applying the leveling correction</b>: the measured tilt and height of the part shift the DexArm's print frame before every section. <span class="task-id">AA-33</span></li>
               <li><b>From slicer to printer</b>: a DexArm profile in Cura, and checks that every sliced file stays inside the safe workspace. <span class="task-id">AA-34</span></li>
+            </ul>
+          </div>
+          <div class="panel done-group" style="grid-column:1 / -1">
+            <h3>Model checks &amp; real-arm tests <small>7 of 12</small></h3>
+            <ul class="done-list">
+              <li><b>A robot model I can trust</b>: the collision model was compared with the real arms at the fold and marked verified. <span class="task-id">AA-40</span></li>
+              <li><b>Powered wrists and grippers</b>: the encoder-only servos were replaced, calibrated, and every first powered move was watched and confirmed. <span class="task-id">AA-43</span> <span class="task-id">AA-48</span></li>
+              <li><b>True joint zeros</b>: shoulder and elbow zeros measured from physical landmarks, so the model&rsquo;s poses match the real arms. <span class="task-id">AA-47</span></li>
+              <li><b>Gripper lock checked on the real arms</b>: repeated lock trials on both arms, all inside the expected band. <span class="task-id">AA-49</span></li>
+              <li><b>The full cycle on the real arms</b>: both arms replay the animated cycle together, smoothly, at animation speed, without the tube. <span class="task-id">AA-50</span></li>
+              <li><b>Touching fold</b>: at the printing pose each lower arm rests on its own shoulder, with the elbow torque capped. <span class="task-id">AA-52</span></li>
             </ul>
           </div>
           <div class="panel done-group" style="grid-column:1 / -1">
@@ -185,6 +200,34 @@
       <section class="section" id="log">
         <div class="section-head"><span class="num">04</span><h2>Dated entries</h2></div>
         <p class="section-lead">Newest first. &ldquo;Work done&rdquo; is a plain summary; &ldquo;Notes&rdquo; are my own words, unedited.</p>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase hw">Hardware</span>
+            <time class="log-date">Nov 13, 2026</time>
+          </header>
+          <h3 class="log-title">From animation to a full cycle on the real arms</h3>
+          <p class="log-tldr">An animation of the whole crawl cycle showed where the model was wrong; after fixing it, both real arms ran the full cycle smoothly.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Animation of the full crawl cycle</b> on my cell model. It showed where the model and the real robot disagreed (the joint zero offsets and the fold pose). Both were fixed from landmark measurements, and the model&rsquo;s bounds now match the robot well.<span class="task-id">AA-45</span></li>
+              <li><b>Shoulder and elbow zero landmarks measured</b> on both arms.<span class="task-id">AA-47</span></li>
+              <li><b>Mesh collision model verified</b> against the real fold.<span class="task-id">AA-40</span></li>
+              <li><b>New wrist servos calibrated</b>, every powered move checked by me, and the 45&deg; gripper position lock verified on both arms.<span class="task-id">AA-43</span> <span class="task-id">AA-48</span> <span class="task-id">AA-49</span></li>
+              <li><b>Whole cycle replayed live</b> on both real arms, without the tube, moving smoothly at animation speed. After I confirm, the whole path is checked once in advance, and single bogus sensor readings are logged instead of aborting the run.<span class="task-id">AA-50</span></li>
+              <li><b>Touching fold</b>: each lower arm now rests on its own shoulder at the printing pose, with elbow torque capped at 15%. It worked on the first supervised live run, at the start and end of the full cycle.<span class="task-id">AA-52</span></li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Have become much better at managing context and keeping cost down. Should look into making it a bit more automated.</p>
+              <p class="notes">Might have implemented too many checks. Progress is greatly slowed because of how many checks there are and how &quot;safely&quot; things are done. Could get more done taking more risk. For example, we don't need to abort because the servos get a sensor reading that was slightly too hot for one reading and then goes back to stable temperature.</p>
+              <p class="notes">Animation has worked really well at quickly identifying misunderstanding between reality and the current robot. Bounds are now matching well.</p>
+              <p class="notes">Another interesting thing is Claude considered the fact that I'm frustrated in weighing the validity of my wishes for less safety lol</p>
+            </section>
+          </div>
+        </article>
         <article class="panel log-entry">
           <header class="log-head">
             <span class="phase hw">Hardware</span>
