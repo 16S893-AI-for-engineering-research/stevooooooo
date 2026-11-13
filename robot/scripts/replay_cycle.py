@@ -20,7 +20,7 @@ Live (owner present, hand on the power switch):
   4. slow profile on; both grippers lock (45-degree turn; look that they turn);
   5. the final adjustment to frame 0, then the whole cycle with no further prompts. Default
      (owner 2026-11-13): FLUID motion, both arms at the same time, never stopping between
-     frames, at --tempo x the animation speed (default 0.5); the arms rest only while a
+     frames, at --tempo x the animation speed (default 1.0, slowed only where a joint would pass ~57 deg/s); the arms rest only while a
      gripper unlocks or locks. --step-by-step = the old frame-by-frame replay at --speed;
   6. at the end the arms are back at the fold: support them, press Enter, torque goes off.
   Abort any time: Ctrl-C or `touch /tmp/inchworm_stop_move`. The arms then HOLD in

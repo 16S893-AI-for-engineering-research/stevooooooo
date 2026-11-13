@@ -212,7 +212,7 @@ def test_segments_split_only_at_gripper_actions_and_rest_at_the_ends():
     assert [(s.first, s.last, s.before) for s in segs] == [
         (0, 1, []), (1, 3, [("left", "unlock")]), (3, 4, [("left", "lock")])]
     s = segs[0]
-    assert s.duration_s == pytest.approx(2 * cr.ANIM_FRAME_S / 0.5)
+    assert s.duration_s >= 1 * cr.ANIM_FRAME_S / 0.5          # one frame at tempo, plus easing
     for a in cr.ARMS:                       # passes through the frames, starts/ends on them
         assert np.allclose(s.q(0.0)[a], plan[0].q[a]) and np.allclose(s.q(s.duration_s)[a], plan[1].q[a])
         e = 1e-3                            # at rest at both ends (eased in and out)
@@ -223,11 +223,27 @@ def test_segments_split_only_at_gripper_actions_and_rest_at_the_ends():
         cr.build_segments(plan, tempo=1.5)
 
 
-def test_full_speed_is_twice_half_speed():
+def test_full_speed_is_twice_half_speed_where_under_the_limit():
     cfg = load_config()
     plan = _short_plan(cfg)
-    assert cr.peak_speed_ticks_s(cr.build_segments(plan, 1.0)) == pytest.approx(
-        2 * cr.peak_speed_ticks_s(cr.build_segments(plan, 0.5)), rel=0.02)
+    big = 1e6
+    assert cr.peak_speed_ticks_s(cr.build_segments(plan, 1.0, big)) == pytest.approx(
+        2 * cr.peak_speed_ticks_s(cr.build_segments(plan, 0.5, big)), rel=0.05)
+
+
+def test_only_the_too_fast_stretch_is_slowed():
+    """Owner 2026-11-13 option 2: animation tempo, slowed only where a joint exceeds the limit."""
+    cfg = load_config()
+    plan = _short_plan(cfg)
+    free = cr.build_segments(plan, 1.0, 1e6)
+    peak = cr.peak_speed_ticks_s(free)
+    cap = 0.6 * peak
+    capped = cr.build_segments(plan, 1.0, cap)
+    assert cr.peak_speed_ticks_s(capped) <= cap * 1.02
+    assert sum(s.duration_s for s in capped) > sum(s.duration_s for s in free)
+    for s in capped:                                  # still starts/ends on the frames
+        for a in cr.ARMS:
+            assert np.allclose(s.q(0)[a], plan[s.first].q[a]) and np.allclose(s.q(s.duration_s)[a], plan[s.last].q[a])
 
 
 class _HitAt:

@@ -277,7 +277,7 @@ def summary(frames: Sequence[Frame], vmax_ticks_s: int) -> str:
 #: The approved cycle GIF plays one timeline frame per 0.2 s (scripts/inchworm_animation.py,
 #: PillowWriter fps=5). ``tempo`` = fraction of that speed (owner: start at 0.5).
 ANIM_FRAME_S = 0.2
-DEFAULT_TEMPO = 0.5
+DEFAULT_TEMPO = 1.0             # owner 2026-11-13: full animation speed (option 2 speed limit applies)
 MAX_TEMPO = 1.0
 MAX_STREAM_SPEED_TICKS_S = 700   # ceiling on any joint's planned speed (~62 deg/s); above = refuse
 STREAM_PERIOD_S = 0.02          # a new goal for both arms every 20 ms (50 Hz), from the path clock
@@ -303,29 +303,44 @@ class Segment:
         return {a: self.path[a](t) for a in ARMS}
 
 
-def _time_to_frames(n: int, dt: float) -> Callable[[float], float]:
-    """Timeline position s (frames) at time t: one frame per ``dt``, easing in and out over the
-    first and last frame (constant acceleration) so each segment starts and ends at rest."""
-    V, ta, T = 1.0 / dt, dt, (n + 1) * dt
-
-    def s(t: float) -> float:
-        t = min(max(t, 0.0), T)
-        if t < ta:
-            return 0.5 * V * t * t / ta
-        if t > T - ta:
-            r = T - t
-            return n - 0.5 * V * r * r / ta
-        return 0.5 * V * ta + V * (t - ta)
-    return s
+#: Owner 2026-11-13 (option 2): play at the animation's tempo, but wherever a joint would go
+#: faster than this, slow just that stretch down. Kept a little under the preflight ceiling.
+PATH_SPEED_LIMIT_TICKS_S = 650
 
 
-def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO) -> List[Segment]:
+def _time_law(rate_cap: Callable[[np.ndarray], np.ndarray], n: int, V: float,
+              grid: int = 4000) -> Tuple[Callable[[float], float], float]:
+    """Timeline position s(t) (frames) for a segment of ``n`` frames.
+
+    ds/dt = min(V, rate_cap(s)) (``V`` = frames/s at the chosen tempo; ``rate_cap`` slows the
+    stretches where a joint would exceed the speed limit), and both ends ease from rest with
+    the acceleration that reaches V half a frame in. Returns (s_of_t, duration)."""
+    A = V * V                                   # reaches V at s = 0.5
+    s = np.linspace(0.0, float(n), grid + 1)
+    mid = 0.5 * (s[:-1] + s[1:])
+    r = np.minimum(V, rate_cap(mid))
+    r = np.minimum(r, np.sqrt(2 * A * mid))
+    r = np.minimum(r, np.sqrt(2 * A * (n - mid)))
+    # keep the speed changes inside the stretch gentle too (same acceleration both ways)
+    ds = s[1] - s[0]
+    for k in range(1, len(r)):
+        r[k] = min(r[k], math.sqrt(r[k - 1] ** 2 + 2 * A * ds))
+    for k in range(len(r) - 2, -1, -1):
+        r[k] = min(r[k], math.sqrt(r[k + 1] ** 2 + 2 * A * ds))
+    t = np.concatenate([[0.0], np.cumsum(ds / r)])
+    T = float(t[-1])
+    return (lambda tt: float(np.interp(min(max(tt, 0.0), T), t, s))), T
+
+
+def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO,
+                   speed_limit_ticks_s: float = PATH_SPEED_LIMIT_TICKS_S) -> List[Segment]:
     """Split the timeline at the gripper actions; each piece becomes one smooth (C1, no
-    overshoot: monotone cubic per joint) path through its frames, both arms on one clock."""
+    overshoot: monotone cubic per joint) path through its frames, both arms on one clock,
+    at ``tempo`` x the animation, slowed only where a joint would exceed the speed limit."""
     from scipy.interpolate import PchipInterpolator
     if not (0.0 < tempo <= MAX_TEMPO):
         raise ValueError(f"tempo must be in (0, {MAX_TEMPO}]")
-    dt = ANIM_FRAME_S / tempo
+    V = tempo / ANIM_FRAME_S
     ev = gripper_events(frames)
     # A gripper action at frame c happens with the arms still at frame c-1 (as in run()).
     starts = [0] + [c - 1 for c in sorted(ev)]
@@ -337,14 +352,21 @@ def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO) -> Lis
         if n <= 0 or all(np.allclose(frames[a0].q[a], frames[k].q[a]) for k in range(a0, a1 + 1) for a in ARMS):
             segs.append(Segment(a0, a1, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS}))
             continue
-        s_of_t = _time_to_frames(n, dt)
-        paths = {}
+        fs = {}
         for a in ARMS:
             Q = np.stack([frames[k].q[a] for k in range(a0, a1 + 1)])
-            f = PchipInterpolator(np.arange(n + 1, dtype=float), Q, axis=0) if n >= 2 else \
-                (lambda x, Q=Q: Q[0] + (Q[1] - Q[0]) * x)
-            paths[a] = (lambda t, f=f, s_of_t=s_of_t: np.asarray(f(s_of_t(t)), dtype=np.float64))
-        segs.append(Segment(a0, a1, before, (n + 1) * dt, paths))
+            fs[a] = PchipInterpolator(np.arange(n + 1, dtype=float), Q, axis=0)
+
+        def rate_cap(x, fs=fs):
+            # fastest joint of either arm, in ticks per frame of timeline
+            dq = np.max(np.stack([np.abs(fs[a].derivative()(x)).max(axis=1) for a in ARMS]), axis=0)
+            dq = dq * TICKS_PER_RAD
+            return np.where(dq > 1e-9, speed_limit_ticks_s / np.maximum(dq, 1e-9), np.inf)
+
+        s_of_t, T = _time_law(rate_cap, n, V)
+        paths = {a: (lambda t, f=fs[a], s_of_t=s_of_t: np.asarray(f(s_of_t(t)), dtype=np.float64))
+                 for a in ARMS}
+        segs.append(Segment(a0, a1, before, T, paths))
     return segs
 
 
