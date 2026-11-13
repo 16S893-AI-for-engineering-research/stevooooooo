@@ -557,7 +557,10 @@ motion_guard:
     servo_tick_limits:
       shoulder_pan: [674, 2527]
       shoulder_lift: [1255, 3000]
-      elbow_flex: [939, 3091]
+      # OWNER 2026-11-13: Max raised 3091 -> 3151 (+60) so the elbow reaches the touching fold
+      # (lower arm resting on its shoulder, measured 3121). Backup
+      # eeprom_backup_left_2026-11-12T20-03-01_pre_limits.json, read back [939, 3151].
+      elbow_flex: [939, 3151]
       # AA-43 2026-11-09: joints 4-6 re-measured on the REPLACEMENT servos (EEPROM, read back);
       # gripper: the previous values, written 2026-11-09; 2026-11-12 measured against the travel
       # (gripper_ends_2026-11-12.jsonl): open end 1526, closed end 2527, both at the limits (owner:
@@ -591,7 +594,10 @@ motion_guard:
     servo_tick_limits:
       shoulder_pan: [1191, 3044]
       shoulder_lift: [1323, 2935]
-      elbow_flex: [906, 3046]
+      # OWNER 2026-11-13: Max raised 3046 -> 3106 (+60) so the elbow reaches the touching fold
+      # (measured 3075). Backup eeprom_backup_right_2026-11-12T20-03-02_pre_limits.json,
+      # read back [906, 3106].
+      elbow_flex: [906, 3106]
       # AA-43 2026-11-09: see left_arm_limits.
       wrist_flex: [797, 3191]
       wrist_roll: [533, 3577]

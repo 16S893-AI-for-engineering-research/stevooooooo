@@ -157,7 +157,7 @@ class _Checker:
     def __init__(self, hit=False):
         self.hit = hit
 
-    def check(self, state, arm):
+    def check(self, state, arm=None):
         return ["left_wrist vs chassis"] if self.hit else []
 
 
@@ -201,3 +201,144 @@ def test_lower_arm_may_rest_on_its_own_shoulder_anywhere():
     pairs = {frozenset(p) for p in cfg.motion_guard.collision.mesh.always_allowed_pairs}
     assert pairs == {frozenset(("left_lower_arm", "left_shoulder")),
                      frozenset(("right_lower_arm", "right_shoulder"))}
+
+
+# --- fluid motion (owner 2026-11-13: both arms together, no stopping, half animation speed) ---
+
+def test_segments_split_only_at_gripper_actions_and_rest_at_the_ends():
+    cfg = load_config()
+    plan = _short_plan(cfg)
+    segs = cr.build_segments(plan, tempo=0.5)
+    assert [(s.first, s.last, s.before) for s in segs] == [
+        (0, 1, []), (1, 3, [("left", "unlock")]), (3, 4, [("left", "lock")])]
+    s = segs[0]
+    assert s.duration_s == pytest.approx(2 * cr.ANIM_FRAME_S / 0.5)
+    for a in cr.ARMS:                       # passes through the frames, starts/ends on them
+        assert np.allclose(s.q(0.0)[a], plan[0].q[a]) and np.allclose(s.q(s.duration_s)[a], plan[1].q[a])
+        e = 1e-3                            # at rest at both ends (eased in and out)
+        assert np.abs(s.q(e)[a] - s.q(0)[a]).max() / e < 0.05
+        assert np.abs(s.q(s.duration_s)[a] - s.q(s.duration_s - e)[a]).max() / e < 0.05
+    assert segs[2].duration_s == 0.0        # relock only, no motion
+    with pytest.raises(ValueError):
+        cr.build_segments(plan, tempo=1.5)
+
+
+def test_full_speed_is_twice_half_speed():
+    cfg = load_config()
+    plan = _short_plan(cfg)
+    assert cr.peak_speed_ticks_s(cr.build_segments(plan, 1.0)) == pytest.approx(
+        2 * cr.peak_speed_ticks_s(cr.build_segments(plan, 0.5)), rel=0.02)
+
+
+class _HitAt:
+    def __init__(self, n):
+        self.n, self.k = n, 0
+
+    def check(self, state, arm=None):
+        self.k += 1
+        return ["left_wrist vs right_wrist"] if self.k == self.n else []
+
+
+def test_stream_preflight_refuses_any_contact_and_speed():
+    cfg = load_config()
+    segs = cr.build_segments(_short_plan(cfg), 0.5)
+    assert cr.stream_preflight(cfg, segs, _Checker()) == []
+    p = cr.stream_preflight(cfg, segs, _HitAt(7))
+    assert len(p) == 1 and "left_wrist vs right_wrist" in p[0]
+    assert cr.stream_preflight(cfg, segs, None) == ["mesh collision model unavailable"]
+    fast = cr.build_segments(_short_plan(cfg), 1.0)
+    old = cr.MAX_STREAM_SPEED_TICKS_S
+    try:
+        cr.MAX_STREAM_SPEED_TICKS_S = cr.peak_speed_ticks_s(fast) - 1
+        assert any("ceiling" in x for x in cr.stream_preflight(cfg, fast, _Checker()))
+    finally:
+        cr.MAX_STREAM_SPEED_TICKS_S = old
+
+
+def test_fluid_simulation_never_stops_between_frames():
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        recs = []
+        r, buses = sim.simulate(cfg, plan, log=recs.append, segments=cr.build_segments(plan, 0.5))
+    finally:
+        logging.disable(logging.NOTSET)
+    ev = [(x["event"], x.get("arm")) for x in recs if x["event"] not in ("stream", "frame")]
+    assert ev == [("gripper_lock", "left"), ("gripper_lock", "right"), ("segment", None),
+                  ("gripper_unlock", "left"), ("segment", None), ("gripper_lock", "left")]
+    segs = [x for x in recs if x["event"] == "segment"]
+    assert all(max(x["worst_path_error_ticks"].values()) < cr.TRACK_TOL_TICKS for x in segs)
+    assert all(x["took_s"] < x["planned_s"] + 1.0 for x in segs)        # no per-frame stops
+
+
+def test_fluid_obstruction_aborts():
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        lift = cr.q_to_ticks(cfg, "left", plan[1].q["left"])[1]
+        start = cr.q_to_ticks(cfg, "left", plan[0].q["left"])[1]
+        with pytest.raises(cr.ReplayAborted, match="off the path|stopped short"):
+            sim.simulate(cfg, plan, stall={"left": {2: (start + lift) // 2}},
+                         segments=cr.build_segments(plan, 0.5))
+    finally:
+        logging.disable(logging.NOTSET)
+
+
+def test_stream_point_is_pose_checked_and_must_be_near_the_present_pose():
+    from inchworm.motion_guard import MotionViolationError, build_guarded_arm
+    cfg = load_config()
+    plan = _short_plan(cfg)
+    clock = sim.SimClock()
+    bus = sim.SimArmBus("arm_left", cr.q_to_ticks(cfg, "left", plan[0].q["left"]) + [1600], clock)
+    g = build_guarded_arm(bus, cfg, "left", live=False)
+    g.guard.mesh.other_arm_pose_source = lambda: plan[0].q["right"]
+    q = plan[0].q["left"].copy()
+    g.write_stream_point_rad(q + 0.05, 0.2)                  # small step: written
+    far = q.copy(); far[1] += 0.3
+    with pytest.raises(MotionViolationError, match="present pose"):
+        g.write_stream_point_rad(far, 0.2)
+    bad = q.copy(); bad[3] = cfg.motion_guard.left_arm_limits.wrist_flex_upper_rad + 0.01
+    with pytest.raises(MotionViolationError):
+        g.write_stream_point_rad(bad, 0.2)
+    with pytest.raises(ValueError):
+        g.write_stream_point_rad(q, 1.0)                     # step ceiling
+
+
+def test_one_garbled_reply_is_retried_once():
+    from inchworm.servo_bus import ServoChecksumError
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        clock = sim.SimClock()
+        buses = {a: sim.SimArmBus(f"arm_{a}", cr.q_to_ticks(cfg, a, plan[0].q[a]) + [1600], clock) for a in cr.ARMS}
+        recs = []
+        r = cr.build_runner(cfg, plan, buses, live=False, clock=clock, sleep=clock.sleep, log=recs.append)
+        real, n = buses["left"].read_joint_state, {"k": 0}
+
+        def flaky(sid):
+            n["k"] += 1
+            if n["k"] in (1, 4, 5):
+                raise ServoChecksumError(sid, 0xF9, 0xFB)
+            return real(sid)
+        buses["left"].read_joint_state = flaky
+        assert r._read_state("left", 2) is not None              # 1st fails, retried
+        assert recs[-1]["event"] == "read_retry"
+        r._read_state("left", 2)                                  # call 3 ok
+        with pytest.raises(ServoChecksumError):
+            r._read_state("left", 2)                              # 4 and its retry 5 fail: abort
+    finally:
+        logging.disable(logging.NOTSET)
+
+
+def test_fold_elbow_stays_where_it_was_until_the_owner_decides_the_contact():
+    cfg = load_config()
+    for a, lim in (("left", 3151), ("right", 3106)):
+        assert cfg.motion_guard.__dict__[f"{a}_arm_limits"].servo_tick_limits["elbow_flex"][1] == lim
+    path = pathlib.Path(__file__).parents[1] / "out" / "inchworm" / "timeline.jsonl"
+    if not path.exists():
+        pytest.skip("no planned timeline")
+    fr, _ = cr.clamp_to_eeprom(cfg, cr.load_timeline(path)[:1], elbow_cap=cr.FOLD_ELBOW_CAP_TICKS)
+    assert [cr.q_to_ticks(cfg, a, fr[0].q[a])[2] for a in cr.ARMS] == [3081, 3036]

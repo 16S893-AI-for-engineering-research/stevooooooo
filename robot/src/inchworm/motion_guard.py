@@ -871,6 +871,10 @@ class PresentPoseUnknownError(RuntimeError):
     guarded move cannot be validated and must not be sent (fail closed)."""
 
 
+#: Largest present->target step a streamed point may have (write_stream_point_rad).
+STREAM_STEP_CEILING_RAD = 0.2
+
+
 class GuardedArm:
     """Wraps :class:`~inchworm.servo_bus.ArmServoBus` to enforce motion guard.
 
@@ -1203,6 +1207,35 @@ class GuardedArm:
                 raise MotionViolationError(traj_violation)
 
         # Convert rad → deg and write each joint
+        for i, name in enumerate(JOINT_NAMES):
+            deg = self._joint_rad_to_servo_deg(i, float(q[i]))
+            deg = max(0.0, min(360.0, deg))
+            self._bus.write_position_deg(name, deg)  # type: ignore[attr-defined]
+
+    def write_stream_point_rad(self, q: JointVec, max_step_rad: float) -> None:
+        """Write one point of a PRE-CHECKED streamed path (AA-50 fluid replay).
+
+        Owner decision 2026-11-13 (option b): for fluid motion the whole path is checked
+        against the cell model offline, both arms together, before the owner's start prompt;
+        during the run each streamed point gets the full pose check (soft limits, keep-out
+        primitives, mesh collision with the other arm's commanded point) here, and must lie
+        within ``max_step_rad`` (every joint) of the present pose, so the unchecked straight
+        piece from present to target stays short. No trajectory sampling (too slow to stream).
+        """
+        if not (0.0 < float(max_step_rad) <= STREAM_STEP_CEILING_RAD):
+            raise ValueError(f"max_step_rad must be in (0, {STREAM_STEP_CEILING_RAD}]")
+        q = np.asarray(q, dtype=np.float64)
+        violation = self._guard.check_pose(q, live=self._live)
+        if violation is not None:
+            raise MotionViolationError(violation)
+        present = self._read_present_pose_rad()
+        step = np.abs(q - present)
+        if float(step.max()) > max_step_rad:
+            j = int(step.argmax())
+            raise MotionViolationError(
+                f"{self._guard.arm_role}: streamed point {JOINT_NAMES[j]} is "
+                f"{math.degrees(step[j]):.1f} deg from the present pose "
+                f"(max {math.degrees(max_step_rad):.1f}); use write_positions_rad")
         for i, name in enumerate(JOINT_NAMES):
             deg = self._joint_rad_to_servo_deg(i, float(q[i]))
             deg = max(0.0, min(360.0, deg))

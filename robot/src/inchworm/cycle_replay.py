@@ -124,8 +124,15 @@ def q_to_ticks(cfg, arm: str, q: Sequence[float]) -> List[int]:
 
 EEPROM_INSIDE_TICKS = 10   # commanded goals stay this far inside the servo's own limits
 
+#: Owner 2026-11-13: the elbow EEPROM Max was raised (L 3091->3151, R 3046->3106) so the arm can
+#: reach the touching fold (lower arm resting on its shoulder). HOW to press into that contact
+#: (force cap, verification) is still the owner's open decision, so until then the replay keeps
+#: the elbow where the 2026-11-13 runs held it: at most these ticks (the old limit - 10).
+FOLD_ELBOW_CAP_TICKS = {"left": 3081, "right": 3036}
 
-def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TICKS) -> Tuple[List[Frame], List[str]]:
+
+def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TICKS,
+                    elbow_cap: Optional[Dict[str, int]] = None) -> Tuple[List[Frame], List[str]]:
     """Frames whose joint goals lie past the EEPROM tick limits, pulled to ``inside`` ticks within.
 
     Found 2026-11-12: the measured fold (start and end of the cycle) has the elbow at its
@@ -143,13 +150,17 @@ def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TI
                 if j not in lim:
                     continue
                 lo, hi = lim[j][0] + inside, lim[j][1] - inside
+                if j == "elbow_flex" and elbow_cap and a in elbow_cap:
+                    hi = min(hi, int(elbow_cap[a]))
                 if lo <= t <= hi:
                     continue
                 tc = min(max(t, lo), hi)
                 sign, z = getattr(cal, f"{j}_sign"), getattr(cal, f"{j}_zero_offset_deg")
                 q[a][k] = sign * math.radians(tc * 360 / 4096 - z)
                 notes.append(f"frame {f.index} {a} {j}: tick {t} -> {tc} "
-                             f"({math.degrees(q[a][k] - f.q[a][k]):+.1f} deg, EEPROM {lim[j]})")
+                             f"({math.degrees(q[a][k] - f.q[a][k]):+.1f} deg, EEPROM {lim[j]}"
+                             + (f", fold cap {elbow_cap[a]}" if j == "elbow_flex" and elbow_cap and a in elbow_cap else "")
+                             + ")")
         out.append(Frame(f.index, f.step, q, dict(f.locked)))
     return out, notes
 
@@ -260,6 +271,147 @@ def summary(frames: Sequence[Frame], vmax_ticks_s: int) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Fluid motion (owner 2026-11-13): both arms together, no stop between frames
+# ---------------------------------------------------------------------------
+
+#: The approved cycle GIF plays one timeline frame per 0.2 s (scripts/inchworm_animation.py,
+#: PillowWriter fps=5). ``tempo`` = fraction of that speed (owner: start at 0.5).
+ANIM_FRAME_S = 0.2
+DEFAULT_TEMPO = 0.5
+MAX_TEMPO = 1.0
+MAX_STREAM_SPEED_TICKS_S = 700   # ceiling on any joint's planned speed (~62 deg/s); above = refuse
+STREAM_PERIOD_S = 0.05          # control loop: a new target for both arms every 50 ms
+STREAM_LEAD_S = 0.1             # the target sent is the path point this far ahead
+STREAM_MAX_STEP_RAD = 0.2       # each sent target within ~11 deg of the present pose (GuardedArm)
+STREAM_ACCEL = 50
+TRACK_TOL_TICKS = 100           # ~8.8 deg behind the path = obstruction/stall: abort
+PREFLIGHT_STREAM_DT_S = 0.025   # offline check of the streamed path every 25 ms of path time
+
+
+@dataclass
+class Segment:
+    """Fluid motion between two gripper actions (the arms stop only at the gripper actions)."""
+    first: int                       # timeline frame index at the start
+    last: int                        # ... and at the end
+    before: List[Tuple[str, str]]    # gripper actions done (arms still) before this segment
+    duration_s: float
+    path: Dict[str, Callable[[float], np.ndarray]]   # arm -> q(t), t in [0, duration_s]
+
+    def q(self, t: float) -> Dict[str, np.ndarray]:
+        t = min(max(float(t), 0.0), self.duration_s)
+        return {a: self.path[a](t) for a in ARMS}
+
+
+def _time_to_frames(n: int, dt: float) -> Callable[[float], float]:
+    """Timeline position s (frames) at time t: one frame per ``dt``, easing in and out over the
+    first and last frame (constant acceleration) so each segment starts and ends at rest."""
+    V, ta, T = 1.0 / dt, dt, (n + 1) * dt
+
+    def s(t: float) -> float:
+        t = min(max(t, 0.0), T)
+        if t < ta:
+            return 0.5 * V * t * t / ta
+        if t > T - ta:
+            r = T - t
+            return n - 0.5 * V * r * r / ta
+        return 0.5 * V * ta + V * (t - ta)
+    return s
+
+
+def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO) -> List[Segment]:
+    """Split the timeline at the gripper actions; each piece becomes one smooth (C1, no
+    overshoot: monotone cubic per joint) path through its frames, both arms on one clock."""
+    from scipy.interpolate import PchipInterpolator
+    if not (0.0 < tempo <= MAX_TEMPO):
+        raise ValueError(f"tempo must be in (0, {MAX_TEMPO}]")
+    dt = ANIM_FRAME_S / tempo
+    ev = gripper_events(frames)
+    # A gripper action at frame c happens with the arms still at frame c-1 (as in run()).
+    starts = [0] + [c - 1 for c in sorted(ev)]
+    ends = starts[1:] + [len(frames) - 1]
+    segs: List[Segment] = []
+    for i, (a0, a1) in enumerate(zip(starts, ends)):
+        before = ev.get(a0 + 1, []) if i else []
+        n = a1 - a0
+        if n <= 0 or all(np.allclose(frames[a0].q[a], frames[k].q[a]) for k in range(a0, a1 + 1) for a in ARMS):
+            segs.append(Segment(a0, a1, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS}))
+            continue
+        s_of_t = _time_to_frames(n, dt)
+        paths = {}
+        for a in ARMS:
+            Q = np.stack([frames[k].q[a] for k in range(a0, a1 + 1)])
+            f = PchipInterpolator(np.arange(n + 1, dtype=float), Q, axis=0) if n >= 2 else \
+                (lambda x, Q=Q: Q[0] + (Q[1] - Q[0]) * x)
+            paths[a] = (lambda t, f=f, s_of_t=s_of_t: np.asarray(f(s_of_t(t)), dtype=np.float64))
+        segs.append(Segment(a0, a1, before, (n + 1) * dt, paths))
+    return segs
+
+
+def stream_samples(seg: Segment, dt: float = PREFLIGHT_STREAM_DT_S) -> np.ndarray:
+    if seg.duration_s <= 0:
+        return np.array([0.0])
+    k = max(2, int(math.ceil(seg.duration_s / dt)) + 1)
+    return np.linspace(0.0, seg.duration_s, k)
+
+
+def peak_speed_ticks_s(segs: Sequence[Segment]) -> float:
+    peak = 0.0
+    for seg in segs:
+        ts = stream_samples(seg)
+        if len(ts) < 2:
+            continue
+        for a in ARMS:
+            Q = np.stack([seg.path[a](t) for t in ts])
+            v = np.abs(np.diff(Q, axis=0)).max(1) * TICKS_PER_RAD / np.diff(ts)
+            peak = max(peak, float(v.max()))
+    return peak
+
+
+def stream_preflight(cfg, segs: Sequence[Segment], checker) -> List[str]:
+    """Owner option (b), 2026-11-13: the WHOLE fluid path, both arms together, no tube, every
+    25 ms of path time: soft limits, EEPROM tick limits, the cell mesh model, and the speed
+    ceiling. Refuse on any problem. (Live, each streamed point also gets the full pose check.)"""
+    from inchworm.inchworm_plan import configured_soft_limits
+    from inchworm.system_model.collision import CellState
+
+    problems: List[str] = []
+    soft = configured_soft_limits(cfg)
+    if soft is None:
+        return ["soft limits not configured"]
+    if checker is None:
+        return ["mesh collision model unavailable"]
+    peak = peak_speed_ticks_s(segs)
+    if peak > MAX_STREAM_SPEED_TICKS_S:
+        problems.append(f"planned joint speed {peak:.0f} ticks/s above the {MAX_STREAM_SPEED_TICKS_S} ceiling")
+    for seg in segs:
+        for t in stream_samples(seg):
+            q = seg.q(t)
+            where = f"frames {seg.first}->{seg.last} t={t:.2f}s"
+            bad = None
+            for a in ARMS:
+                lo, hi = soft[a]
+                for j, v, l, h in zip(JOINTS, q[a], lo, hi):
+                    if not (l - 1e-9 <= v <= h + 1e-9):
+                        bad = f"{where}: {a} {j} {math.degrees(v):.1f} deg outside soft limits"
+                lim = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits or {}
+                for j, tk in zip(JOINTS, q_to_ticks(cfg, a, q[a])):
+                    if j in lim and not (lim[j][0] <= tk <= lim[j][1]):
+                        bad = f"{where}: {a} {j} tick {tk} outside EEPROM {lim[j]}"
+            if bad is None:
+                try:
+                    hits = checker.check(CellState(left_q=q["left"], right_q=q["right"], dexarm_q={},
+                                                   tube_advance_m=None))
+                except Exception as exc:  # noqa: BLE001 - fail closed
+                    hits = [f"collision check failed: {exc}"]
+                if hits:
+                    bad = f"{where}: {hits[0]}"
+            if bad:
+                problems.append(bad)
+                break
+    return problems
+
+
+# ---------------------------------------------------------------------------
 # Live runner (injected buses; tested against simulated servos)
 # ---------------------------------------------------------------------------
 
@@ -279,8 +431,6 @@ class ReplayRunner:
     vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S
     arm_torque_limit: int = DEFAULT_ARM_TORQUE_LIMIT
     should_abort: Callable[[], bool] = lambda: False
-    prompt: Callable[[str], str] = input
-    pause_each_phase: bool = False
     log: Callable[[dict], None] = lambda rec: None
     sleep: Callable[[float], None] = time.sleep
     clock: Callable[[], float] = time.monotonic
@@ -402,14 +552,10 @@ class ReplayRunner:
         self._move(start, self.frames[0])
 
     def run(self):
+        """Step-by-step replay (each frame reached before the next is sent). No prompts."""
         ev = gripper_events(self.frames)
-        phase = self.frames[0].step
         for prev, cur in zip(self.frames, self.frames[1:]):
             self._check_abort()
-            if self.pause_each_phase and cur.step != phase:
-                if self.prompt(f"next phase: {cur.step!r} (frame {cur.index}). Enter to go, q to stop: ").strip().lower() == "q":
-                    raise ReplayAborted("stopped by the owner at a phase pause")
-            phase = cur.step
             for a, what in ev.get(cur.index, []):
                 (self._lock if what == "lock" else self._unlock)(a)
             self._move(prev, cur)
@@ -445,6 +591,101 @@ class ReplayRunner:
                   "goal_ticks": tick_goals, "final_ticks": final,
                   "error_ticks": {a: [f - g for f, g in zip(final[a], tick_goals[a])] for a in final},
                   "peak_abs_load": peak, "expected_s": round(exp, 2), "took_s": round(dt, 2)})
+
+    def _read_state(self, arm: str, sid: int):
+        """One joint-state read; a single garbled reply (seen once live 2026-11-13: checksum
+        error on servo 2) is retried once and logged. A second failure aborts."""
+        from inchworm.servo_bus import ServoError
+        try:
+            return self.arms[arm].bus.read_joint_state(sid)
+        except ServoError as exc:
+            self.log({"event": "read_retry", "arm": arm, "servo": sid, "error": str(exc)})
+            return self.arms[arm].bus.read_joint_state(sid)
+
+    def run_fluid(self, segs: Sequence[Segment]):
+        """Owner 2026-11-13: fluid motion, both arms at the same time, no stop between frames.
+        The arms come to rest only for the gripper actions between segments."""
+        from inchworm.gripper_lock import GripperState
+        for h in self.arms.values():
+            for j in JOINTS:
+                h.bus.set_acceleration(h.ids[j], STREAM_ACCEL)
+        for seg in segs:
+            for a, what in seg.before:
+                (self._lock if what == "lock" else self._unlock)(a)
+            if seg.duration_s <= 0:
+                continue
+            self._stream_segment(seg)
+            for a in ARMS:
+                if self.arms[a].sm.state == GripperState.LOCKED:
+                    self.arms[a].sm.hold_tick()
+
+    def _stream_segment(self, seg: Segment):
+        from inchworm.gripper_lock import GripperState
+        t0 = self.clock()
+        worst = {a: 0 for a in ARMS}
+        peak_load = {a: [0] * 5 for a in ARMS}
+        n = 0
+        last_speed = {a: [None] * 5 for a in ARMS}
+        while True:
+            self._check_abort()
+            tick_start = self.clock()
+            t = tick_start - t0
+            # 1. read both arms; faults; how far behind the path?
+            want = seg.q(t)
+            present = {}
+            for a in ARMS:
+                ticks = []
+                for k, j in enumerate(JOINTS):
+                    st = self._read_state(a, self.arms[a].ids[j])
+                    ticks.append(round(st.position_deg * 4096 / 360))
+                    peak_load[a][k] = max(peak_load[a][k], abs(st.load_raw))
+                    if st.temperature_c >= self.cfg.fault_thresholds.overtemperature_c:
+                        raise ReplayAborted(f"{a} {j} at {st.temperature_c} C")
+                    if st.current_raw >= self.cfg.fault_thresholds.overcurrent_raw:
+                        raise ReplayAborted(f"{a} {j} current {st.current_raw} raw (overcurrent)")
+                present[a] = ticks
+                err = [p - w for p, w in zip(ticks, q_to_ticks(self.cfg, a, want[a]))]
+                worst[a] = max(worst[a], max(abs(e) for e in err))
+                if max(abs(e) for e in err) > TRACK_TOL_TICKS:
+                    raise ReplayAborted(f"frames {seg.first}->{seg.last} t={t:.2f}s: {a} is "
+                                        f"{err} ticks off the path (more than {TRACK_TOL_TICKS})")
+            if t >= seg.duration_s:
+                break
+            # 2. send both arms the point STREAM_LEAD_S ahead, each checked against the other's
+            tgt = seg.q(t + STREAM_LEAD_S)
+            for a in ARMS:
+                h, o = self.arms[a], "right" if a == "left" else "left"
+                h.guarded.guard.mesh.other_arm_pose_source = (lambda q=tgt[o]: q)
+                goal = q_to_ticks(self.cfg, a, tgt[a])
+                for k, j in enumerate(JOINTS):
+                    sp = abs(goal[k] - present[a][k]) / STREAM_LEAD_S
+                    sp = int(min(MAX_STREAM_SPEED_TICKS_S, max(MIN_SPEED_TICKS_S, round(sp))))
+                    if last_speed[a][k] is None or abs(sp - last_speed[a][k]) > 0.1 * last_speed[a][k] + 2:
+                        h.bus.set_goal_speed(h.ids[j], sp)
+                        last_speed[a][k] = sp
+                h.guarded.write_stream_point_rad(tgt[a], STREAM_MAX_STEP_RAD)
+            n += 1
+            if n % 10 == 0:
+                for a in ARMS:
+                    if self.arms[a].sm.state == GripperState.LOCKED:
+                        self.arms[a].sm.hold_tick()
+                self.log({"event": "stream", "t": round(t, 2), "frames": [seg.first, seg.last],
+                          "present_ticks": present})
+            rest = STREAM_PERIOD_S - (self.clock() - tick_start)
+            if rest > 0:
+                self.sleep(rest)
+        # 3. come to rest on the segment's last frame
+        end = self.frames[seg.last]
+        goals = {a: q_to_ticks(self.cfg, a, end.q[a]) for a in ARMS}
+        for a in ARMS:
+            for j in JOINTS:
+                self.arms[a].bus.set_goal_speed(self.arms[a].ids[j], DEFAULT_VMAX_TICKS_S)
+        final, peak2, dt = self._wait_arrival(goals, 1.0, seg.last)
+        self.log({"event": "segment", "frames": [seg.first, seg.last], "step": end.step,
+                  "planned_s": round(seg.duration_s, 2), "took_s": round(self.clock() - t0, 2),
+                  "loops": n, "worst_path_error_ticks": worst,
+                  "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS},
+                  "peak_abs_load": {a: [max(x, y) for x, y in zip(peak_load[a], peak2[a])] for a in ARMS}})
 
     def hold(self):
         """Owner decision: e-stop HOLDS. Re-command present positions with torque on."""

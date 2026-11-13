@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-12 23:13'
+updated_date: '2026-11-13 01:34'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -29,7 +29,9 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **OWNER DECISION 2026-11-13:** live move allowed although the soft limits are marked unverified. Implemented as a per-run waiver `--allow-unverified-soft-limits "<text>"` (GuardedArm `unverified_soft_limits_override`); values, keep-out boxes, mesh collision and calibration stay enforced; `hardware.yaml` stays `unverified: true`.
 - Start pose (owner request 2026-11-13): place the arms roughly; the robot makes the final adjustment itself when every joint is within 10 deg and the move is clear in the cell model (`approach_problems`).
 - **OWNER DECISION 2026-11-13:** each lower arm may touch its own shoulder at ANY pose (stability while holding the tube): `mesh.always_allowed_pairs`. The owner wants fewer needless refusals; before adding checks, ask whether they block intended contact.
-- **Next:** handoff AA-51 (supervised live run, 7 steps, ~20 min); revised for the auto-adjust, so **the owner must re-accept**. Order: AA-49 first (it confirms the 45-deg lock by eye), then AA-51. After the run: read `calibration_data/replay_cycle_<date>.jsonl`, record observations, check AA-50 AC #5.
+- **AA-51 live replay DONE twice 2026-11-13 (owner: 'It worked great!')**; AA-50 AC #5 checked. The AA-51 handoff is still 'paused at step 2' in the queue: the owner should complete it in the handoff tab, then `human_verify`.
+- Fluid replay built (owner 2026-11-13, option b, whole path checked offline): `replay_cycle.py` now defaults to fluid motion at tempo 0.5, with a single YES prompt; `--step-by-step` gives the old mode. Dry-run: 0 problems, 36 s of motion, peak 54 deg/s. **Next: the owner runs it live**: `uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-50 fluid replay"`.
+- Elbow EEPROM Max raised +60 (L 3151, R 3106), owner approved, backups in calibration_data. **OPEN owner decision:** how to press into the touching fold (force cap, check by eye). Until then the replay caps the fold elbow at L 3081 / R 3036.
 ### Gripper lock = 45-degree position lock (OWNER DECISION 2026-11-12; VERIFIED AA-49 2026-11-13)
 - The locking piece slips on its screw at both ends (deliberate clutch), so no stall marks the lock. Lock = slow drive (150 ticks/s, torque 300) to open end + 512 ticks: L 2038, R 2041; LOCKED within 12 ticks; stopping short = FAULT + torque off. AA-49: key-in trials settle at L 2032-2034, R 2035, all in band; the owner confirmed by eye the key locked every time. `hardware.yaml gripper_lock.arm_*.unverified: false`. AA-43 and AA-17 Done. AA-41 is superseded (owner may decline it). Grippers' rest state after AA-49 was not reported (probably open, torque off).
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)

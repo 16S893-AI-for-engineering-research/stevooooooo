@@ -261,6 +261,7 @@ class CellCollisionChecker:
         }
         self._adjacent = self._adjacent_pairs()
         self._pairs_cache: Dict[Tuple[str, bool], List[Tuple[str, str]]] = {}
+        self._corners: Dict[str, np.ndarray] = {}  # local bbox corners per link (speed only)
         if TUBE_LINK not in self._geom:
             raise CollisionModelError(f"cell URDF lacks the tube link {TUBE_LINK!r}")
         self.tube_axis = tube_axis_from_mesh(self._mesh[TUBE_LINK])
@@ -389,26 +390,34 @@ class CellCollisionChecker:
         objs: Dict[str, object] = {}
         aabbs: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
 
-        def obj(link: str):
-            if link not in objs:
-                geom, T, mesh = self._geom[link], poses[link], self._mesh[link]
-                objs[link] = fcl.CollisionObject(geom, fcl.Transform(T[:3, :3], T[:3, 3]))
-                # cheap world AABB from the 8 local bbox corners (conservative)
-                lo, hi = mesh.bounds
-                c = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+        def box(link: str):
+            # cheap world AABB from the 8 local bbox corners (conservative)
+            if link not in aabbs:
+                c = self._corners.get(link)
+                if c is None:
+                    lo, hi = self._mesh[link].bounds
+                    c = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+                    self._corners[link] = c
+                T = poses[link]
                 w = c @ T[:3, :3].T + T[:3, 3]
                 aabbs[link] = (w.min(0), w.max(0))
+            return aabbs[link]
+
+        def obj(link: str):
+            if link not in objs:
+                T = poses[link]
+                objs[link] = fcl.CollisionObject(self._geom[link], fcl.Transform(T[:3, :3], T[:3, 3]))
             return objs[link]
 
         contacts: List[Contact] = []
         m = self.margin_m
         for a, b in self.checked_pairs(arm, with_tube=state.tube_advance_m is not None):
-            oa, ob = obj(a), obj(b)
-            (la, ha), (lb, hb) = aabbs[a], aabbs[b]
+            (la, ha), (lb, hb) = box(a), box(b)
             if np.any(la - m > hb) or np.any(lb - m > ha):
                 continue  # boxes farther apart than the margin
             if any(al.covers(a, b, self._driver, state) for al in self.allowances):
                 continue
+            oa, ob = obj(a), obj(b)
             if fcl.collide(oa, ob, fcl.CollisionRequest(), fcl.CollisionResult()):
                 contacts.append(Contact(a, b, 0.0))
             elif m > 0.0:

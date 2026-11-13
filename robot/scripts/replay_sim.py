@@ -140,7 +140,7 @@ class SimClock:
 
 
 def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_ticks=None,
-             stall=None, log=lambda r: None) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
+             stall=None, log=lambda r: None, segments=None) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
     """Run the full replay sequence against simulated servos (same code as live)."""
     clock = SimClock()
     buses = {}
@@ -154,5 +154,8 @@ def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_tic
     r.energise()
     r.lock_both()
     r.move_to_start()
-    r.run()
+    if segments is None:
+        r.run()
+    else:
+        r.run_fluid(segments)
     return r, buses
