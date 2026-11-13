@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-13 02:20'
+updated_date: '2026-11-13 03:11'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-13. AA-49 VERIFIED; AA-43 and AA-17 DONE. AA-50 software done (AC 1-4); live run = handoff AA-51 (proposed, needs `accept AA-51`). Suite passes.
+**Last verified:** 2026-11-13 (late). AA-50 DONE: full-cycle fluid replay on the real arms at animation speed, owner: 'this worked great'. **Next: AA-52 (touching fold), which needs an owner decision first.** Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -24,15 +24,18 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
-### In flight: AA-50 (full-cycle movement test, no tube, grippers moving; owner request 2026-11-12)
-- Done (AC 1-4): `src/inchworm/cycle_replay.py`, `scripts/replay_sim.py` (simulated servos), `scripts/replay_cycle.py` (CLI), `tests/test_cycle_replay.py` (9). Dry-run on the real timeline: preflight 0 problems (98 s, cached afterwards), simulated full cycle OK (85 moves, 6 gripper actions, worst error 20 ticks). The fold elbow is 30 ticks past EEPROM, so goals are pulled 10 ticks inside it (about -3.5 deg).
-- **OWNER DECISION 2026-11-13:** live move allowed although the soft limits are marked unverified. Implemented as a per-run waiver `--allow-unverified-soft-limits "<text>"` (GuardedArm `unverified_soft_limits_override`); values, keep-out boxes, mesh collision and calibration stay enforced; `hardware.yaml` stays `unverified: true`.
-- Start pose (owner request 2026-11-13): place the arms roughly; the robot makes the final adjustment itself when every joint is within 10 deg and the move is clear in the cell model (`approach_problems`).
-- **OWNER DECISION 2026-11-13:** each lower arm may touch its own shoulder at ANY pose (stability while holding the tube): `mesh.always_allowed_pairs`. The owner wants fewer needless refusals; before adding checks, ask whether they block intended contact.
-- **AA-51 live replay DONE twice 2026-11-13 (owner: 'It worked great!')**; AA-50 AC #5 checked. The AA-51 handoff is still 'paused at step 2' in the queue: the owner should complete it in the handoff tab, then `human_verify`.
-- **OWNER DECISION 2026-11-13:** no safety checks or automatic aborts once a motion is confirmed. The fluid replay streams the preflighted path at 50 Hz (sync-write, no per-point checks), and readings are only logged. 4 of 5 fluid runs had aborted on single bogus temperature reads (70-84 C; 28-31 C at rest).
-- Fluid replay built (owner 2026-11-13, option b, whole path checked offline): `replay_cycle.py` now defaults to fluid motion at tempo 0.5, with a single YES prompt; `--step-by-step` gives the old mode. Dry-run: 0 problems, 36 s of motion, peak 54 deg/s. **Next: the owner runs it live**: `uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-50 fluid replay"`.
-- Elbow EEPROM Max raised +60 (L 3151, R 3106), owner approved, backups in calibration_data. **OPEN owner decision:** how to press into the touching fold (force cap, check by eye). Until then the replay caps the fold elbow at L 3081 / R 3036.
+### Next: AA-52, touching fold (open owner decision)
+- The owner wants each lower arm resting on its own shoulder at the printing pose (supported, not torque-only). Ready: the model allows that contact (`mesh.always_allowed_pairs`), and the elbow EEPROM Max is raised (L 3151, R 3106). The replay still caps the fold elbow at L 3081 / R 3036 (`cycle_replay.FOLD_ELBOW_CAP_TICKS`). **Ask the owner first** how to press into the contact (proposed: slow, capped torque about 15%, confirmed by eye).
+- Handoff AA-51 is still 'active, step 2' in the human queue, but the work it describes is done (5 complete live runs). The owner can finish it in the handoff tab; then `human_verify` it with the AA-50 evidence. Do not mark it verified otherwise.
+
+### Done: AA-50 full-cycle movement test (2026-11-13)
+- Run: `cd robot && uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-50 fluid replay"` (arms roughly in the fold, no tube). Without `--live` it is a dry-run (preflight + simulation). Log: `calibration_data/replay_cycle_<date>.jsonl`.
+- Default = fluid: the whole path, both arms, is checked against the soft limits, EEPROM limits and mesh before the single YES prompt; then it streams at 50 Hz (sync-write position + speed) at animation tempo, slowed only where a joint passes 650 ticks/s (about 18 s of motion). `--tempo` scales the speed; `--step-by-step` is the old checked frame-by-frame mode.
+- **OWNER DECISIONS 2026-11-13 (do not revisit):**
+  - No per-point checks or automatic aborts once a motion is confirmed; readings (temperature, current, lag) are only logged. Only Ctrl-C, the stop file or a gripper-lock failure stop the run (hold, then release).
+  - Per-run waiver for the unverified soft limits (`--allow-unverified-soft-limits`); `hardware.yaml` stays `unverified: true`.
+  - The lower arm may touch its own shoulder at any pose. The robot makes the final adjustment to the start pose itself if each joint is within 10 deg. The owner dislikes needless refusals: ask before adding checks that block intended motion.
+- Hardware note: single temperature reads of 70-150 C appear while moving (at rest the servos read 28-31 C). These are bogus readings, so do not act on them. One checksum error was also seen once.
 ### Gripper lock = 45-degree position lock (OWNER DECISION 2026-11-12; VERIFIED AA-49 2026-11-13)
 - The locking piece slips on its screw at both ends (deliberate clutch), so no stall marks the lock. Lock = slow drive (150 ticks/s, torque 300) to open end + 512 ticks: L 2038, R 2041; LOCKED within 12 ticks; stopping short = FAULT + torque off. AA-49: key-in trials settle at L 2032-2034, R 2035, all in band; the owner confirmed by eye the key locked every time. `hardware.yaml gripper_lock.arm_*.unverified: false`. AA-43 and AA-17 Done. AA-41 is superseded (owner may decline it). Grippers' rest state after AA-49 was not reported (probably open, torque off).
 ### In flight: AA-43 (servo swap + recalibration of joints 4-6)

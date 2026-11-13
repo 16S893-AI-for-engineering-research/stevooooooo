@@ -552,3 +552,141 @@
 {"utc": "2026-11-13T02:28:07Z", "event": "done"}
 {"utc": "2026-11-13T02:28:13Z", "event": "released", "errors": {}}
 {"utc": "2026-11-13T02:39:58Z", "event": "start", "ticks": {"left": [1972, 1428, 3082, 1002, 2062], "right": [2062, 1492, 3037, 966, 2054]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, 0.13087362226415852, 0.08789062499999652, -0.06468468616495975, 0.04346874999998818], "right": [-0.08753125000001205, 0.13087362226415852, 0.08789062500000924, -0.19674718616495185, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:50:13Z", "event": "start", "ticks": {"left": [1972, 1428, 3082, 1002, 2062], "right": [2062, 1492, 3037, 966, 2054]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, 0.13087362226415852, 0.08789062499999652, -0.06468468616495975, 0.04346874999998818], "right": [-0.08753125000001205, 0.13087362226415852, 0.08789062500000924, -0.19674718616495185, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:50:23Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2026}
+{"utc": "2026-11-13T02:50:29Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2031}
+{"utc": "2026-11-13T02:50:31Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1428, 3082, 1002, 2062], "right": [2062, 1492, 3037, 966, 2054]}, "error_ticks": {"left": [0, 1, 1, -1, 0], "right": [-1, 1, 1, -2, -1]}, "peak_abs_load": {"left": [0, 0, 0, 0, 0], "right": [0, 0, 0, 0, 0]}, "expected_s": 0.01, "took_s": 0.0}
+{"utc": "2026-11-13T02:50:32Z", "event": "stream", "t": 0.49, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:32Z", "event": "stream", "t": 1.0, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:33Z", "event": "stream", "t": 1.51, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:33Z", "event": "stream", "t": 2.01, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:34Z", "event": "stream", "t": 2.52, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:34Z", "event": "stream", "t": 3.03, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:35Z", "event": "stream", "t": 3.53, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:35Z", "event": "stream", "t": 4.04, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:36Z", "event": "stream", "t": 4.54, "frames": [0, 24]}
+{"utc": "2026-11-13T02:50:36Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 5.0, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 31, "right": 32}, "max_temp_read_c": {"left": 47, "right": 43}, "read_errors": 0, "final_error_ticks": {"left": [-1, 0, 3, -3, 0], "right": [-1, -2, 3, -2, -1]}, "peak_abs_load": {"left": [0, 120, 240, 100, 0], "right": [0, 116, 244, 104, 0]}}
+{"utc": "2026-11-13T02:50:41Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1607}
+{"utc": "2026-11-13T02:50:41Z", "event": "stream", "t": 0.48, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:42Z", "event": "stream", "t": 0.99, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:42Z", "event": "stream", "t": 1.5, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:43Z", "event": "stream", "t": 2.0, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:43Z", "event": "stream", "t": 2.51, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:44Z", "event": "stream", "t": 3.02, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:44Z", "event": "stream", "t": 3.52, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:45Z", "event": "stream", "t": 4.03, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:45Z", "event": "stream", "t": 4.54, "frames": [24, 48]}
+{"utc": "2026-11-13T02:50:46Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 4.99, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 18, "right": 3}, "max_temp_read_c": {"left": 101, "right": 32}, "read_errors": 0, "final_error_ticks": {"left": [1, -1, 13, -5, 0], "right": [-1, -2, 3, -2, -1]}, "peak_abs_load": {"left": [0, 148, 204, 132, 0], "right": [0, 24, 32, 24, 0]}}
+{"utc": "2026-11-13T02:50:49Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2028}
+{"utc": "2026-11-13T02:50:52Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1588}
+{"utc": "2026-11-13T02:50:52Z", "event": "stream", "t": 0.49, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:53Z", "event": "stream", "t": 0.99, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:53Z", "event": "stream", "t": 1.5, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:54Z", "event": "stream", "t": 2.01, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:54Z", "event": "stream", "t": 2.51, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:55Z", "event": "stream", "t": 3.02, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:55Z", "event": "stream", "t": 3.53, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:56Z", "event": "stream", "t": 4.03, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:56Z", "event": "stream", "t": 4.54, "frames": [49, 73]}
+{"utc": "2026-11-13T02:50:57Z", "event": "segment", "frames": [49, 73], "step": "right regrip middle point", "planned_s": 4.99, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 11, "right": 21}, "max_temp_read_c": {"left": 31, "right": 66}, "read_errors": 0, "final_error_ticks": {"left": [1, 2, 11, -3, 0], "right": [-1, 1, 11, -3, -1]}, "peak_abs_load": {"left": [0, 24, 96, 32, 0], "right": [0, 164, 204, 132, 0]}}
+{"utc": "2026-11-13T02:51:00Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2031}
+{"utc": "2026-11-13T02:51:01Z", "event": "stream", "t": 0.48, "frames": [73, 86]}
+{"utc": "2026-11-13T02:51:01Z", "event": "stream", "t": 0.99, "frames": [73, 86]}
+{"utc": "2026-11-13T02:51:02Z", "event": "stream", "t": 1.49, "frames": [73, 86]}
+{"utc": "2026-11-13T02:51:02Z", "event": "stream", "t": 2.0, "frames": [73, 86]}
+{"utc": "2026-11-13T02:51:03Z", "event": "stream", "t": 2.51, "frames": [73, 86]}
+{"utc": "2026-11-13T02:51:03Z", "event": "segment", "frames": [73, 86], "step": "lower tube, arms return to start (both locked)", "planned_s": 2.92, "took_s": 2.95, "loops": 145, "worst_path_error_ticks": {"left": 26, "right": 28}, "max_temp_read_c": {"left": 109, "right": 43}, "read_errors": 0, "final_error_ticks": {"left": [0, 13, -3, -1, 0], "right": [-1, 12, -2, -1, -1]}, "peak_abs_load": {"left": [24, 188, 160, 108, 0], "right": [0, 184, 176, 108, 0]}}
+{"utc": "2026-11-13T02:51:03Z", "event": "done"}
+{"utc": "2026-11-13T02:51:11Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T02:51:39Z", "event": "start", "ticks": {"left": [1972, 1428, 3084, 1002, 2062], "right": [2062, 1491, 3039, 967, 2054]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, 0.13087362226415852, 0.2636718750000023, -0.06468468616495975, 0.04346874999998818], "right": [-0.08753125000001205, 0.04298299726416201, 0.2636718750000023, -0.10885656116495533, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:51:52Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2028}
+{"utc": "2026-11-13T02:51:58Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T02:52:01Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1428, 3084, 1002, 2062], "right": [2062, 1491, 3039, 967, 2054]}, "error_ticks": {"left": [0, 1, 3, -1, 0], "right": [-1, 0, 3, -1, -1]}, "peak_abs_load": {"left": [0, 0, 32, 0, 0], "right": [0, 0, 0, 0, 0]}, "expected_s": 0.02, "took_s": 0.0}
+{"utc": "2026-11-13T02:52:01Z", "event": "stream", "t": 0.49, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:02Z", "event": "stream", "t": 0.99, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:02Z", "event": "stream", "t": 1.5, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:03Z", "event": "stream", "t": 2.0, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:03Z", "event": "stream", "t": 2.51, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:04Z", "event": "stream", "t": 3.02, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:04Z", "event": "stream", "t": 3.52, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:05Z", "event": "stream", "t": 4.03, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:05Z", "event": "stream", "t": 4.53, "frames": [0, 24]}
+{"utc": "2026-11-13T02:52:06Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 5.0, "took_s": 5.04, "loops": 248, "worst_path_error_ticks": {"left": 30, "right": 32}, "max_temp_read_c": {"left": 46, "right": 56}, "read_errors": 0, "final_error_ticks": {"left": [-1, 0, 3, -3, 0], "right": [-1, 1, 3, -2, -1]}, "peak_abs_load": {"left": [0, 124, 236, 96, 0], "right": [0, 116, 240, 100, 0]}}
+{"utc": "2026-11-13T02:52:08Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1608}
+{"utc": "2026-11-13T02:52:09Z", "event": "stream", "t": 0.49, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:10Z", "event": "stream", "t": 0.99, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:10Z", "event": "stream", "t": 1.5, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:11Z", "event": "stream", "t": 2.0, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:11Z", "event": "stream", "t": 2.51, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:12Z", "event": "stream", "t": 3.01, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:12Z", "event": "stream", "t": 3.52, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:13Z", "event": "stream", "t": 4.02, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:13Z", "event": "stream", "t": 4.53, "frames": [24, 48]}
+{"utc": "2026-11-13T02:52:14Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 4.99, "took_s": 5.01, "loops": 247, "worst_path_error_ticks": {"left": 19, "right": 3}, "max_temp_read_c": {"left": 67, "right": 34}, "read_errors": 0, "final_error_ticks": {"left": [2, -1, 13, -5, 0], "right": [-1, 1, 3, -2, -1]}, "peak_abs_load": {"left": [24, 152, 204, 128, 0], "right": [0, 0, 32, 24, 0]}}
+{"utc": "2026-11-13T02:52:17Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2026}
+{"utc": "2026-11-13T02:52:20Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1589}
+{"utc": "2026-11-13T02:52:22Z", "event": "stream", "t": 0.48, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:22Z", "event": "stream", "t": 0.99, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:23Z", "event": "stream", "t": 1.49, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:23Z", "event": "stream", "t": 2.0, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:24Z", "event": "stream", "t": 2.51, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:24Z", "event": "stream", "t": 3.01, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:25Z", "event": "stream", "t": 3.52, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:25Z", "event": "stream", "t": 4.03, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:26Z", "event": "stream", "t": 4.53, "frames": [49, 73]}
+{"utc": "2026-11-13T02:52:26Z", "event": "segment", "frames": [49, 73], "step": "right regrip middle point", "planned_s": 4.99, "took_s": 5.01, "loops": 247, "worst_path_error_ticks": {"left": 11, "right": 20}, "max_temp_read_c": {"left": 31, "right": 47}, "read_errors": 0, "final_error_ticks": {"left": [2, 2, 11, -3, 0], "right": [-1, 1, 12, -3, -1]}, "peak_abs_load": {"left": [24, 24, 96, 32, 0], "right": [0, 164, 204, 136, 0]}}
+{"utc": "2026-11-13T02:52:29Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-13T02:52:30Z", "event": "stream", "t": 0.49, "frames": [73, 86]}
+{"utc": "2026-11-13T02:52:30Z", "event": "stream", "t": 0.99, "frames": [73, 86]}
+{"utc": "2026-11-13T02:52:31Z", "event": "stream", "t": 1.5, "frames": [73, 86]}
+{"utc": "2026-11-13T02:52:31Z", "event": "stream", "t": 2.01, "frames": [73, 86]}
+{"utc": "2026-11-13T02:52:32Z", "event": "stream", "t": 2.51, "frames": [73, 86]}
+{"utc": "2026-11-13T02:52:32Z", "event": "segment", "frames": [73, 86], "step": "lower tube, arms return to start (both locked)", "planned_s": 2.92, "took_s": 2.95, "loops": 145, "worst_path_error_ticks": {"left": 25, "right": 27}, "max_temp_read_c": {"left": 128, "right": 31}, "read_errors": 0, "final_error_ticks": {"left": [0, 10, -3, -1, 0], "right": [-1, 11, -3, -1, -1]}, "peak_abs_load": {"left": [24, 184, 164, 108, 0], "right": [0, 192, 180, 112, 0]}}
+{"utc": "2026-11-13T02:52:32Z", "event": "done"}
+{"utc": "2026-11-13T02:54:54Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T02:55:07Z", "event": "start", "ticks": {"left": [1972, 1428, 3082, 1002, 2062], "right": [2062, 1492, 3037, 967, 2054]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, 0.13087362226415852, 0.08789062499999652, -0.06468468616495975, 0.04346874999998818], "right": [-0.08753125000001205, 0.13087362226415852, 0.08789062500000924, -0.10885656116495533, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:57:43Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2026}
+{"utc": "2026-11-13T02:57:49Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T02:57:52Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1428, 3082, 1002, 2062], "right": [2062, 1492, 3037, 966, 2054]}, "error_ticks": {"left": [0, 1, 1, -1, 0], "right": [-1, 1, 1, -2, -1]}, "peak_abs_load": {"left": [0, 0, 0, 0, 0], "right": [0, 0, 0, 0, 0]}, "expected_s": 0.01, "took_s": 0.0}
+{"utc": "2026-11-13T02:57:52Z", "event": "stream", "t": 0.49, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:53Z", "event": "stream", "t": 0.99, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:53Z", "event": "stream", "t": 1.5, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:54Z", "event": "stream", "t": 2.01, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:54Z", "event": "stream", "t": 2.51, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:55Z", "event": "stream", "t": 3.02, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:55Z", "event": "stream", "t": 3.53, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:56Z", "event": "stream", "t": 4.03, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:56Z", "event": "stream", "t": 4.54, "frames": [0, 24]}
+{"utc": "2026-11-13T02:57:57Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 5.0, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 30, "right": 33}, "max_temp_read_c": {"left": 53, "right": 51}, "read_errors": 0, "final_error_ticks": {"left": [-1, -2, 4, -3, 0], "right": [-1, 1, 3, -3, -1]}, "peak_abs_load": {"left": [0, 120, 232, 100, 0], "right": [0, 120, 236, 104, 0]}}
+{"utc": "2026-11-13T02:58:01Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1608}
+{"utc": "2026-11-13T02:58:02Z", "event": "stream", "t": 0.49, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:02Z", "event": "stream", "t": 0.99, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:03Z", "event": "stream", "t": 1.5, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:03Z", "event": "stream", "t": 2.0, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:04Z", "event": "stream", "t": 2.51, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:04Z", "event": "stream", "t": 3.02, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:05Z", "event": "stream", "t": 3.53, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:05Z", "event": "stream", "t": 4.03, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:06Z", "event": "stream", "t": 4.54, "frames": [24, 48]}
+{"utc": "2026-11-13T02:58:06Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 4.99, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 18, "right": 3}, "max_temp_read_c": {"left": 42, "right": 32}, "read_errors": 0, "final_error_ticks": {"left": [2, -1, 12, -3, 0], "right": [-1, 1, 3, -3, -1]}, "peak_abs_load": {"left": [28, 156, 196, 140, 0], "right": [0, 0, 32, 32, 0]}}
+{"utc": "2026-11-13T02:58:09Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T02:58:12Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1587}
+{"utc": "2026-11-13T02:58:13Z", "event": "stream", "t": 0.48, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:13Z", "event": "stream", "t": 0.99, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:14Z", "event": "stream", "t": 1.49, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:14Z", "event": "stream", "t": 2.0, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:15Z", "event": "stream", "t": 2.51, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:15Z", "event": "stream", "t": 3.01, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:16Z", "event": "stream", "t": 3.52, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:16Z", "event": "stream", "t": 4.03, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:17Z", "event": "stream", "t": 4.53, "frames": [49, 73]}
+{"utc": "2026-11-13T02:58:17Z", "event": "segment", "frames": [49, 73], "step": "right regrip middle point", "planned_s": 4.99, "took_s": 5.02, "loops": 247, "worst_path_error_ticks": {"left": 10, "right": 19}, "max_temp_read_c": {"left": 31, "right": 45}, "read_errors": 0, "final_error_ticks": {"left": [2, 0, 10, -3, 0], "right": [-1, 1, 12, -3, -1]}, "peak_abs_load": {"left": [24, 0, 88, 32, 0], "right": [0, 164, 204, 128, 0]}}
+{"utc": "2026-11-13T02:58:21Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2031}
+{"utc": "2026-11-13T02:58:21Z", "event": "stream", "t": 0.49, "frames": [73, 86]}
+{"utc": "2026-11-13T02:58:22Z", "event": "stream", "t": 0.99, "frames": [73, 86]}
+{"utc": "2026-11-13T02:58:22Z", "event": "stream", "t": 1.5, "frames": [73, 86]}
+{"utc": "2026-11-13T02:58:23Z", "event": "stream", "t": 2.0, "frames": [73, 86]}
+{"utc": "2026-11-13T02:58:23Z", "event": "stream", "t": 2.51, "frames": [73, 86]}
+{"utc": "2026-11-13T02:58:24Z", "event": "segment", "frames": [73, 86], "step": "lower tube, arms return to start (both locked)", "planned_s": 2.92, "took_s": 2.95, "loops": 145, "worst_path_error_ticks": {"left": 24, "right": 26}, "max_temp_read_c": {"left": 94, "right": 68}, "read_errors": 0, "final_error_ticks": {"left": [0, 11, -3, -2, 0], "right": [-1, 11, -3, -1, -1]}, "peak_abs_load": {"left": [24, 188, 164, 104, 0], "right": [0, 196, 168, 116, 0]}}
+{"utc": "2026-11-13T02:58:24Z", "event": "done"}
+{"utc": "2026-11-13T02:58:30Z", "event": "released", "errors": {}}
