@@ -1,11 +1,11 @@
 ---
 id: AA-52
 title: 'Touching fold: rest each lower arm on its shoulder at the printing pose'
-status: In Progress
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-11-13 03:10'
-updated_date: '2026-11-13 03:38'
+updated_date: '2026-11-13 03:48'
 labels:
   - hardware
 dependencies:
@@ -26,19 +26,19 @@ Owner request 2026-11-13: the folded (printing) pose should have each lower arm 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The owner has decided how the elbow presses into the shoulder contact (force cap, speed, how it is confirmed), recorded in this task
-- [ ] #2 At the start and end of the replay both lower arms rest on their shoulders as decided, shown in a logged live run with the owner's observation
-- [ ] #3 Contact is limited as decided (capped torque or position) and the run log shows elbow load and current at the fold
+- [x] #1 The owner has decided how the elbow presses into the shoulder contact (force cap, speed, how it is confirmed), recorded in this task
+- [x] #2 At the start and end of the replay both lower arms rest on their shoulders as decided, shown in a logged live run with the owner's observation
+- [x] #3 Contact is limited as decided (capped torque or position) and the run log shows elbow load and current at the fold
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -65,6 +65,14 @@ Chosen (owner delegated 2026-11-13):
 - replay_sim: one-sided contact stop (blocks only travel past the tick). Dry-run: presses end at 3120/3075 (0 short), cycle worst error 20 ticks.
 - Tests: 4 new in tests/test_cycle_replay.py; full suite passes.
 - Next: owner-supervised live run: cd robot && uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-52 touching fold". AC #1 is the owner's to accept (decision was delegated); AC #2/#3 need that run.
+
+2026-11-13 03:46-03:48Z live run (owner present), log robot/calibration_data/replay_cycle_2026-11-12.jsonl:
+- Start: approach_problems [], every joint within 0.3 deg of frame 0.
+- Fold press START: settle 0.82 s; left elbow 3123, right 3078 (3 ticks past the measured contact, steady over 38 readings); elbow load 104 both, current 5 / 4.9 raw; owner y.
+- Unpress back to the cap: 0.48 s, elbow error 17 / 15 ticks (inside the 20-tick reach tolerance). The full fluid cycle (4 segments) followed with no read errors.
+- Fold press END: settle 0.81 s; left 3123, right 3078; load 104, current 5.1 / 4.8 raw; owner y. Torque released with no errors.
+- Temperature reads of 47-65 C appeared during motion; these are the known bogus single reads (at rest 30-35 C). Logged only.
+- Owner: 'worked great'.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -75,4 +83,16 @@ created: 2026-11-13 03:23
 ---
 Owner 2026-11-13 (asked how to press into the contact): 'use your best judgement. just let me know what you choose'. Decision delegated to the orchestrator; choice recorded in the plan.
 ---
+
+author: @orchestrator
+created: 2026-11-13 03:48
+---
+Owner 2026-11-13 after the live run: 'worked great'. Taken as acceptance of the delegated press method (15% elbow torque, 100 ticks/s, goal = contact + 15, confirmed by eye).
+---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Touching fold: at the start and end of the replay each elbow alone presses into its shoulder at 15% torque and 100 ticks/s, aiming at contact + 15 ticks; readings logged, warnings never abort; owner y/n prompt. Verified by tests, a dry-run and a live supervised run (both arms rested at 3 ticks past the measured contact, load 104, current about 5 raw, owner y both times, owner: 'worked great').
+<!-- SECTION:FINAL_SUMMARY:END -->

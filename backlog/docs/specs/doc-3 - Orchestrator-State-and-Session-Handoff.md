@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-13 03:11'
+updated_date: '2026-11-13 03:49'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-13 (late). AA-50 DONE: full-cycle fluid replay on the real arms at animation speed, owner: 'this worked great'. **Next: AA-52 (touching fold), which needs an owner decision first.** Suite passes.
+**Last verified:** 2026-11-13 (late). AA-52 DONE: touching fold live (both lower arms rest on their shoulders at the start and end of the cycle, 15% elbow torque; owner: 'worked great'). **Next: owner picks from 'Next actions' below.** Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -24,9 +24,10 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
-### Next: AA-52, touching fold (open owner decision)
-- The owner wants each lower arm resting on its own shoulder at the printing pose (supported, not torque-only). Ready: the model allows that contact (`mesh.always_allowed_pairs`), and the elbow EEPROM Max is raised (L 3151, R 3106). The replay still caps the fold elbow at L 3081 / R 3036 (`cycle_replay.FOLD_ELBOW_CAP_TICKS`). **Ask the owner first** how to press into the contact (proposed: slow, capped torque about 15%, confirmed by eye).
-- Handoff AA-51 is still 'active, step 2' in the human queue, but the work it describes is done (5 complete live runs). The owner can finish it in the handoff tab; then `human_verify` it with the AA-50 evidence. Do not mark it verified otherwise.
+### Done: AA-52 touching fold (2026-11-13)
+- The method was delegated by the owner ("use your best judgement") and accepted after the run ("worked great"). The replay stream keeps the elbow cap (`FOLD_ELBOW_CAP_TICKS` L 3081 / R 3036). At the start (after the final adjustment) and at the end, `ReplayRunner.fold_press` drives ONLY the elbows at 100 ticks/s with torque limit 150/1000 toward contact + 15 (L 3135 / R 3090) and holds; then the owner answers a y/n prompt (logged). `fold_unpress` returns to the cap and restores torque 500 before the stream starts. Warnings (> 20 ticks short of contact) are logged only. `--no-fold-press` disables it.
+- Live 2026-11-13 03:47Z: both presses settled in 0.8 s at L 3123 / R 3078 (3 ticks past the hand-measured contact), elbow load 104, current about 5 raw; owner y twice; torque released without errors.
+- Handoff AA-51 is still 'active' in the human queue, although its work is done (AA-50 runs). The owner can finish it in the handoff tab; then `human_verify` it with the AA-50 evidence. Do not mark it verified otherwise.
 
 ### Done: AA-50 full-cycle movement test (2026-11-13)
 - Run: `cd robot && uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-50 fluid replay"` (arms roughly in the fold, no tube). Without `--live` it is a dry-run (preflight + simulation). Log: `calibration_data/replay_cycle_<date>.jsonl`.
@@ -85,7 +86,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - **Cell model + SO-101 mesh collision (AA-40, 5/6 AC):** `system_model/urdf.py`, `collision.py` (python-fcl, fail closed), `MotionGuard.mesh` layer, `scripts/view_pose.py` on the cell URDF, `tests/test_cell_collision.py`. AA-40 Done 2026-11-12: mesh model verified by the owner (`unverified: false`).
 - **DexArm cell check (2026-10-28):** `system_model/dexarm_kinematics.py` (firmware IK/FK from Rotrics' Marlin_For_DexArm source, URDF mapping 0.31 mm max), `system_model/dexarm_guard.py`, wired into `DexArmDriver.move_absolute/move_relative/print_move/home`; `dexarm.open_live_dexarm()` fails closed without SO-101 poses and tube state; `so101_pose_reader.py` (read-only, tolerates 0x08 only on IDs 4-6); `level_scan.py` / `calibrate_scanner.py --live` require `--tube`.
 
-### Next actions (pick one per session)
+### Next actions (pick one per session; ask the owner which)
 1. **Supervised DexArm check** (owner at the robot): attach arm ports, read real SO-101 poses, dry-run queries including one expected refusal, one 5 mm move, compare reported vs model. Also explain the unexplained Z drop (31.05 -> 9.35 mm between two reads 2026-10-28, nothing commanded).
 2. **AA-13 DexArm repeatability** by scanner camera + chessboard, scale checked with the owner's digital calipers (method approved in principle; write the script and dry-run first; AA-30 intrinsics can come first).
 3. **AA-30 scanner intrinsics** (owner deferred 2026-11-06, wants to do it soon). Software pre-flight DONE 2026-11-09: live paths fixed and tested, `robot/assets/chessboard_9x6_25mm.pdf` generated (`scripts/make_chessboard_pdf.py`). Owner session: print the PDF at 100 % ("actual size"), check one square (25 mm) and the 100 mm bar with calipers, mount flat, good light, then `cd robot && uv run python scripts/calibrate_scanner.py --live --step intrinsics --n-frames 20` (about 20 board poses; the script re-prompts if the board is not detected). Needs the scanner camera attached (`scripts/attach_usb.py`); no arm motion, laser off. Optional: re-measure arm-camera fps with the room lit.

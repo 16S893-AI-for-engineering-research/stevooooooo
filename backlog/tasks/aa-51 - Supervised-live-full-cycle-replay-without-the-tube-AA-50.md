@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-11-12 21:48'
-updated_date: '2026-11-13 03:22'
+updated_date: '2026-11-13 03:40'
 labels:
   - human-action
   - human-key-56aeb9883b7721f9
@@ -159,7 +159,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
   "phase": "active",
   "createdAt": "2026-11-12T21:48:39.439Z",
   "origin": "01a1d101-b8e5-7496-a5a0-f4e66bdd6498",
-  "step": 6,
+  "step": 7,
   "evidence": [
     {
       "step": 1,
@@ -216,6 +216,14 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "robot/calibration_data/replay_cycle_2026-11-12.jsonl, done and released events at 00:27:31Z/00:27:39Z and 00:59:48Z/01:01:31Z",
       "advanced": true,
       "at": "2026-11-13T03:22:13.931Z"
+    },
+    {
+      "step": 7,
+      "note": "Step 7 (owner report) recorded. Owner's answers, self-reported and not observed by the agent: (1) both arms followed the cycle smoothly: \"yes\"; (2) each gripper unlocked and relocked about 45 degrees: \"yes\"; (3) any contact, grinding, alarming sound or hot servo: \"no\". The answers are short and do not say which run they cover. The log holds two full no-tube runs that end in done and released (00:23:01Z and 00:51:59Z), plus later 'fluid' runs (AA-50 fluid replay) that aborted on temperature or a servo 2 checksum error. The owner's answers are therefore not tied to one run, and the agent does not know whether \"hot servo: no\" covers the later fluid runs. The temperature aborts (70 to 84 C) and the 100 to 150 C readings logged in later fluid segments are in the file and are flagged for the orchestrator. The owner did not give a number or a feel for servo temperature. Earlier steps 3 to 6 were recorded from the log, not from owner observation, as noted in those checkpoints.",
+      "type": "self-reported",
+      "reference": "Owner reply in conversation: \"1.yes 2. yes. 3. no\"; robot/calibration_data/replay_cycle_2026-11-12.jsonl",
+      "advanced": true,
+      "at": "2026-11-13T03:40:19.571Z"
     }
   ],
   "history": [
