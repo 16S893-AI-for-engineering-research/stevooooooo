@@ -1241,6 +1241,21 @@ class GuardedArm:
             deg = max(0.0, min(360.0, deg))
             self._bus.write_position_deg(name, deg)  # type: ignore[attr-defined]
 
+    def write_preflighted_ticks(self, ticks: Sequence[int], speeds: Optional[Sequence[int]] = None) -> None:
+        """Stream one point of a path that was checked IN FULL before the owner confirmed it.
+
+        OWNER DECISION 2026-11-13: "I don't need safety checks once we have confirmed a
+        motion." The AA-50 fluid replay checks the whole streamed path offline (both arms
+        together: soft limits, EEPROM limits, cell mesh model, speed ceiling) before the
+        owner's YES; after that the points are only written (one sync-write per arm), with
+        no per-point checks, so the motion is smooth. The servo's own EEPROM position limits
+        still apply. Never use this for a path that was not preflighted.
+        """
+        if len(ticks) != len(JOINT_NAMES):
+            raise ValueError(f"need {len(JOINT_NAMES)} joint ticks, got {len(ticks)}")
+        sp = None if speeds is None else dict(zip(JOINT_NAMES, (int(v) for v in speeds)))
+        self._bus.sync_write_goal_ticks(dict(zip(JOINT_NAMES, (int(t) for t in ticks))), sp)  # type: ignore[attr-defined]
+
     def check_trajectory_rad(
         self,
         q_start: JointVec,

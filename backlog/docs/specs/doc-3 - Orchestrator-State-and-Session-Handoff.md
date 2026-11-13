@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-13 01:34'
+updated_date: '2026-11-13 02:20'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -30,6 +30,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - Start pose (owner request 2026-11-13): place the arms roughly; the robot makes the final adjustment itself when every joint is within 10 deg and the move is clear in the cell model (`approach_problems`).
 - **OWNER DECISION 2026-11-13:** each lower arm may touch its own shoulder at ANY pose (stability while holding the tube): `mesh.always_allowed_pairs`. The owner wants fewer needless refusals; before adding checks, ask whether they block intended contact.
 - **AA-51 live replay DONE twice 2026-11-13 (owner: 'It worked great!')**; AA-50 AC #5 checked. The AA-51 handoff is still 'paused at step 2' in the queue: the owner should complete it in the handoff tab, then `human_verify`.
+- **OWNER DECISION 2026-11-13:** no safety checks or automatic aborts once a motion is confirmed. The fluid replay streams the preflighted path at 50 Hz (sync-write, no per-point checks), and readings are only logged. 4 of 5 fluid runs had aborted on single bogus temperature reads (70-84 C; 28-31 C at rest).
 - Fluid replay built (owner 2026-11-13, option b, whole path checked offline): `replay_cycle.py` now defaults to fluid motion at tempo 0.5, with a single YES prompt; `--step-by-step` gives the old mode. Dry-run: 0 problems, 36 s of motion, peak 54 deg/s. **Next: the owner runs it live**: `uv run python scripts/replay_cycle.py --live --allow-unverified-soft-limits "owner 2026-11-13: AA-50 fluid replay"`.
 - Elbow EEPROM Max raised +60 (L 3151, R 3106), owner approved, backups in calibration_data. **OPEN owner decision:** how to press into the touching fold (force cap, check by eye). Until then the replay caps the fold elbow at L 3081 / R 3036.
 ### Gripper lock = 45-degree position lock (OWNER DECISION 2026-11-12; VERIFIED AA-49 2026-11-13)

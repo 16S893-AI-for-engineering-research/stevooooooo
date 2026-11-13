@@ -188,7 +188,8 @@ def live(cfg, frames, a) -> int:
             return
         if rec.get("event") == "segment":
             print(f"  frames {rec['frames'][0]}-{rec['frames'][1]} done in {rec['took_s']} s "
-                  f"(planned {rec['planned_s']}; worst lag {rec['worst_path_error_ticks']} ticks)", flush=True)
+                  f"(planned {rec['planned_s']}; worst lag {rec['worst_path_error_ticks']} ticks; "
+                  f"max temp read {rec['max_temp_read_c']} C)", flush=True)
         elif rec.get("event") != "frame":
             print(json.dumps(rec))
         else:
@@ -244,7 +245,8 @@ def live(cfg, frames, a) -> int:
 
         r = cr.build_runner(cfg, frames, buses, live=True,
                             soft_limits_override=a.allow_unverified_soft_limits,
-                            vmax_ticks_s=a.speed, should_abort=STOP_FILE.exists, log=log)
+                            vmax_ticks_s=a.speed, should_abort=STOP_FILE.exists, log=log,
+                            abort_on_faults=a.segments is None)
         try:
             r.energise()
             print("locking both grippers (45-degree turn) ...")
@@ -254,7 +256,8 @@ def live(cfg, frames, a) -> int:
             if a.segments is None:
                 r.run()
             else:
-                print("running the cycle (fluid, no more prompts; Ctrl-C to stop and hold) ...")
+                print("running the cycle (fluid, no more prompts). It stops only for Ctrl-C or the stop "
+                      "file, or if a gripper fails to lock; readings are logged, never acted on.")
                 r.run_fluid(a.segments)
             log({"event": "done"})
             print("\nCYCLE COMPLETE. Support both arms (they go limp when torque turns off).")

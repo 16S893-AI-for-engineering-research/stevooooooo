@@ -191,3 +191,281 @@
 {"utc": "2026-11-13T00:59:48Z", "event": "frame", "frame": 86, "step": "lower tube, arms return to start (both locked)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1428, 3083, 1003, 2060], "right": [2065, 1510, 3028, 967, 2053]}, "error_ticks": {"left": [0, 1, 2, 0, -2], "right": [2, 19, -8, -1, -2]}, "peak_abs_load": {"left": [0, 0, 24, 0, 24], "right": [24, 64, 36, 52, 24]}, "expected_s": 0.85, "took_s": 0.72}
 {"utc": "2026-11-13T00:59:48Z", "event": "done"}
 {"utc": "2026-11-13T01:01:31Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T01:52:02Z", "event": "start", "ticks": {"left": [1972, 1428, 3121, 1003, 2060], "right": [2065, 1491, 3077, 967, 2053]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, 0.13087362226415852, 3.515625000000001, 0.02320593883503677, -0.13231250000001182], "right": [0.17614062499998795, 0.04298299726416201, 3.60351562500001, -0.10885656116495533, -0.1755468750000091]}, "approach_problems": []}
+{"utc": "2026-11-13T01:52:14Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2026}
+{"utc": "2026-11-13T01:52:20Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-13T01:52:23Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1428, 3091, 1003, 2060], "right": [2065, 1491, 3052, 967, 2053]}, "error_ticks": {"left": [0, 1, 10, 0, -2], "right": [2, 0, 16, -1, -2]}, "peak_abs_load": {"left": [0, 0, 88, 0, 24], "right": [28, 0, 136, 0, 28]}, "expected_s": 0.27, "took_s": 0.26}
+{"utc": "2026-11-13T01:52:23Z", "event": "stream", "t": 0.64, "frames": [0, 24], "present_ticks": {"left": [1972, 1436, 3059, 1058, 2060], "right": [2065, 1499, 3018, 1020, 2053]}}
+{"utc": "2026-11-13T01:52:24Z", "event": "stream", "t": 1.14, "frames": [0, 24], "present_ticks": {"left": [1972, 1471, 2961, 1121, 2060], "right": [2065, 1534, 2921, 1086, 2053]}}
+{"utc": "2026-11-13T01:52:26Z", "event": "stream", "t": 1.64, "frames": [0, 24], "present_ticks": {"left": [1972, 1513, 2866, 1176, 2060], "right": [2065, 1576, 2825, 1140, 2053]}}
+{"utc": "2026-11-13T01:52:27Z", "event": "stream", "t": 2.17, "frames": [0, 24], "present_ticks": {"left": [1972, 1560, 2764, 1229, 2060], "right": [2065, 1624, 2723, 1195, 2053]}}
+{"utc": "2026-11-13T01:52:27Z", "event": "aborted", "reason": "ReplayAborted: left wrist_flex at 70 C", "hold": {"arm_left": "None", "arm_right": "None"}}
+{"utc": "2026-11-13T01:52:41Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T01:53:13Z", "event": "start", "ticks": {"left": [1972, 1404, 3120, 1029, 2062], "right": [2065, 1499, 3075, 957, 2054]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, -1.9785013777358342, 3.4277343750000044, 2.3083621888350354, 0.04346874999998818], "right": [0.17614062499998795, 0.7461079972641597, 3.4277343750000044, -0.987762811164946, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T01:53:23Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T01:53:29Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T01:53:31Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1424, 3091, 1005, 2062], "right": [2065, 1492, 3055, 966, 2054]}, "error_ticks": {"left": [0, -3, 10, 2, 0], "right": [2, 1, 19, -2, -1]}, "peak_abs_load": {"left": [0, 32, 88, 24, 0], "right": [24, 36, 132, 60, 0]}, "expected_s": 0.26, "took_s": 0.21}
+{"utc": "2026-11-13T01:53:34Z", "event": "stream", "t": 0.69, "frames": [0, 24], "present_ticks": {"left": [1972, 1439, 3050, 1068, 2061], "right": [2065, 1502, 3009, 1030, 2054]}}
+{"utc": "2026-11-13T01:53:34Z", "event": "stream", "t": 1.19, "frames": [0, 24], "present_ticks": {"left": [1972, 1475, 2952, 1127, 2061], "right": [2065, 1539, 2911, 1091, 2054]}}
+{"utc": "2026-11-13T01:53:35Z", "event": "stream", "t": 1.7, "frames": [0, 24], "present_ticks": {"left": [1972, 1517, 2856, 1180, 2061], "right": [2065, 1580, 2816, 1145, 2054]}}
+{"utc": "2026-11-13T01:53:35Z", "event": "stream", "t": 2.22, "frames": [0, 24], "present_ticks": {"left": [1972, 1566, 2751, 1236, 2061], "right": [2065, 1630, 2709, 1201, 2054]}}
+{"utc": "2026-11-13T01:53:36Z", "event": "stream", "t": 2.74, "frames": [0, 24], "present_ticks": {"left": [1972, 1616, 2648, 1289, 2061], "right": [2065, 1679, 2608, 1254, 2054]}}
+{"utc": "2026-11-13T01:53:36Z", "event": "stream", "t": 3.29, "frames": [0, 24], "present_ticks": {"left": [1972, 1675, 2531, 1348, 2061], "right": [2065, 1738, 2490, 1312, 2054]}}
+{"utc": "2026-11-13T01:53:37Z", "event": "stream", "t": 3.82, "frames": [0, 24], "present_ticks": {"left": [1972, 1735, 2411, 1406, 2061], "right": [2065, 1797, 2374, 1370, 2054]}}
+{"utc": "2026-11-13T01:53:37Z", "event": "stream", "t": 4.36, "frames": [0, 24], "present_ticks": {"left": [1972, 1806, 2272, 1475, 2061], "right": [2065, 1870, 2229, 1442, 2054]}}
+{"utc": "2026-11-13T01:53:38Z", "event": "stream", "t": 4.87, "frames": [0, 24], "present_ticks": {"left": [1972, 1887, 2116, 1548, 2061], "right": [2065, 1951, 2076, 1512, 2054]}}
+{"utc": "2026-11-13T01:53:38Z", "event": "stream", "t": 5.38, "frames": [0, 24], "present_ticks": {"left": [1972, 1877, 2089, 1584, 2061], "right": [2065, 1942, 2044, 1550, 2054]}}
+{"utc": "2026-11-13T01:53:39Z", "event": "stream", "t": 5.88, "frames": [0, 24], "present_ticks": {"left": [1972, 1842, 2089, 1613, 2061], "right": [2065, 1907, 2047, 1579, 2054]}}
+{"utc": "2026-11-13T01:53:40Z", "event": "stream", "t": 6.41, "frames": [0, 24], "present_ticks": {"left": [1971, 1811, 2091, 1646, 2061], "right": [2065, 1876, 2047, 1612, 2054]}}
+{"utc": "2026-11-13T01:53:40Z", "event": "stream", "t": 6.96, "frames": [0, 24], "present_ticks": {"left": [1971, 1778, 2091, 1683, 2061], "right": [2065, 1842, 2046, 1648, 2054]}}
+{"utc": "2026-11-13T01:53:41Z", "event": "stream", "t": 7.51, "frames": [0, 24], "present_ticks": {"left": [1971, 1749, 2084, 1720, 2061], "right": [2065, 1815, 2040, 1685, 2054]}}
+{"utc": "2026-11-13T01:53:41Z", "event": "stream", "t": 8.03, "frames": [0, 24], "present_ticks": {"left": [1971, 1726, 2071, 1756, 2061], "right": [2065, 1791, 2026, 1720, 2054]}}
+{"utc": "2026-11-13T01:53:42Z", "event": "stream", "t": 8.55, "frames": [0, 24], "present_ticks": {"left": [1971, 1702, 2051, 1797, 2061], "right": [2065, 1768, 2007, 1761, 2054]}}
+{"utc": "2026-11-13T01:53:42Z", "event": "stream", "t": 9.05, "frames": [0, 24], "present_ticks": {"left": [1971, 1686, 2030, 1836, 2061], "right": [2065, 1750, 1985, 1802, 2054]}}
+{"utc": "2026-11-13T01:53:43Z", "event": "stream", "t": 9.59, "frames": [0, 24], "present_ticks": {"left": [1971, 1669, 2000, 1880, 2061], "right": [2065, 1734, 1956, 1845, 2054]}}
+{"utc": "2026-11-13T01:53:43Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 10.0, "took_s": 10.06, "loops": 188, "worst_path_error_ticks": {"left": 22, "right": 26}, "final_error_ticks": {"left": [-1, 0, 4, -3, -1], "right": [2, 1, 4, -2, -1]}, "peak_abs_load": {"left": [0, 104, 188, 84, 0], "right": [24, 100, 196, 76, 0]}}
+{"utc": "2026-11-13T01:53:46Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1607}
+{"utc": "2026-11-13T01:53:46Z", "event": "stream", "t": 0.45, "frames": [24, 48], "present_ticks": {"left": [1971, 1634, 2029, 1885, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:47Z", "event": "stream", "t": 0.95, "frames": [24, 48], "present_ticks": {"left": [1971, 1573, 2116, 1858, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:47Z", "event": "stream", "t": 1.48, "frames": [24, 48], "present_ticks": {"left": [1971, 1513, 2198, 1836, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:48Z", "event": "stream", "t": 1.98, "frames": [24, 48], "present_ticks": {"left": [1971, 1458, 2271, 1821, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:48Z", "event": "stream", "t": 2.49, "frames": [24, 48], "present_ticks": {"left": [1971, 1396, 2341, 1807, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:49Z", "event": "stream", "t": 2.99, "frames": [24, 48], "present_ticks": {"left": [1971, 1411, 2395, 1736, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:49Z", "event": "stream", "t": 3.5, "frames": [24, 48], "present_ticks": {"left": [1971, 1466, 2432, 1643, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:50Z", "event": "stream", "t": 4.0, "frames": [24, 48], "present_ticks": {"left": [1971, 1536, 2455, 1554, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:50Z", "event": "stream", "t": 4.53, "frames": [24, 48], "present_ticks": {"left": [1971, 1622, 2457, 1464, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:51Z", "event": "stream", "t": 5.03, "frames": [24, 48], "present_ticks": {"left": [1971, 1715, 2457, 1384, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:52Z", "event": "stream", "t": 5.53, "frames": [24, 48], "present_ticks": {"left": [1971, 1811, 2430, 1315, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:52Z", "event": "stream", "t": 6.03, "frames": [24, 48], "present_ticks": {"left": [1971, 1914, 2387, 1257, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:53Z", "event": "stream", "t": 6.55, "frames": [24, 48], "present_ticks": {"left": [1972, 2018, 2329, 1212, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:53Z", "event": "stream", "t": 7.07, "frames": [24, 48], "present_ticks": {"left": [1972, 2124, 2255, 1182, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:54Z", "event": "stream", "t": 7.65, "frames": [24, 48], "present_ticks": {"left": [1972, 2204, 2163, 1186, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:54Z", "event": "stream", "t": 8.18, "frames": [24, 48], "present_ticks": {"left": [1973, 2226, 2087, 1245, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:55Z", "event": "stream", "t": 8.71, "frames": [24, 48], "present_ticks": {"left": [1973, 2254, 2002, 1303, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:55Z", "event": "stream", "t": 9.32, "frames": [24, 48], "present_ticks": {"left": [1973, 2295, 1892, 1372, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:56Z", "event": "stream", "t": 9.82, "frames": [24, 48], "present_ticks": {"left": [1973, 2333, 1794, 1429, 2061], "right": [2065, 1731, 1945, 1863, 2054]}}
+{"utc": "2026-11-13T01:53:56Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 10.0, "took_s": 10.06, "loops": 193, "worst_path_error_ticks": {"left": 21, "right": 4}, "final_error_ticks": {"left": [1, 0, 13, -5, -1], "right": [2, 1, 4, -2, -1]}, "peak_abs_load": {"left": [0, 128, 196, 88, 0], "right": [24, 0, 40, 24, 0]}}
+{"utc": "2026-11-13T01:53:59Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2028}
+{"utc": "2026-11-13T01:54:02Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1589}
+{"utc": "2026-11-13T01:54:03Z", "event": "stream", "t": 0.45, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1700, 1983, 1850, 2054]}}
+{"utc": "2026-11-13T01:54:03Z", "event": "stream", "t": 0.95, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1637, 2069, 1824, 2054]}}
+{"utc": "2026-11-13T01:54:04Z", "event": "stream", "t": 1.48, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1577, 2154, 1803, 2054]}}
+{"utc": "2026-11-13T01:54:04Z", "event": "stream", "t": 1.99, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1521, 2229, 1785, 2054]}}
+{"utc": "2026-11-13T01:54:05Z", "event": "stream", "t": 2.56, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1453, 2307, 1772, 2054]}}
+{"utc": "2026-11-13T01:54:05Z", "event": "stream", "t": 3.06, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1482, 2357, 1689, 2054]}}
+{"utc": "2026-11-13T01:54:06Z", "event": "stream", "t": 3.64, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1543, 2394, 1591, 2054]}}
+{"utc": "2026-11-13T01:54:08Z", "event": "stream", "t": 4.14, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1622, 2413, 1494, 2054]}}
+{"utc": "2026-11-13T01:54:08Z", "event": "stream", "t": 4.65, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1707, 2413, 1410, 2054]}}
+{"utc": "2026-11-13T01:54:09Z", "event": "stream", "t": 5.17, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1805, 2408, 1330, 2054]}}
+{"utc": "2026-11-13T01:54:09Z", "event": "stream", "t": 5.71, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 1902, 2375, 1265, 2054]}}
+{"utc": "2026-11-13T01:54:10Z", "event": "stream", "t": 6.24, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 2017, 2323, 1205, 2054]}}
+{"utc": "2026-11-13T01:54:10Z", "event": "stream", "t": 6.74, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 2120, 2258, 1167, 2054]}}
+{"utc": "2026-11-13T01:54:11Z", "event": "stream", "t": 7.25, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 2232, 2178, 1140, 2054]}}
+{"utc": "2026-11-13T01:54:11Z", "event": "stream", "t": 7.75, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2065, 2271, 2106, 1166, 2054]}}
+{"utc": "2026-11-13T01:54:12Z", "event": "stream", "t": 8.25, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2064, 2293, 2033, 1218, 2054]}}
+{"utc": "2026-11-13T01:54:12Z", "event": "stream", "t": 8.75, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2064, 2320, 1952, 1271, 2054]}}
+{"utc": "2026-11-13T01:54:13Z", "event": "stream", "t": 9.25, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2064, 2354, 1861, 1329, 2054]}}
+{"utc": "2026-11-13T01:54:14Z", "event": "stream", "t": 9.82, "frames": [49, 73], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2064, 2396, 1755, 1393, 2054]}}
+{"utc": "2026-11-13T01:54:14Z", "event": "segment", "frames": [49, 73], "step": "right regrip middle point", "planned_s": 10.0, "took_s": 10.05, "loops": 193, "worst_path_error_ticks": {"left": 13, "right": 23}, "final_error_ticks": {"left": [1, 0, 13, -5, -1], "right": [1, 3, 10, -3, -1]}, "peak_abs_load": {"left": [0, 0, 112, 48, 0], "right": [24, 136, 164, 96, 0]}}
+{"utc": "2026-11-13T01:54:17Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-13T01:54:17Z", "event": "stream", "t": 0.45, "frames": [73, 86], "present_ticks": {"left": [1973, 2337, 1788, 1433, 2061], "right": [2064, 2404, 1741, 1400, 2054]}}
+{"utc": "2026-11-13T01:54:18Z", "event": "stream", "t": 0.95, "frames": [73, 86], "present_ticks": {"left": [1974, 2265, 1914, 1369, 2061], "right": [2064, 2332, 1863, 1337, 2054]}}
+{"utc": "2026-11-13T01:54:18Z", "event": "stream", "t": 1.55, "frames": [73, 86], "present_ticks": {"left": [1974, 2142, 2147, 1269, 2061], "right": [2064, 2211, 2091, 1238, 2054]}}
+{"utc": "2026-11-13T01:54:19Z", "event": "stream", "t": 2.07, "frames": [73, 86], "present_ticks": {"left": [1974, 2050, 2309, 1197, 2061], "right": [2064, 2117, 2260, 1164, 2054]}}
+{"utc": "2026-11-13T01:54:19Z", "event": "aborted", "reason": "ReplayAborted: left elbow_flex at 84 C", "hold": {"arm_left": "None", "arm_right": "None"}}
+{"utc": "2026-11-13T01:54:42Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T01:55:09Z", "event": "start", "ticks": {"left": [1971, 1372, 3121, 972, 2061], "right": [2062, 1470, 3077, 984, 2053]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [-0.08757812499999319, -4.791001377735838, 3.515625000000001, -2.701403436164957, -0.04442187500001182], "right": [-0.08753125000001205, -1.8027201277358413, 3.60351562500001, 1.3852840638350492, -0.1755468750000091]}, "approach_problems": []}
+{"utc": "2026-11-13T01:55:22Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T01:55:28Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2031}
+{"utc": "2026-11-13T01:55:30Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1971, 1422, 3091, 1005, 2061], "right": [2063, 1482, 3056, 973, 2053]}, "error_ticks": {"left": [-1, -5, 10, 2, -1], "right": [0, -9, 20, 5, -2]}, "peak_abs_load": {"left": [0, 48, 88, 24, 0], "right": [0, 72, 140, 60, 28]}, "expected_s": 0.47, "took_s": 0.24}
+{"utc": "2026-11-13T01:55:31Z", "event": "stream", "t": 0.69, "frames": [0, 24], "present_ticks": {"left": [1971, 1438, 3052, 1067, 2061], "right": [2063, 1501, 3013, 1027, 2053]}}
+{"utc": "2026-11-13T01:55:32Z", "event": "stream", "t": 1.22, "frames": [0, 24], "present_ticks": {"left": [1971, 1478, 2946, 1131, 2061], "right": [2063, 1541, 2905, 1095, 2053]}}
+{"utc": "2026-11-13T01:55:32Z", "event": "stream", "t": 1.73, "frames": [0, 24], "present_ticks": {"left": [1971, 1520, 2850, 1183, 2061], "right": [2063, 1583, 2811, 1148, 2053]}}
+{"utc": "2026-11-13T01:55:33Z", "event": "stream", "t": 2.24, "frames": [0, 24], "present_ticks": {"left": [1971, 1566, 2752, 1237, 2061], "right": [2063, 1630, 2709, 1201, 2053]}}
+{"utc": "2026-11-13T01:55:33Z", "event": "stream", "t": 2.79, "frames": [0, 24], "present_ticks": {"left": [1971, 1622, 2639, 1295, 2061], "right": [2063, 1684, 2599, 1259, 2053]}}
+{"utc": "2026-11-13T01:55:34Z", "event": "stream", "t": 3.32, "frames": [0, 24], "present_ticks": {"left": [1971, 1678, 2523, 1351, 2061], "right": [2063, 1743, 2481, 1317, 2053]}}
+{"utc": "2026-11-13T01:55:34Z", "event": "stream", "t": 3.86, "frames": [0, 24], "present_ticks": {"left": [1971, 1741, 2400, 1415, 2061], "right": [2063, 1804, 2358, 1378, 2053]}}
+{"utc": "2026-11-13T01:55:35Z", "event": "stream", "t": 4.36, "frames": [0, 24], "present_ticks": {"left": [1971, 1807, 2269, 1477, 2061], "right": [2063, 1870, 2228, 1441, 2053]}}
+{"utc": "2026-11-13T01:55:35Z", "event": "stream", "t": 4.89, "frames": [0, 24], "present_ticks": {"left": [1971, 1893, 2109, 1552, 2061], "right": [2063, 1954, 2071, 1516, 2053]}}
+{"utc": "2026-11-13T01:55:36Z", "event": "stream", "t": 5.4, "frames": [0, 24], "present_ticks": {"left": [1971, 1877, 2087, 1585, 2061], "right": [2063, 1943, 2044, 1552, 2053]}}
+{"utc": "2026-11-13T01:55:36Z", "event": "stream", "t": 5.9, "frames": [0, 24], "present_ticks": {"left": [1971, 1842, 2089, 1615, 2061], "right": [2063, 1905, 2044, 1581, 2053]}}
+{"utc": "2026-11-13T01:55:37Z", "event": "stream", "t": 6.46, "frames": [0, 24], "present_ticks": {"left": [1971, 1809, 2093, 1648, 2061], "right": [2063, 1874, 2047, 1613, 2053]}}
+{"utc": "2026-11-13T01:55:37Z", "event": "stream", "t": 6.98, "frames": [0, 24], "present_ticks": {"left": [1971, 1776, 2092, 1685, 2061], "right": [2063, 1841, 2046, 1651, 2053]}}
+{"utc": "2026-11-13T01:55:38Z", "event": "stream", "t": 7.53, "frames": [0, 24], "present_ticks": {"left": [1971, 1749, 2084, 1722, 2061], "right": [2063, 1812, 2038, 1685, 2053]}}
+{"utc": "2026-11-13T01:55:38Z", "event": "stream", "t": 8.05, "frames": [0, 24], "present_ticks": {"left": [1971, 1724, 2070, 1759, 2061], "right": [2063, 1788, 2025, 1725, 2053]}}
+{"utc": "2026-11-13T01:55:39Z", "event": "stream", "t": 8.55, "frames": [0, 24], "present_ticks": {"left": [1971, 1702, 2050, 1797, 2061], "right": [2063, 1766, 2007, 1764, 2053]}}
+{"utc": "2026-11-13T01:55:39Z", "event": "stream", "t": 9.07, "frames": [0, 24], "present_ticks": {"left": [1971, 1684, 2028, 1837, 2061], "right": [2063, 1749, 1984, 1802, 2053]}}
+{"utc": "2026-11-13T01:55:40Z", "event": "stream", "t": 9.59, "frames": [0, 24], "present_ticks": {"left": [1971, 1670, 2000, 1879, 2061], "right": [2063, 1736, 1957, 1844, 2053]}}
+{"utc": "2026-11-13T01:55:40Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 10.0, "took_s": 10.06, "loops": 188, "worst_path_error_ticks": {"left": 21, "right": 30}, "final_error_ticks": {"left": [-1, 0, 3, -3, -1], "right": [0, 1, 3, -2, -2]}, "peak_abs_load": {"left": [0, 100, 188, 100, 0], "right": [0, 112, 200, 84, 24]}}
+{"utc": "2026-11-13T01:55:43Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1607}
+{"utc": "2026-11-13T01:55:44Z", "event": "stream", "t": 0.5, "frames": [24, 48], "present_ticks": {"left": [1971, 1630, 2035, 1883, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:44Z", "event": "stream", "t": 1.06, "frames": [24, 48], "present_ticks": {"left": [1971, 1563, 2131, 1854, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:45Z", "event": "stream", "t": 1.57, "frames": [24, 48], "present_ticks": {"left": [1971, 1504, 2211, 1833, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:45Z", "event": "stream", "t": 2.07, "frames": [24, 48], "present_ticks": {"left": [1971, 1448, 2282, 1817, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:46Z", "event": "stream", "t": 2.59, "frames": [24, 48], "present_ticks": {"left": [1971, 1390, 2353, 1805, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:46Z", "event": "stream", "t": 3.12, "frames": [24, 48], "present_ticks": {"left": [1971, 1424, 2406, 1712, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:47Z", "event": "stream", "t": 3.69, "frames": [24, 48], "present_ticks": {"left": [1971, 1492, 2443, 1609, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:49Z", "event": "stream", "t": 4.25, "frames": [24, 48], "present_ticks": {"left": [1971, 1574, 2457, 1512, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:50Z", "event": "stream", "t": 4.79, "frames": [24, 48], "present_ticks": {"left": [1971, 1666, 2457, 1424, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:50Z", "event": "stream", "t": 5.31, "frames": [24, 48], "present_ticks": {"left": [1971, 1765, 2445, 1346, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:51Z", "event": "stream", "t": 5.84, "frames": [24, 48], "present_ticks": {"left": [1972, 1873, 2409, 1280, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:51Z", "event": "stream", "t": 6.36, "frames": [24, 48], "present_ticks": {"left": [1973, 1977, 2352, 1229, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:52Z", "event": "stream", "t": 6.87, "frames": [24, 48], "present_ticks": {"left": [1973, 2084, 2284, 1193, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:52Z", "event": "stream", "t": 7.37, "frames": [24, 48], "present_ticks": {"left": [1974, 2194, 2201, 1172, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:53Z", "event": "stream", "t": 7.88, "frames": [24, 48], "present_ticks": {"left": [1974, 2213, 2130, 1216, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:53Z", "event": "stream", "t": 8.38, "frames": [24, 48], "present_ticks": {"left": [1974, 2235, 2056, 1267, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:54Z", "event": "stream", "t": 8.93, "frames": [24, 48], "present_ticks": {"left": [1974, 2268, 1965, 1326, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:54Z", "event": "stream", "t": 9.47, "frames": [24, 48], "present_ticks": {"left": [1974, 2306, 1862, 1390, 2061], "right": [2063, 1731, 1944, 1863, 2053]}}
+{"utc": "2026-11-13T01:55:55Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 10.0, "took_s": 10.06, "loops": 189, "worst_path_error_ticks": {"left": 19, "right": 3}, "final_error_ticks": {"left": [2, 0, 11, -3, -1], "right": [0, 1, 3, -2, -2]}, "peak_abs_load": {"left": [24, 132, 176, 96, 0], "right": [0, 0, 32, 24, 24]}}
+{"utc": "2026-11-13T01:55:58Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2026}
+{"utc": "2026-11-13T01:56:01Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1586}
+{"utc": "2026-11-13T01:56:01Z", "event": "stream", "t": 0.46, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1696, 1985, 1851, 2053]}}
+{"utc": "2026-11-13T01:56:02Z", "event": "stream", "t": 0.97, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1637, 2071, 1825, 2053]}}
+{"utc": "2026-11-13T01:56:02Z", "event": "stream", "t": 1.49, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1579, 2154, 1804, 2053]}}
+{"utc": "2026-11-13T01:56:03Z", "event": "stream", "t": 2.01, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1518, 2232, 1783, 2053]}}
+{"utc": "2026-11-13T01:56:04Z", "event": "stream", "t": 2.52, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1456, 2301, 1774, 2053]}}
+{"utc": "2026-11-13T01:56:04Z", "event": "stream", "t": 3.03, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1478, 2353, 1694, 2053]}}
+{"utc": "2026-11-13T01:56:05Z", "event": "stream", "t": 3.54, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1537, 2391, 1600, 2053]}}
+{"utc": "2026-11-13T01:56:05Z", "event": "stream", "t": 4.06, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1609, 2411, 1511, 2053]}}
+{"utc": "2026-11-13T01:56:06Z", "event": "stream", "t": 4.6, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1695, 2413, 1421, 2053]}}
+{"utc": "2026-11-13T01:56:06Z", "event": "stream", "t": 5.11, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1793, 2411, 1338, 2053]}}
+{"utc": "2026-11-13T01:56:07Z", "event": "stream", "t": 5.62, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1891, 2378, 1270, 2053]}}
+{"utc": "2026-11-13T01:56:07Z", "event": "stream", "t": 6.15, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 1999, 2332, 1212, 2053]}}
+{"utc": "2026-11-13T01:56:08Z", "event": "stream", "t": 6.66, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2104, 2270, 1172, 2053]}}
+{"utc": "2026-11-13T01:56:08Z", "event": "stream", "t": 7.23, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2224, 2182, 1141, 2053]}}
+{"utc": "2026-11-13T01:56:09Z", "event": "stream", "t": 7.75, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2272, 2106, 1165, 2053]}}
+{"utc": "2026-11-13T01:56:09Z", "event": "stream", "t": 8.28, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2294, 2028, 1222, 2053]}}
+{"utc": "2026-11-13T01:56:10Z", "event": "stream", "t": 8.79, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2322, 1946, 1276, 2053]}}
+{"utc": "2026-11-13T01:56:10Z", "event": "stream", "t": 9.32, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2357, 1849, 1338, 2053]}}
+{"utc": "2026-11-13T01:56:11Z", "event": "stream", "t": 9.84, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2398, 1749, 1396, 2053]}}
+{"utc": "2026-11-13T01:56:11Z", "event": "segment", "frames": [49, 73], "step": "right regrip middle point", "planned_s": 10.0, "took_s": 10.08, "loops": 193, "worst_path_error_ticks": {"left": 11, "right": 22}, "final_error_ticks": {"left": [2, 0, 11, -2, -1], "right": [0, -1, 10, -3, -2]}, "peak_abs_load": {"left": [24, 0, 96, 24, 0], "right": [0, 136, 172, 92, 24]}}
+{"utc": "2026-11-13T01:56:14Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T01:56:15Z", "event": "stream", "t": 0.49, "frames": [73, 86], "present_ticks": {"left": [1974, 2337, 1786, 1436, 2061], "right": [2063, 2400, 1741, 1400, 2053]}}
+{"utc": "2026-11-13T01:56:15Z", "event": "stream", "t": 1.0, "frames": [73, 86], "present_ticks": {"left": [1974, 2250, 1943, 1356, 2061], "right": [2063, 2316, 1891, 1324, 2053]}}
+{"utc": "2026-11-13T01:56:16Z", "event": "stream", "t": 1.52, "frames": [73, 86], "present_ticks": {"left": [1974, 2144, 2142, 1271, 2061], "right": [2063, 2212, 2088, 1239, 2053]}}
+{"utc": "2026-11-13T01:56:16Z", "event": "stream", "t": 2.04, "frames": [73, 86], "present_ticks": {"left": [1974, 2053, 2303, 1199, 2061], "right": [2063, 2120, 2254, 1168, 2053]}}
+{"utc": "2026-11-13T01:56:17Z", "event": "stream", "t": 2.56, "frames": [73, 86], "present_ticks": {"left": [1974, 1971, 2446, 1139, 2061], "right": [2063, 2039, 2395, 1106, 2053]}}
+{"utc": "2026-11-13T01:56:17Z", "event": "stream", "t": 3.08, "frames": [73, 86], "present_ticks": {"left": [1974, 1892, 2579, 1085, 2061], "right": [2063, 1959, 2530, 1052, 2053]}}
+{"utc": "2026-11-13T01:56:18Z", "event": "stream", "t": 3.66, "frames": [73, 86], "present_ticks": {"left": [1974, 1802, 2721, 1031, 2061], "right": [2063, 1868, 2673, 998, 2053]}}
+{"utc": "2026-11-13T01:56:19Z", "event": "stream", "t": 4.31, "frames": [73, 86], "present_ticks": {"left": [1973, 1699, 2870, 987, 2061], "right": [2063, 1763, 2821, 953, 2053]}}
+{"utc": "2026-11-13T01:56:19Z", "event": "stream", "t": 4.92, "frames": [73, 86], "present_ticks": {"left": [1973, 1582, 3008, 972, 2061], "right": [2063, 1650, 2959, 937, 2053]}}
+{"utc": "2026-11-13T01:56:20Z", "event": "segment", "frames": [73, 86], "step": "lower tube, arms return to start (both locked)", "planned_s": 5.6, "took_s": 5.65, "loops": 99, "worst_path_error_ticks": {"left": 22, "right": 30}, "final_error_ticks": {"left": [1, 1, 1, -2, -1], "right": [0, 1, -1, -2, -2]}, "peak_abs_load": {"left": [24, 180, 152, 108, 0], "right": [0, 176, 148, 108, 24]}}
+{"utc": "2026-11-13T01:56:20Z", "event": "done"}
+{"utc": "2026-11-13T01:56:54Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T01:57:08Z", "event": "start", "ticks": {"left": [1973, 1428, 3083, 1001, 2061], "right": [2063, 1492, 3035, 966, 2053]}, "gripper_ticks": {"left": 2034, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.08820312500000682, 0.13087362226415852, 0.17578125000000577, -0.15257531116495626, -0.04442187500001182], "right": [0.0003593749999879492, 0.13087362226415852, -0.08789062499999652, -0.19674718616495185, -0.1755468750000091]}, "approach_problems": []}
+{"utc": "2026-11-13T01:57:54Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2028}
+{"utc": "2026-11-13T01:58:00Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T01:58:03Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1973, 1428, 3084, 1001, 2061], "right": [2063, 1492, 3035, 966, 2053]}, "error_ticks": {"left": [1, 1, 3, -2, -1], "right": [0, 1, -1, -2, -2]}, "peak_abs_load": {"left": [0, 0, 32, 24, 0], "right": [0, 0, 0, 0, 0]}, "expected_s": 0.02, "took_s": 0.0}
+{"utc": "2026-11-13T01:58:05Z", "event": "stream", "t": 0.7, "frames": [0, 24], "present_ticks": {"left": [1972, 1438, 3053, 1065, 2061], "right": [2063, 1500, 3017, 1023, 2053]}}
+{"utc": "2026-11-13T01:58:05Z", "event": "stream", "t": 1.22, "frames": [0, 24], "present_ticks": {"left": [1972, 1477, 2949, 1129, 2061], "right": [2063, 1539, 2909, 1093, 2053]}}
+{"utc": "2026-11-13T01:58:06Z", "event": "stream", "t": 1.73, "frames": [0, 24], "present_ticks": {"left": [1972, 1519, 2851, 1183, 2061], "right": [2063, 1583, 2811, 1147, 2053]}}
+{"utc": "2026-11-13T01:58:06Z", "event": "stream", "t": 2.24, "frames": [0, 24], "present_ticks": {"left": [1972, 1567, 2749, 1238, 2061], "right": [2063, 1631, 2706, 1203, 2053]}}
+{"utc": "2026-11-13T01:58:07Z", "event": "stream", "t": 2.8, "frames": [0, 24], "present_ticks": {"left": [1972, 1621, 2637, 1295, 2061], "right": [2063, 1684, 2598, 1258, 2053]}}
+{"utc": "2026-11-13T01:58:08Z", "event": "stream", "t": 3.34, "frames": [0, 24], "present_ticks": {"left": [1972, 1679, 2521, 1354, 2061], "right": [2063, 1743, 2480, 1318, 2053]}}
+{"utc": "2026-11-13T01:58:08Z", "event": "stream", "t": 3.84, "frames": [0, 24], "present_ticks": {"left": [1972, 1741, 2401, 1414, 2061], "right": [2063, 1804, 2358, 1378, 2053]}}
+{"utc": "2026-11-13T01:58:09Z", "event": "stream", "t": 4.35, "frames": [0, 24], "present_ticks": {"left": [1972, 1806, 2274, 1475, 2061], "right": [2063, 1869, 2233, 1440, 2053]}}
+{"utc": "2026-11-13T01:58:09Z", "event": "stream", "t": 4.89, "frames": [0, 24], "present_ticks": {"left": [1972, 1889, 2116, 1549, 2061], "right": [2063, 1950, 2080, 1512, 2053]}}
+{"utc": "2026-11-13T01:58:10Z", "event": "stream", "t": 5.4, "frames": [0, 24], "present_ticks": {"left": [1972, 1877, 2088, 1585, 2061], "right": [2063, 1940, 2045, 1551, 2053]}}
+{"utc": "2026-11-13T01:58:10Z", "event": "stream", "t": 5.91, "frames": [0, 24], "present_ticks": {"left": [1972, 1842, 2089, 1615, 2061], "right": [2063, 1907, 2045, 1580, 2053]}}
+{"utc": "2026-11-13T01:58:11Z", "event": "stream", "t": 6.44, "frames": [0, 24], "present_ticks": {"left": [1972, 1809, 2091, 1648, 2061], "right": [2063, 1874, 2047, 1612, 2053]}}
+{"utc": "2026-11-13T01:58:11Z", "event": "stream", "t": 6.95, "frames": [0, 24], "present_ticks": {"left": [1971, 1779, 2091, 1681, 2061], "right": [2063, 1843, 2046, 1646, 2053]}}
+{"utc": "2026-11-13T01:58:12Z", "event": "stream", "t": 7.45, "frames": [0, 24], "present_ticks": {"left": [1971, 1752, 2085, 1717, 2061], "right": [2063, 1816, 2040, 1682, 2053]}}
+{"utc": "2026-11-13T01:58:12Z", "event": "stream", "t": 7.96, "frames": [0, 24], "present_ticks": {"left": [1971, 1728, 2072, 1752, 2061], "right": [2063, 1792, 2027, 1718, 2053]}}
+{"utc": "2026-11-13T01:58:13Z", "event": "stream", "t": 8.46, "frames": [0, 24], "present_ticks": {"left": [1971, 1706, 2056, 1790, 2061], "right": [2063, 1770, 2010, 1756, 2053]}}
+{"utc": "2026-11-13T01:58:13Z", "event": "stream", "t": 8.97, "frames": [0, 24], "present_ticks": {"left": [1971, 1689, 2033, 1830, 2061], "right": [2063, 1752, 1990, 1794, 2053]}}
+{"utc": "2026-11-13T01:58:14Z", "event": "stream", "t": 9.48, "frames": [0, 24], "present_ticks": {"left": [1971, 1672, 2007, 1870, 2061], "right": [2063, 1736, 1964, 1835, 2053]}}
+{"utc": "2026-11-13T01:58:14Z", "event": "stream", "t": 9.98, "frames": [0, 24], "present_ticks": {"left": [1971, 1666, 1990, 1896, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:14Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 10.0, "took_s": 10.05, "loops": 190, "worst_path_error_ticks": {"left": 27, "right": 35}, "final_error_ticks": {"left": [-1, 0, 5, -3, -1], "right": [0, -1, 4, -2, -2]}, "peak_abs_load": {"left": [0, 108, 204, 92, 0], "right": [0, 100, 200, 92, 24]}}
+{"utc": "2026-11-13T01:58:17Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1608}
+{"utc": "2026-11-13T01:58:18Z", "event": "stream", "t": 0.62, "frames": [24, 48], "present_ticks": {"left": [1971, 1615, 2057, 1877, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:18Z", "event": "stream", "t": 1.16, "frames": [24, 48], "present_ticks": {"left": [1971, 1550, 2148, 1849, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:19Z", "event": "stream", "t": 1.69, "frames": [24, 48], "present_ticks": {"left": [1971, 1491, 2227, 1828, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:19Z", "event": "stream", "t": 2.25, "frames": [24, 48], "present_ticks": {"left": [1971, 1428, 2308, 1813, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:20Z", "event": "stream", "t": 2.81, "frames": [24, 48], "present_ticks": {"left": [1971, 1390, 2379, 1777, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:20Z", "event": "stream", "t": 3.33, "frames": [24, 48], "present_ticks": {"left": [1971, 1447, 2422, 1674, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:21Z", "event": "stream", "t": 3.84, "frames": [24, 48], "present_ticks": {"left": [1971, 1514, 2448, 1581, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:21Z", "event": "stream", "t": 4.36, "frames": [24, 48], "present_ticks": {"left": [1971, 1594, 2457, 1492, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:22Z", "event": "stream", "t": 4.9, "frames": [24, 48], "present_ticks": {"left": [1971, 1689, 2457, 1404, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:22Z", "event": "stream", "t": 5.45, "frames": [24, 48], "present_ticks": {"left": [1971, 1793, 2437, 1327, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:23Z", "event": "stream", "t": 5.99, "frames": [24, 48], "present_ticks": {"left": [1972, 1901, 2392, 1263, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:24Z", "event": "stream", "t": 6.52, "frames": [24, 48], "present_ticks": {"left": [1973, 2011, 2333, 1216, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:24Z", "event": "stream", "t": 7.04, "frames": [24, 48], "present_ticks": {"left": [1973, 2122, 2256, 1184, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:25Z", "event": "stream", "t": 7.55, "frames": [24, 48], "present_ticks": {"left": [1974, 2203, 2174, 1172, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:25Z", "event": "stream", "t": 8.06, "frames": [24, 48], "present_ticks": {"left": [1974, 2219, 2106, 1234, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:26Z", "event": "stream", "t": 8.63, "frames": [24, 48], "present_ticks": {"left": [1974, 2246, 2023, 1289, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:26Z", "event": "stream", "t": 9.32, "frames": [24, 48], "present_ticks": {"left": [1974, 2293, 1893, 1371, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:27Z", "event": "stream", "t": 9.86, "frames": [24, 48], "present_ticks": {"left": [1974, 2333, 1790, 1432, 2061], "right": [2063, 1729, 1945, 1863, 2053]}}
+{"utc": "2026-11-13T01:58:27Z", "event": "segment", "frames": [24, 48], "step": "left regrip near point", "planned_s": 10.0, "took_s": 10.04, "loops": 182, "worst_path_error_ticks": {"left": 22, "right": 4}, "final_error_ticks": {"left": [2, 0, 10, -3, -1], "right": [0, -1, 4, -2, -2]}, "peak_abs_load": {"left": [28, 132, 176, 92, 0], "right": [0, 0, 40, 24, 24]}}
+{"utc": "2026-11-13T01:58:30Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T01:58:33Z", "event": "gripper_unlock", "arm": "right", "state": "UNLOCKED", "ticks": 1586}
+{"utc": "2026-11-13T01:58:34Z", "event": "stream", "t": 0.48, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1784, 1436, 2061], "right": [2063, 1694, 1989, 1850, 2053]}}
+{"utc": "2026-11-13T01:58:34Z", "event": "stream", "t": 1.0, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1784, 1436, 2061], "right": [2063, 1633, 2076, 1821, 2053]}}
+{"utc": "2026-11-13T01:58:35Z", "event": "stream", "t": 1.52, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1784, 1436, 2061], "right": [2063, 1576, 2153, 1803, 2053]}}
+{"utc": "2026-11-13T01:58:35Z", "event": "stream", "t": 2.03, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1784, 1436, 2061], "right": [2063, 1517, 2233, 1784, 2053]}}
+{"utc": "2026-11-13T01:58:36Z", "event": "stream", "t": 2.53, "frames": [49, 73], "present_ticks": {"left": [1974, 2337, 1784, 1436, 2061], "right": [2063, 1455, 2302, 1773, 2053]}}
+{"utc": "2026-11-13T01:58:36Z", "event": "aborted", "reason": "ReplayAborted: right shoulder_lift at 76 C", "hold": {"arm_left": "None", "arm_right": "None"}}
+{"utc": "2026-11-13T01:59:36Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T02:01:01Z", "event": "start", "ticks": {"left": [1972, 1417, 3121, 1007, 2062], "right": [2062, 1468, 3076, 1013, 2054]}, "gripper_ticks": {"left": 2034, "right": 1552}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [0.0003125000000068212, -0.8359232527358413, 3.515625000000001, 0.3747684388350356, 0.04346874999998818], "right": [-0.08753125000001205, -1.9785013777358342, 3.515625000000001, 3.93411218883505, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:01:10Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T02:01:13Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2030}
+{"utc": "2026-11-13T02:01:16Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1972, 1423, 3091, 1005, 2062], "right": [2062, 1482, 3053, 976, 2054]}, "error_ticks": {"left": [0, -4, 10, 2, 0], "right": [-1, -9, 17, 8, -1]}, "peak_abs_load": {"left": [0, 40, 88, 24, 0], "right": [0, 88, 132, 76, 0]}, "expected_s": 0.3, "took_s": 0.26}
+{"utc": "2026-11-13T02:01:16Z", "event": "stream", "t": 0.65, "frames": [0, 24], "present_ticks": {"left": [1972, 1436, 3059, 1059, 2062], "right": [2062, 1499, 3017, 1021, 2054]}}
+{"utc": "2026-11-13T02:01:17Z", "event": "stream", "t": 1.19, "frames": [0, 24], "present_ticks": {"left": [1972, 1473, 2955, 1125, 2062], "right": [2062, 1536, 2918, 1088, 2054]}}
+{"utc": "2026-11-13T02:01:17Z", "event": "stream", "t": 1.75, "frames": [0, 24], "present_ticks": {"left": [1972, 1520, 2850, 1184, 2062], "right": [2062, 1582, 2810, 1147, 2054]}}
+{"utc": "2026-11-13T02:01:18Z", "event": "stream", "t": 2.32, "frames": [0, 24], "present_ticks": {"left": [1972, 1572, 2740, 1242, 2062], "right": [2062, 1635, 2700, 1206, 2054]}}
+{"utc": "2026-11-13T02:01:18Z", "event": "stream", "t": 2.82, "frames": [0, 24], "present_ticks": {"left": [1972, 1626, 2628, 1299, 2062], "right": [2062, 1690, 2586, 1265, 2054]}}
+{"utc": "2026-11-13T02:01:19Z", "event": "stream", "t": 3.37, "frames": [0, 24], "present_ticks": {"left": [1971, 1685, 2511, 1357, 2062], "right": [2062, 1748, 2467, 1323, 2054]}}
+{"utc": "2026-11-13T02:01:20Z", "event": "stream", "t": 3.88, "frames": [0, 24], "present_ticks": {"left": [1971, 1744, 2393, 1416, 2062], "right": [2062, 1808, 2351, 1382, 2054]}}
+{"utc": "2026-11-13T02:01:20Z", "event": "stream", "t": 4.38, "frames": [0, 24], "present_ticks": {"left": [1971, 1808, 2266, 1478, 2062], "right": [2062, 1872, 2226, 1442, 2054]}}
+{"utc": "2026-11-13T02:01:21Z", "event": "stream", "t": 4.89, "frames": [0, 24], "present_ticks": {"left": [1971, 1890, 2108, 1551, 2062], "right": [2062, 1952, 2069, 1514, 2054]}}
+{"utc": "2026-11-13T02:01:21Z", "event": "stream", "t": 5.4, "frames": [0, 24], "present_ticks": {"left": [1971, 1877, 2089, 1585, 2062], "right": [2062, 1942, 2044, 1552, 2054]}}
+{"utc": "2026-11-13T02:01:22Z", "event": "stream", "t": 5.92, "frames": [0, 24], "present_ticks": {"left": [1971, 1841, 2089, 1617, 2062], "right": [2062, 1905, 2044, 1581, 2054]}}
+{"utc": "2026-11-13T02:01:22Z", "event": "stream", "t": 6.43, "frames": [0, 24], "present_ticks": {"left": [1971, 1809, 2091, 1648, 2062], "right": [2062, 1875, 2046, 1613, 2054]}}
+{"utc": "2026-11-13T02:01:23Z", "event": "stream", "t": 6.95, "frames": [0, 24], "present_ticks": {"left": [1971, 1780, 2091, 1682, 2062], "right": [2062, 1844, 2046, 1648, 2054]}}
+{"utc": "2026-11-13T02:01:23Z", "event": "stream", "t": 7.5, "frames": [0, 24], "present_ticks": {"left": [1971, 1750, 2084, 1720, 2062], "right": [2062, 1815, 2040, 1685, 2054]}}
+{"utc": "2026-11-13T02:01:24Z", "event": "stream", "t": 8.01, "frames": [0, 24], "present_ticks": {"left": [1971, 1726, 2070, 1757, 2062], "right": [2062, 1789, 2025, 1722, 2054]}}
+{"utc": "2026-11-13T02:01:24Z", "event": "stream", "t": 8.56, "frames": [0, 24], "present_ticks": {"left": [1971, 1703, 2051, 1797, 2062], "right": [2063, 1768, 2009, 1763, 2054]}}
+{"utc": "2026-11-13T02:01:25Z", "event": "stream", "t": 9.08, "frames": [0, 24], "present_ticks": {"left": [1971, 1685, 2027, 1837, 2062], "right": [2063, 1749, 1985, 1802, 2054]}}
+{"utc": "2026-11-13T02:01:25Z", "event": "stream", "t": 9.59, "frames": [0, 24], "present_ticks": {"left": [1971, 1671, 2001, 1879, 2062], "right": [2063, 1735, 1956, 1844, 2054]}}
+{"utc": "2026-11-13T02:01:26Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 10.0, "took_s": 10.07, "loops": 188, "worst_path_error_ticks": {"left": 21, "right": 24}, "final_error_ticks": {"left": [-1, -2, 2, -3, 0], "right": [0, 1, 2, -2, -1]}, "peak_abs_load": {"left": [0, 112, 188, 76, 0], "right": [0, 104, 188, 92, 0]}}
+{"utc": "2026-11-13T02:01:30Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1608}
+{"utc": "2026-11-13T02:01:31Z", "event": "stream", "t": 0.51, "frames": [24, 48], "present_ticks": {"left": [1971, 1628, 2037, 1884, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:31Z", "event": "stream", "t": 1.06, "frames": [24, 48], "present_ticks": {"left": [1971, 1563, 2130, 1856, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:32Z", "event": "stream", "t": 1.56, "frames": [24, 48], "present_ticks": {"left": [1971, 1505, 2209, 1834, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:32Z", "event": "stream", "t": 2.06, "frames": [24, 48], "present_ticks": {"left": [1971, 1449, 2281, 1817, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:33Z", "event": "stream", "t": 2.56, "frames": [24, 48], "present_ticks": {"left": [1971, 1391, 2351, 1805, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:33Z", "event": "stream", "t": 3.07, "frames": [24, 48], "present_ticks": {"left": [1971, 1418, 2402, 1721, 2062], "right": [2063, 1731, 1943, 1863, 2054]}}
+{"utc": "2026-11-13T02:01:34Z", "event": "aborted", "reason": "ReplayAborted: left shoulder_lift at 70 C", "hold": {"arm_left": "None", "arm_right": "None"}}
+{"utc": "2026-11-13T02:02:18Z", "event": "released", "errors": {}}
+{"utc": "2026-11-13T02:05:54Z", "event": "start", "ticks": {"left": [1971, 1388, 3119, 1024, 2061], "right": [2064, 1507, 3077, 933, 2054]}, "gripper_ticks": {"left": 1567, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [-0.08757812499999319, -3.3847513777358422, 3.339843749999995, 1.86890906383504, -0.04442187500001182], "right": [0.08824999999998795, 1.4492329972641573, 3.60351562500001, -3.0971378111649517, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:06:19Z", "event": "start", "ticks": {"left": [1971, 1388, 3119, 1024, 2061], "right": [2064, 1507, 3077, 933, 2054]}, "gripper_ticks": {"left": 1567, "right": 2036}, "speed": 150, "mode": "fluid tempo 0.5", "soft_limits_override": "owner 2026-11-13: AA-50 fluid replay", "diff_to_start_deg": {"left": [-0.08757812499999319, -3.3847513777358422, 3.339843749999995, 1.86890906383504, -0.04442187500001182], "right": [0.08824999999998795, 1.4492329972641573, 3.60351562500001, -3.0971378111649517, -0.0876562500000091]}, "approach_problems": []}
+{"utc": "2026-11-13T02:06:27Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-13T02:06:35Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2031}
+{"utc": "2026-11-13T02:06:38Z", "event": "frame", "frame": 0, "step": "printing pose (start)", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 2062], "right": [2063, 1491, 3036, 968, 2055]}, "final_ticks": {"left": [1971, 1422, 3092, 1005, 2061], "right": [2064, 1492, 3053, 961, 2054]}, "error_ticks": {"left": [-1, -5, 11, 2, -1], "right": [1, 1, 17, -7, -1]}, "peak_abs_load": {"left": [0, 48, 96, 24, 0], "right": [0, 44, 132, 72, 0]}, "expected_s": 0.27, "took_s": 0.25}
+{"utc": "2026-11-13T02:06:39Z", "event": "stream", "t": 0.82, "frames": [0, 24], "present_ticks": {"left": [1971, 1445, 3039, 1078, 2061], "right": [2064, 1508, 3001, 1038, 2054]}}
+{"utc": "2026-11-13T02:06:39Z", "event": "stream", "t": 1.33, "frames": [0, 24], "present_ticks": {"left": [1971, 1486, 2926, 1143, 2061], "right": [2064, 1550, 2885, 1106, 2054]}}
+{"utc": "2026-11-13T02:06:40Z", "event": "stream", "t": 1.85, "frames": [0, 24], "present_ticks": {"left": [1971, 1530, 2828, 1195, 2061], "right": [2064, 1593, 2788, 1160, 2054]}}
+{"utc": "2026-11-13T02:06:40Z", "event": "stream", "t": 2.37, "frames": [0, 24], "present_ticks": {"left": [1971, 1580, 2720, 1252, 2061], "right": [2064, 1644, 2679, 1217, 2054]}}
+{"utc": "2026-11-13T02:06:41Z", "event": "stream", "t": 3.03, "frames": [0, 24], "present_ticks": {"left": [1971, 1644, 2594, 1317, 2061], "right": [2064, 1707, 2554, 1281, 2054]}}
+{"utc": "2026-11-13T02:06:42Z", "event": "stream", "t": 3.75, "frames": [0, 24], "present_ticks": {"left": [1971, 1725, 2430, 1398, 2061], "right": [2064, 1789, 2388, 1363, 2054]}}
+{"utc": "2026-11-13T02:06:42Z", "event": "stream", "t": 4.39, "frames": [0, 24], "present_ticks": {"left": [1971, 1808, 2267, 1478, 2061], "right": [2064, 1872, 2226, 1442, 2054]}}
+{"utc": "2026-11-13T02:06:43Z", "event": "stream", "t": 4.9, "frames": [0, 24], "present_ticks": {"left": [1971, 1892, 2105, 1553, 2061], "right": [2064, 1956, 2065, 1517, 2054]}}
+{"utc": "2026-11-13T02:06:43Z", "event": "stream", "t": 5.41, "frames": [0, 24], "present_ticks": {"left": [1971, 1876, 2088, 1585, 2061], "right": [2064, 1941, 2044, 1551, 2054]}}
+{"utc": "2026-11-13T02:06:44Z", "event": "stream", "t": 5.91, "frames": [0, 24], "present_ticks": {"left": [1971, 1841, 2089, 1615, 2061], "right": [2064, 1906, 2045, 1581, 2054]}}
+{"utc": "2026-11-13T02:06:44Z", "event": "stream", "t": 6.41, "frames": [0, 24], "present_ticks": {"left": [1971, 1810, 2093, 1647, 2061], "right": [2064, 1875, 2047, 1613, 2054]}}
+{"utc": "2026-11-13T02:06:45Z", "event": "stream", "t": 6.92, "frames": [0, 24], "present_ticks": {"left": [1971, 1781, 2092, 1680, 2061], "right": [2064, 1846, 2046, 1644, 2054]}}
+{"utc": "2026-11-13T02:06:45Z", "event": "stream", "t": 7.44, "frames": [0, 24], "present_ticks": {"left": [1971, 1754, 2085, 1715, 2061], "right": [2064, 1819, 2041, 1680, 2054]}}
+{"utc": "2026-11-13T02:06:46Z", "event": "stream", "t": 8.06, "frames": [0, 24], "present_ticks": {"left": [1971, 1726, 2069, 1757, 2061], "right": [2064, 1790, 2026, 1722, 2054]}}
+{"utc": "2026-11-13T02:06:47Z", "event": "stream", "t": 8.66, "frames": [0, 24], "present_ticks": {"left": [1971, 1700, 2048, 1804, 2061], "right": [2064, 1764, 2003, 1771, 2054]}}
+{"utc": "2026-11-13T02:06:47Z", "event": "stream", "t": 9.19, "frames": [0, 24], "present_ticks": {"left": [1971, 1682, 2023, 1846, 2061], "right": [2064, 1746, 1979, 1811, 2054]}}
+{"utc": "2026-11-13T02:06:48Z", "event": "stream", "t": 9.71, "frames": [0, 24], "present_ticks": {"left": [1971, 1666, 1995, 1888, 2061], "right": [2064, 1733, 1951, 1853, 2054]}}
+{"utc": "2026-11-13T02:06:48Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 10.0, "took_s": 10.04, "loops": 175, "worst_path_error_ticks": {"left": 27, "right": 39}, "final_error_ticks": {"left": [-1, 0, 5, -3, -1], "right": [1, -3, 3, -3, -1]}, "peak_abs_load": {"left": [0, 112, 204, 88, 0], "right": [0, 100, 200, 104, 0]}}
+{"utc": "2026-11-13T02:06:51Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1606}
+{"utc": "2026-11-13T02:06:51Z", "event": "stream", "t": 0.5, "frames": [24, 48], "present_ticks": {"left": [1971, 1628, 2036, 1882, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:52Z", "event": "stream", "t": 1.02, "frames": [24, 48], "present_ticks": {"left": [1971, 1567, 2125, 1857, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:52Z", "event": "stream", "t": 1.53, "frames": [24, 48], "present_ticks": {"left": [1971, 1508, 2205, 1836, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:53Z", "event": "stream", "t": 2.03, "frames": [24, 48], "present_ticks": {"left": [1971, 1453, 2279, 1817, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:53Z", "event": "stream", "t": 2.53, "frames": [24, 48], "present_ticks": {"left": [1971, 1391, 2347, 1807, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:54Z", "event": "stream", "t": 3.08, "frames": [24, 48], "present_ticks": {"left": [1971, 1418, 2400, 1722, 2061], "right": [2064, 1727, 1944, 1862, 2054]}}
+{"utc": "2026-11-13T02:06:54Z", "event": "aborted", "reason": "ReplayAborted: left shoulder_lift at 78 C", "hold": {"arm_left": "None", "arm_right": "None"}}
+{"utc": "2026-11-13T02:07:03Z", "event": "released", "errors": {}}

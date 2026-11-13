@@ -280,12 +280,13 @@ ANIM_FRAME_S = 0.2
 DEFAULT_TEMPO = 0.5
 MAX_TEMPO = 1.0
 MAX_STREAM_SPEED_TICKS_S = 700   # ceiling on any joint's planned speed (~62 deg/s); above = refuse
-STREAM_PERIOD_S = 0.05          # control loop: a new target for both arms every 50 ms
-STREAM_LEAD_S = 0.1             # the target sent is the path point this far ahead
-STREAM_MAX_STEP_RAD = 0.2       # each sent target within ~11 deg of the present pose (GuardedArm)
-STREAM_ACCEL = 50
-TRACK_TOL_TICKS = 100           # ~8.8 deg behind the path = obstruction/stall: abort
-PREFLIGHT_STREAM_DT_S = 0.025   # offline check of the streamed path every 25 ms of path time
+STREAM_PERIOD_S = 0.02          # a new goal for both arms every 20 ms (50 Hz), from the path clock
+STREAM_LEAD_S = 0.06            # each goal is the path point this far ahead, sent with the path's
+                                # speed, so the servo is always travelling and never stops at a point
+STREAM_ACCEL = 100              # servo ramp (x100 ticks/s^2): smooths the speed changes between goals
+STREAM_SPEED_CAP_TICKS_S = 1000 # Goal_Speed ceiling while streaming
+SETTLE_S = 1.0                  # at the end of a piece: wait at most this long for the last frame
+PREFLIGHT_STREAM_DT_S = 0.02    # offline check of the streamed path at the stream rate (every 20 ms)
 
 
 @dataclass
@@ -435,6 +436,12 @@ class ReplayRunner:
     sleep: Callable[[float], None] = time.sleep
     clock: Callable[[], float] = time.monotonic
     targets: Dict[str, np.ndarray] = field(default_factory=dict)
+    #: OWNER DECISION 2026-11-13 ("aborting like that is more dangerous than whatever it is
+    #: trying to prevent"; "I don't need safety checks once we have confirmed a motion"): when
+    #: False, temperature/current/stall/lag readings are LOGGED and never stop the arms; only
+    #: the owner (Ctrl-C / stop file) or a gripper state-machine failure stops the run. True
+    #: (the step-by-step mode) keeps the old automatic aborts.
+    abort_on_faults: bool = True
 
     def __post_init__(self):
         for h in self.arms.values():
@@ -466,16 +473,19 @@ class ReplayRunner:
             moved = False
             cur = {}
             for a, g in goals.items():
-                b, ids = self.arms[a].bus, self.arms[a].ids
+                ids = self.arms[a].ids
                 ticks = []
                 for k, j in enumerate(JOINTS):
-                    st = b.read_joint_state(ids[j])
+                    try:
+                        st = self._read_state(a, ids[j])
+                    except Exception:  # noqa: BLE001
+                        if self.abort_on_faults:
+                            raise
+                        ticks.append(last[a][k] if last[a] else g[k])
+                        continue
                     ticks.append(round(st.position_deg * 4096 / 360))
                     peak_load[a][k] = max(peak_load[a][k], abs(st.load_raw))
-                    if st.temperature_c >= self.cfg.fault_thresholds.overtemperature_c:
-                        raise ReplayAborted(f"{a} {j} at {st.temperature_c} C")
-                    if st.current_raw >= self.cfg.fault_thresholds.overcurrent_raw:
-                        raise ReplayAborted(f"{a} {j} current {st.current_raw} raw (overcurrent)")
+                    self._fault(a, j, st)
                 cur[a] = ticks
                 if any(abs(t - gg) > REACH_TOL_TICKS for t, gg in zip(ticks, g)):
                     done = False
@@ -486,11 +496,15 @@ class ReplayRunner:
                 return cur, peak_load, now - t0
             if moved:
                 last_move = now
+            elif not self.abort_on_faults and now - t0 > SETTLE_S:
+                return cur, peak_load, now - t0       # logged by the caller; never stops the run
             elif now - last_move > STALL_S:
                 raise ReplayAborted(f"frame {frame}: stopped short of the goal: "
                                     + "; ".join(f"{a} err {[c - g for c, g in zip(cur[a], goals[a])]}"
                                                 for a in goals))
             if now - t0 > timeout:
+                if not self.abort_on_faults:
+                    return cur, peak_load, now - t0
                 raise ReplayAborted(f"frame {frame}: timeout after {now - t0:.1f} s")
             self.sleep(0.02)
 
@@ -602,13 +616,23 @@ class ReplayRunner:
             self.log({"event": "read_retry", "arm": arm, "servo": sid, "error": str(exc)})
             return self.arms[arm].bus.read_joint_state(sid)
 
+    def _fault(self, arm: str, joint: str, st) -> None:
+        """Over-temperature / overcurrent reading: abort (strict mode) or log it (fluid)."""
+        msg = None
+        if st.temperature_c >= self.cfg.fault_thresholds.overtemperature_c:
+            msg = f"{arm} {joint} at {st.temperature_c} C"
+        elif st.current_raw >= self.cfg.fault_thresholds.overcurrent_raw:
+            msg = f"{arm} {joint} current {st.current_raw} raw (overcurrent)"
+        if msg is None:
+            return
+        if self.abort_on_faults:
+            raise ReplayAborted(msg)
+        self.log({"event": "reading_warning", "arm": arm, "joint": joint, "what": msg})
+
     def run_fluid(self, segs: Sequence[Segment]):
         """Owner 2026-11-13: fluid motion, both arms at the same time, no stop between frames.
         The arms come to rest only for the gripper actions between segments."""
         from inchworm.gripper_lock import GripperState
-        for h in self.arms.values():
-            for j in JOINTS:
-                h.bus.set_acceleration(h.ids[j], STREAM_ACCEL)
         for seg in segs:
             for a, what in seg.before:
                 (self._lock if what == "lock" else self._unlock)(a)
@@ -620,70 +644,60 @@ class ReplayRunner:
                     self.arms[a].sm.hold_tick()
 
     def _stream_segment(self, seg: Segment):
-        from inchworm.gripper_lock import GripperState
-        t0 = self.clock()
-        worst = {a: 0 for a in ARMS}
+        """Stream the confirmed path: both arms get the path point for the CURRENT time every
+        20 ms (one sync-write packet per arm). No per-point checks (the whole path was checked
+        before the owner's YES). Read-back is for the log only and never stops the motion."""
+        from inchworm.servo_bus import ServoError
+        for h in self.arms.values():
+            for j in JOINTS:
+                h.bus.set_acceleration(h.ids[j], STREAM_ACCEL)
+        lag = {a: 0 for a in ARMS}
+        hot = {a: 0 for a in ARMS}
         peak_load = {a: [0] * 5 for a in ARMS}
-        n = 0
-        last_speed = {a: [None] * 5 for a in ARMS}
+        read_errors, n = 0, 0
+        t0 = self.clock()
         while True:
-            self._check_abort()
-            tick_start = self.clock()
-            t = tick_start - t0
-            # 1. read both arms; faults; how far behind the path?
-            want = seg.q(t)
-            present = {}
+            if self.should_abort():
+                raise ReplayAborted("stop requested")
+            now = self.clock()
+            t = now - t0
+            q = seg.q(t)
+            ahead = seg.q(t + STREAM_LEAD_S)
             for a in ARMS:
-                ticks = []
-                for k, j in enumerate(JOINTS):
-                    st = self._read_state(a, self.arms[a].ids[j])
-                    ticks.append(round(st.position_deg * 4096 / 360))
-                    peak_load[a][k] = max(peak_load[a][k], abs(st.load_raw))
-                    if st.temperature_c >= self.cfg.fault_thresholds.overtemperature_c:
-                        raise ReplayAborted(f"{a} {j} at {st.temperature_c} C")
-                    if st.current_raw >= self.cfg.fault_thresholds.overcurrent_raw:
-                        raise ReplayAborted(f"{a} {j} current {st.current_raw} raw (overcurrent)")
-                present[a] = ticks
-                err = [p - w for p, w in zip(ticks, q_to_ticks(self.cfg, a, want[a]))]
-                worst[a] = max(worst[a], max(abs(e) for e in err))
-                if max(abs(e) for e in err) > TRACK_TOL_TICKS:
-                    raise ReplayAborted(f"frames {seg.first}->{seg.last} t={t:.2f}s: {a} is "
-                                        f"{err} ticks off the path (more than {TRACK_TOL_TICKS})")
+                now_t = q_to_ticks(self.cfg, a, q[a])
+                goal = q_to_ticks(self.cfg, a, ahead[a])
+                sp = [int(min(STREAM_SPEED_CAP_TICKS_S, max(MIN_SPEED_TICKS_S, abs(g - c) / STREAM_LEAD_S)))
+                      for g, c in zip(goal, now_t)]
+                self.arms[a].guarded.write_preflighted_ticks(goal, sp)
             if t >= seg.duration_s:
                 break
-            # 2. send both arms the point STREAM_LEAD_S ahead, each checked against the other's
-            tgt = seg.q(t + STREAM_LEAD_S)
-            for a in ARMS:
-                h, o = self.arms[a], "right" if a == "left" else "left"
-                h.guarded.guard.mesh.other_arm_pose_source = (lambda q=tgt[o]: q)
-                goal = q_to_ticks(self.cfg, a, tgt[a])
+            a = ARMS[n % 2]                           # read back one arm per tick (log only)
+            try:
+                want = q_to_ticks(self.cfg, a, q[a])
                 for k, j in enumerate(JOINTS):
-                    sp = abs(goal[k] - present[a][k]) / STREAM_LEAD_S
-                    sp = int(min(MAX_STREAM_SPEED_TICKS_S, max(MIN_SPEED_TICKS_S, round(sp))))
-                    if last_speed[a][k] is None or abs(sp - last_speed[a][k]) > 0.1 * last_speed[a][k] + 2:
-                        h.bus.set_goal_speed(h.ids[j], sp)
-                        last_speed[a][k] = sp
-                h.guarded.write_stream_point_rad(tgt[a], STREAM_MAX_STEP_RAD)
+                    st = self.arms[a].bus.read_joint_state(self.arms[a].ids[j])
+                    lag[a] = max(lag[a], abs(round(st.position_deg * 4096 / 360) - want[k]))
+                    peak_load[a][k] = max(peak_load[a][k], abs(st.load_raw))
+                    hot[a] = max(hot[a], st.temperature_c)
+            except ServoError:
+                read_errors += 1
             n += 1
-            if n % 10 == 0:
-                for a in ARMS:
-                    if self.arms[a].sm.state == GripperState.LOCKED:
-                        self.arms[a].sm.hold_tick()
-                self.log({"event": "stream", "t": round(t, 2), "frames": [seg.first, seg.last],
-                          "present_ticks": present})
-            rest = STREAM_PERIOD_S - (self.clock() - tick_start)
+            if n % 25 == 0:
+                self.log({"event": "stream", "t": round(t, 2), "frames": [seg.first, seg.last]})
+            rest = STREAM_PERIOD_S - (self.clock() - now)
             if rest > 0:
                 self.sleep(rest)
-        # 3. come to rest on the segment's last frame
         end = self.frames[seg.last]
         goals = {a: q_to_ticks(self.cfg, a, end.q[a]) for a in ARMS}
-        for a in ARMS:
-            for j in JOINTS:
-                self.arms[a].bus.set_goal_speed(self.arms[a].ids[j], DEFAULT_VMAX_TICKS_S)
-        final, peak2, dt = self._wait_arrival(goals, 1.0, seg.last)
+        strict, self.abort_on_faults = self.abort_on_faults, False
+        try:
+            final, peak2, _ = self._wait_arrival(goals, SETTLE_S, seg.last)
+        finally:
+            self.abort_on_faults = strict
         self.log({"event": "segment", "frames": [seg.first, seg.last], "step": end.step,
                   "planned_s": round(seg.duration_s, 2), "took_s": round(self.clock() - t0, 2),
-                  "loops": n, "worst_path_error_ticks": worst,
+                  "loops": n, "worst_path_error_ticks": lag, "max_temp_read_c": hot,
+                  "read_errors": read_errors,
                   "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS},
                   "peak_abs_load": {a: [max(x, y) for x, y in zip(peak_load[a], peak2[a])] for a in ARMS}})
 

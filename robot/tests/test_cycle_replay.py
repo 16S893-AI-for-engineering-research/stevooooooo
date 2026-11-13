@@ -268,22 +268,85 @@ def test_fluid_simulation_never_stops_between_frames():
     assert ev == [("gripper_lock", "left"), ("gripper_lock", "right"), ("segment", None),
                   ("gripper_unlock", "left"), ("segment", None), ("gripper_lock", "left")]
     segs = [x for x in recs if x["event"] == "segment"]
-    assert all(max(x["worst_path_error_ticks"].values()) < cr.TRACK_TOL_TICKS for x in segs)
+    assert all(max(x["worst_path_error_ticks"].values()) < 40 for x in segs)
     assert all(x["took_s"] < x["planned_s"] + 1.0 for x in segs)        # no per-frame stops
 
 
-def test_fluid_obstruction_aborts():
+def test_fluid_run_never_aborts_on_readings_only_on_the_owner():
+    """Owner 2026-11-13: after the confirmed path, readings are logged, never acted on."""
+    from inchworm.servo_bus import JointState
     logging.disable(logging.WARNING)
     try:
         cfg = load_config()
         plan = _short_plan(cfg)
         lift = cr.q_to_ticks(cfg, "left", plan[1].q["left"])[1]
         start = cr.q_to_ticks(cfg, "left", plan[0].q["left"])[1]
-        with pytest.raises(cr.ReplayAborted, match="off the path|stopped short"):
-            sim.simulate(cfg, plan, stall={"left": {2: (start + lift) // 2}},
-                         segments=cr.build_segments(plan, 0.5))
+        segs = cr.build_segments(plan, 0.5)
+        clock = sim.SimClock()
+        buses = {}
+        for a in cr.ARMS:
+            buses[a] = sim.SimArmBus(f"arm_{a}", cr.q_to_ticks(cfg, a, plan[0].q[a]) + [1600], clock,
+                                     stall={2: (start + lift) // 2} if a == "left" else None)
+        hot = buses["right"].read_joint_state
+        buses["right"].read_joint_state = lambda sid: JointState(sid, hot(sid).position_deg, 0, 40, 12.2, 84, 2)
+        recs = []
+        r = cr.build_runner(cfg, plan, buses, live=False, clock=clock, sleep=clock.sleep, log=recs.append,
+                            abort_on_faults=False)
+        r.energise(); r.lock_both(); r.move_to_start(); r.run_fluid(segs)      # no exception
+        assert [x["event"] for x in recs].count("segment") == 2
+        assert any(x["event"] == "reading_warning" and "84 C" in x["what"] for x in recs)
+        stop = {"n": 0}
+
+        def flag():
+            stop["n"] += 1
+            return stop["n"] > 5
+        r2 = cr.build_runner(cfg, plan, buses, live=False, clock=clock, sleep=clock.sleep,
+                             abort_on_faults=False, should_abort=flag)
+        with pytest.raises(cr.ReplayAborted, match="stop requested"):
+            r2._stream_segment(segs[0])                                        # the owner still stops it
     finally:
         logging.disable(logging.NOTSET)
+
+
+def test_step_by_step_mode_still_aborts_on_obstruction():
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        lift = cr.q_to_ticks(cfg, "left", plan[1].q["left"])[1]
+        start = cr.q_to_ticks(cfg, "left", plan[0].q["left"])[1]
+        with pytest.raises(cr.ReplayAborted, match="stopped short"):
+            sim.simulate(cfg, plan, stall={"left": {2: (start + lift) // 2}})
+    finally:
+        logging.disable(logging.NOTSET)
+
+
+def test_preflighted_stream_uses_one_sync_write_and_never_the_gripper():
+    import struct
+    from inchworm.servo_bus import ArmServoBus, GripperWriteNotAllowed
+
+    class T:
+        def __init__(self):
+            self.out = []
+
+        def write(self, b):
+            self.out.append(bytes(b))
+
+        def read(self, n):
+            return b""
+    t = T()
+    b = ArmServoBus(t, role="arm_left", joint_id_map={n: i + 1 for i, n in enumerate((*cr.JOINTS, "gripper"))})
+    b.sync_write_goal_ticks({"shoulder_pan": 2000, "elbow_flex": 3000})
+    pkt = t.out[-1]
+    assert pkt[:3] == b"\xff\xff\xfe" and pkt[4] == 0x83 and pkt[5:7] == bytes([0x2A, 2])
+    assert pkt[7:10] == bytes([1]) + struct.pack("<H", 2000) and pkt[10:13] == bytes([3]) + struct.pack("<H", 3000)
+    assert (~sum(pkt[2:-1])) & 0xFF == pkt[-1]
+    b.sync_write_goal_ticks({"shoulder_pan": 2000}, {"shoulder_pan": 250})
+    assert t.out[-1][5:7] == bytes([0x2A, 6]) and t.out[-1][7:14] == bytes([1]) + struct.pack("<HHH", 2000, 0, 250)
+    with pytest.raises(Exception):
+        b.sync_write_goal_ticks({"shoulder_pan": 2000}, {"shoulder_pan": 0})   # 0 = full speed: refused
+    with pytest.raises(GripperWriteNotAllowed):
+        b.sync_write_goal_ticks({"gripper": 2000})
 
 
 def test_stream_point_is_pose_checked_and_must_be_near_the_present_pose():

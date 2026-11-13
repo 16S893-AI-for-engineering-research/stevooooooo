@@ -102,6 +102,18 @@ class SimArmBus:
         self.torque[sid] = True
         self.max_speed_seen[sid] = max(self.max_speed_seen[sid], self.speed[sid] or 3000)
 
+    def sync_write_goal_ticks(self, ticks_by_joint, speed_by_joint=None):
+        if "gripper" in ticks_by_joint:
+            raise PermissionError("gripper writes only through the AA-17 channel")
+        self._step()
+        for name, t in ticks_by_joint.items():
+            sid = self._joint_id_map[name]
+            self.goal[sid] = int(t)
+            if speed_by_joint is not None:
+                self.speed[sid] = int(speed_by_joint[name])
+            self.torque[sid] = True
+            self.max_speed_seen[sid] = max(self.max_speed_seen[sid], self.speed[sid] or 3000)
+
     def gripper_channel(self, token):
         from types import SimpleNamespace
 

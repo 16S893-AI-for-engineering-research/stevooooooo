@@ -98,6 +98,7 @@ _INST_PING: int = 0x01
 _INST_READ: int = 0x02
 _INST_WRITE: int = 0x03
 _INST_SYNC_READ: int = 0x82
+_INST_SYNC_WRITE: int = 0x83
 
 # Register addresses (verified against rustypot src/servo/feetech/sts3215.rs)
 _REG_MODEL_L: int = 0x03        # model number L/H (2 bytes) [3]; STS3215 = 777. Registers 0-1 are firmware major/minor (rustypot sts3215.rs). Orchestrator fix 2026-10-24: read was at 0, verified live.
@@ -1046,6 +1047,42 @@ class ArmServoBus:
                 "ticks": ticks,
             },
         )
+
+    def sync_write_goal_ticks(self, ticks_by_joint: Dict[str, int],
+                              speed_by_joint: Optional[Dict[str, int]] = None) -> None:
+        """Goal positions (raw ticks) for several ARM joints in ONE sync-write packet.
+
+        No status reply (broadcast ID), so all joints of the arm get their new goal at the
+        same instant and the bus is free again in well under a millisecond (AA-50 fluid
+        replay). With ``speed_by_joint`` the packet also sets each joint's Goal_Speed
+        (registers 42-47: position, time = 0, speed; 1..3000, never 0 = full speed), so the
+        servo travels toward the goal at the path's speed instead of stopping at each point.
+        The gripper is rejected: it is commanded only by the AA-17 state machine.
+        """
+        if _GRIPPER_JOINT_NAME in ticks_by_joint:
+            raise GripperWriteNotAllowed()
+        items = []
+        for name, t in ticks_by_joint.items():
+            sid = self._servo_id_for_joint(name)
+            t = int(t)
+            if not 0 <= t <= 4095:
+                raise ServoRangeError(sid, t, "goal ticks out of 0-4095")
+            v = None
+            if speed_by_joint is not None:
+                v = int(speed_by_joint[name])
+                if not 1 <= v <= 3000:
+                    raise ServoRangeError(sid, v, "goal speed must be 1..3000 (0 = full speed)")
+            items.append((sid, t, v))
+        if self._dry_run:
+            self._emit("info", "servo_sync_write_dry_run", {"goals": {i: (t, v) for i, t, v in items}})
+            return
+        if speed_by_joint is None:
+            params = bytes([_REG_GOAL_POSITION, 2]) + b"".join(
+                bytes([sid]) + struct.pack("<H", t) for sid, t, _ in items)
+        else:
+            params = bytes([_REG_GOAL_POSITION, 6]) + b"".join(
+                bytes([sid]) + struct.pack("<HHH", t, 0, v) for sid, t, v in items)
+        self._bus._transport.write(_build_request(0xFE, _INST_SYNC_WRITE, params))
 
     # ------------------------------------------------------------------
     # Scan (discovery helper)
