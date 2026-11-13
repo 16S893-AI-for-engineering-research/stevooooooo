@@ -421,3 +421,88 @@ def test_fold_elbow_stays_where_it_was_until_the_owner_decides_the_contact():
         pytest.skip("no planned timeline")
     fr, _ = cr.clamp_to_eeprom(cfg, cr.load_timeline(path)[:1], elbow_cap=cr.FOLD_ELBOW_CAP_TICKS)
     assert [cr.q_to_ticks(cfg, a, fr[0].q[a])[2] for a in cr.ARMS] == [3081, 3036]
+
+
+# --- AA-52 touching fold (owner delegated the choice 2026-11-13) ---------------------------
+
+def test_fold_press_values_stay_inside_the_eeprom_and_past_the_measured_contact():
+    cfg = load_config()
+    for a in cr.ARMS:
+        hi = cfg.motion_guard.__dict__[f"{a}_arm_limits"].servo_tick_limits["elbow_flex"][1]
+        assert cr.FOLD_ELBOW_CAP_TICKS[a] < cr.FOLD_CONTACT_TICKS[a] < cr.FOLD_PRESS_GOAL_TICKS[a]
+        assert cr.FOLD_PRESS_GOAL_TICKS[a] <= hi - cr.EEPROM_INSIDE_TICKS
+    assert cr.FOLD_PRESS_TORQUE_LIMIT <= 150 < cr.DEFAULT_ARM_TORQUE_LIMIT
+    f = cr.fold_press_frame(cfg, _short_plan(cfg)[0])
+    for a in cr.ARMS:
+        t = cr.q_to_ticks(cfg, a, f.q[a])
+        assert t[2] == cr.FOLD_PRESS_GOAL_TICKS[a]
+        assert t[:2] + t[3:] == [2048, 1500, 1100, 2048]       # only the elbow changes
+
+
+def _press_sim(cfg, contact):
+    """Short plan with the start/end elbow at the cap; the shoulder (stall) stops the elbow."""
+    plan = _short_plan(cfg)
+    for f in plan:
+        for a in cr.ARMS:
+            cal = getattr(cfg.motion_guard.servo_calibration, f"{a}_arm")
+            f.q[a][2] = math.radians(cr.FOLD_ELBOW_CAP_TICKS[a] * 360 / 4096 - cal.elbow_flex_zero_offset_deg)
+    stop = {a: {3: contact[a]} for a in cr.ARMS}
+    recs, tl = [], []
+    orig = sim.SimArmBus.set_torque_limit
+
+    def spy(self, sid, v):
+        if sid == 3:
+            tl.append((self.role, v))
+        orig(self, sid, v)
+    sim.SimArmBus.set_torque_limit = spy
+    logging.disable(logging.WARNING)
+    try:
+        r, buses = sim.simulate(cfg, plan, log=recs.append, segments=cr.build_segments(plan, 0.5),
+                                contact=stop, fold_press=True)
+    finally:
+        sim.SimArmBus.set_torque_limit = orig
+        logging.disable(logging.NOTSET)
+    return recs, tl, buses
+
+
+def test_fold_press_rests_on_the_contact_at_capped_torque_start_and_end():
+    cfg = load_config()
+    recs, tl, buses = _press_sim(cfg, cr.FOLD_CONTACT_TICKS)
+    presses = [x for x in recs if x["event"] == "fold_press"]
+    assert [p["where"] for p in presses] == ["start", "end"]
+    for p in presses:
+        assert p["warnings"] == []
+        for a in cr.ARMS:
+            assert abs(p[a]["short_of_contact_ticks"]) <= 1
+            assert {"load_abs_mean", "current_raw_mean", "load_abs_max", "current_raw_max"} <= set(p[a])
+    # torque: 15 % only around the press, back to normal before the cycle streams
+    for role in ("arm_left", "arm_right"):
+        seq = [v for r_, v in tl if r_ == role]
+        assert seq == [cr.DEFAULT_ARM_TORQUE_LIMIT, cr.FOLD_PRESS_TORQUE_LIMIT,
+                       cr.DEFAULT_ARM_TORQUE_LIMIT, cr.FOLD_PRESS_TORQUE_LIMIT]
+    # after leaving the contact the cycle tracks its path as without the press
+    assert all(max(x["worst_path_error_ticks"].values()) < 40 for x in recs if x["event"] == "segment")
+    assert all(max(map(abs, v)) <= cr.REACH_TOL_TICKS for x in recs if x["event"] == "fold_unpress"
+               for v in x["final_error_ticks"].values())
+    ev = [x["event"] for x in recs if x["event"] in ("fold_press", "fold_unpress", "segment")]
+    assert ev[:2] == ["fold_press", "fold_unpress"] and ev[-1] == "fold_press"
+
+
+def test_fold_press_short_of_contact_is_only_a_warning():
+    cfg = load_config()
+    short = {a: cr.FOLD_CONTACT_TICKS[a] - 30 for a in cr.ARMS}
+    recs, _, _ = _press_sim(cfg, short)                         # no exception: never aborts
+    p = [x for x in recs if x["event"] == "fold_press"][0]
+    assert len(p["warnings"]) == 2 and "short of the measured contact" in p["warnings"][0]
+
+
+def test_fold_press_move_passes_the_cell_preflight():
+    from inchworm.motion_guard import build_mesh_collision_guard
+    cfg = load_config()
+    path = pathlib.Path(__file__).parents[1] / "out" / "inchworm" / "timeline.jsonl"
+    if not path.exists():
+        pytest.skip("no planned timeline")
+    fr, _ = cr.clamp_to_eeprom(cfg, cr.load_timeline(path), elbow_cap=cr.FOLD_ELBOW_CAP_TICKS)
+    mesh = build_mesh_collision_guard(cfg, "left")
+    assert cr.fold_press_preflight(cfg, fr[0], mesh.checker, samples=5) == []
+    assert cr.fold_press_preflight(cfg, fr[-1], mesh.checker, samples=5) == []

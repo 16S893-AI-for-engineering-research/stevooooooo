@@ -113,6 +113,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help=f"fluid mode: fraction of the animation speed (0.1..{cr.MAX_TEMPO}, default {cr.DEFAULT_TEMPO})")
     ap.add_argument("--step-by-step", action="store_true",
                     help="frame-by-frame replay (each frame reached before the next) at --speed")
+    ap.add_argument("--no-fold-press", action="store_true",
+                    help="AA-52: do NOT rest the lower arms on their shoulders at the start and end")
     ap.add_argument("--skip-sim", action="store_true", help="dry-run: skip the simulated run")
     ap.add_argument("--out", type=Path, default=None)
     a = ap.parse_args(argv)
@@ -134,6 +136,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if problems:
         print("REFUSED: preflight problems:"); [print("  " + p) for p in problems[:20]]; return 3
     print(cr.summary(frames, a.speed))
+    a.fold_press = not a.no_fold_press
+    if a.fold_press:
+        from inchworm.motion_guard import build_mesh_collision_guard
+        mesh = build_mesh_collision_guard(cfg, "left")
+        chk = None if mesh is None else mesh.checker
+        problems = [p for f in (frames[0], frames[-1]) for p in cr.fold_press_preflight(cfg, f, chk)]
+        if problems:
+            print("REFUSED: fold-press preflight problems:"); [print("  " + p) for p in problems[:20]]; return 3
+        print(f"fold press (AA-52) at the start and the end: elbows only, {cr.FOLD_PRESS_SPEED_TICKS_S} ticks/s, "
+              f"torque limit {cr.FOLD_PRESS_TORQUE_LIMIT}/1000, goal {cr.FOLD_PRESS_GOAL_TICKS} "
+              f"(measured contact {cr.FOLD_CONTACT_TICKS}); preflight OK")
     a.segments = None
     if not a.step_by_step:
         a.segments = cr.build_segments(frames, a.tempo)
@@ -153,8 +166,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             logging.getLogger().setLevel(logging.ERROR)
             recs: List[dict] = []
             try:
+                contact = ({arm: {3: cr.FOLD_CONTACT_TICKS[arm]} for arm in cr.ARMS}
+                           if a.fold_press else None)     # the shoulder stops the elbow (one-sided)
                 r, buses = replay_sim.simulate(cfg, frames, vmax_ticks_s=a.speed, log=recs.append,
-                                               segments=a.segments)
+                                               segments=a.segments, fold_press=a.fold_press,
+                                               contact=contact)
             except Exception as exc:  # noqa: BLE001
                 print(f"SIMULATION FAILED: {type(exc).__name__}: {exc}"); return 4
             if a.segments is not None:
@@ -164,6 +180,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"simulation OK: {sum(x['event'] in ('frame', 'segment') for x in recs)} moves, "
                   f"{sum(x['event'].startswith('gripper') for x in recs)} gripper actions, worst error {worst} ticks, "
                   f"{buses['left'].clock():.0f} s simulated")
+            for x in recs:
+                if x["event"] == "fold_press":
+                    print(f"  fold press {x['where']}: " + "; ".join(
+                        f"{arm} elbow {x[arm]['elbow_ticks']} ({x[arm]['short_of_contact_ticks']} short)"
+                        for arm in cr.ARMS) + (f"  WARNINGS {x['warnings']}" if x["warnings"] else ""))
         print("DRY-RUN: nothing opened or moved. Add --live with the owner present.")
         return 0
     return live(cfg, frames, a)
@@ -184,6 +205,12 @@ def live(cfg, frames, a) -> int:
     def log(rec):
         rec = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **rec}
         fh.write(json.dumps(rec) + "\n"); fh.flush()
+        if rec.get("event") == "fold_press":
+            print(f"  fold press {rec['where']}: " + "; ".join(
+                f"{arm} elbow {rec[arm].get('elbow_ticks')} ({rec[arm].get('short_of_contact_ticks')} short of "
+                f"contact, load {rec[arm].get('load_abs_mean')}, current {rec[arm].get('current_raw_mean')})"
+                for arm in cr.ARMS) + (f"  WARNINGS {rec['warnings']}" if rec["warnings"] else ""), flush=True)
+            return
         if rec.get("event") == "stream":
             return
         if rec.get("event") == "segment":
@@ -253,12 +280,26 @@ def live(cfg, frames, a) -> int:
             r.lock_both()
             print("final adjustment to the start pose ...")
             r.move_to_start()
+            if a.fold_press:
+                print("fold press: resting both lower arms on their shoulders (15 % elbow torque) ...")
+                r.fold_press(frames[0], "start")
+                if input("Do BOTH lower arms rest on their shoulders now? [y/n]: ").strip().lower() == "y":
+                    obs = "y"
+                else:
+                    obs = "n"
+                log({"event": "owner_observation", "where": "start", "both_resting": obs})
+                r.fold_unpress(frames[0])
             if a.segments is None:
                 r.run()
             else:
                 print("running the cycle (fluid, no more prompts). It stops only for Ctrl-C or the stop "
                       "file, or if a gripper fails to lock; readings are logged, never acted on.")
                 r.run_fluid(a.segments)
+            if a.fold_press:
+                print("fold press at the end ...")
+                r.fold_press(frames[-1], "end")
+                obs = input("Do BOTH lower arms rest on their shoulders now? [y/n]: ").strip().lower()
+                log({"event": "owner_observation", "where": "end", "both_resting": "y" if obs == "y" else "n"})
             log({"event": "done"})
             print("\nCYCLE COMPLETE. Support both arms (they go limp when torque turns off).")
             input("Press Enter to release torque: ")

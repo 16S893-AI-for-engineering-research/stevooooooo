@@ -28,7 +28,7 @@ class SimArmBus:
     there (an obstruction).
     """
 
-    def __init__(self, role: str, start_ticks: Sequence[int], clock, limits=None, stall=None):
+    def __init__(self, role: str, start_ticks: Sequence[int], clock, limits=None, stall=None, contact=None):
         from types import SimpleNamespace
         self.role, self.clock = role, clock
         self._joint_id_map = {n: i + 1 for i, n in enumerate((*JOINTS, "gripper"))}
@@ -39,6 +39,9 @@ class SimArmBus:
         self.tlimit = {i: 1000 for i in self.pos}
         self.limits = limits or {i: (0, 4095) for i in self.pos}
         self.stall = dict(stall or {})
+        # {servo id: tick}: a one-sided stop (AA-52: the lower arm on its shoulder). It blocks
+        # only motion toward higher ticks past it; moving back off it is free.
+        self.contact = dict(contact or {})
         self.t_last = clock()
         self.dry_run = False
         self._dry_run = False
@@ -59,6 +62,8 @@ class SimArmBus:
                 a, b = sorted((self.pos[i], tgt))
                 if a <= self.stall[i] <= b:
                     tgt = self.stall[i]
+            if i in self.contact and tgt > self.contact[i]:
+                tgt = max(self.contact[i], min(self.pos[i], tgt))
             d = tgt - self.pos[i]
             self.pos[i] += max(-v * dt, min(v * dt, d))
 
@@ -152,7 +157,7 @@ class SimClock:
 
 
 def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_ticks=None,
-             stall=None, log=lambda r: None, segments=None) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
+             stall=None, log=lambda r: None, segments=None, fold_press=False, contact=None) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
     """Run the full replay sequence against simulated servos (same code as live)."""
     clock = SimClock()
     buses = {}
@@ -160,14 +165,20 @@ def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_tic
         t0 = start_ticks[a] if start_ticks else q_to_ticks(cfg, a, frames[0].q[a]) + [2516 if a == "left" else 2499]
         lim = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits
         limits = {i + 1: tuple(lim[j]) for i, j in enumerate((*JOINTS, "gripper"))}
-        buses[a] = SimArmBus(f"arm_{a}", t0, clock, limits=limits, stall=(stall or {}).get(a))
+        buses[a] = SimArmBus(f"arm_{a}", t0, clock, limits=limits, stall=(stall or {}).get(a),
+                             contact=(contact or {}).get(a))
     r = build_runner(cfg, frames, buses, live=False, vmax_ticks_s=vmax_ticks_s,
                      clock=clock, sleep=clock.sleep, log=log)
     r.energise()
     r.lock_both()
     r.move_to_start()
+    if fold_press:
+        r.fold_press(frames[0], "start")
+        r.fold_unpress(frames[0])
     if segments is None:
         r.run()
     else:
         r.run_fluid(segments)
+    if fold_press:
+        r.fold_press(frames[-1], "end")
     return r, buses

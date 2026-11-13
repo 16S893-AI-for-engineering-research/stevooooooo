@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@human'
 created_date: '2026-11-12 21:48'
-updated_date: '2026-11-13 01:51'
+updated_date: '2026-11-13 03:22'
 labels:
   - human-action
   - human-key-56aeb9883b7721f9
@@ -159,7 +159,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
   "phase": "active",
   "createdAt": "2026-11-12T21:48:39.439Z",
   "origin": "01a1d101-b8e5-7496-a5a0-f4e66bdd6498",
-  "step": 2,
+  "step": 6,
   "evidence": [
     {
       "step": 1,
@@ -184,6 +184,38 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
       "reference": "Owner-pasted terminal output of scripts/replay_cycle.py --live --allow-unverified-soft-limits (REFUSED, approach problem: right_lower_arm within 0.1 mm of right_shoulder)",
       "advanced": false,
       "at": "2026-11-12T22:39:49.703Z"
+    },
+    {
+      "step": 3,
+      "note": "Step 3 (live start, revised AA-51) recorded from the log, on the owner's instruction (\"all of these steps were finished\"). Not owner-observed and not from a pasted terminal output. I read calibration_data/replay_cycle_2026-11-12.jsonl (693 lines). The earlier refusal (right_lower_arm within 0.1 mm of right_shoulder at t=0.00) did not recur. The start event at 2026-11-13T00:23:01Z has \"approach_problems\": [] and diff_to_start_deg (left [+0.6,-2.2,+3.5,+1.0,-5.2], right [+1.1,-3.1,+3.4,+0.2,-3.3]), all within the 10 deg limit. The same measured ticks as the refused attempts, so the arms were not moved. The run went on to log gripper locks and frames, so a CONFIRM prompt must have been answered, but the CONFIRM text and the \"degrees to move\" lines are not in the log. The log shows nothing about the code change that cleared the collision flag. Not verified: the printed start-pose lines, and what was typed at CONFIRM.",
+      "type": "automated",
+      "reference": "robot/calibration_data/replay_cycle_2026-11-12.jsonl, start event 2026-11-13T00:23:01Z",
+      "advanced": true,
+      "at": "2026-11-13T03:21:31.677Z"
+    },
+    {
+      "step": 4,
+      "note": "Step 4 (CONFIRM, YES, grippers lock, move to frame 0) recorded from the log, on the owner's instruction. Not owner-observed. In replay_cycle_2026-11-12.jsonl, the run started 2026-11-13T00:23:01Z logs gripper_lock left LOCKED ticks 2026 (00:23:15Z) and right LOCKED ticks 2031 (00:23:20Z), then frame 0 at 00:23:24Z with error_ticks left [2,-3,10,2,-2] and right [4,-12,18,2,-9] (elbow errors of 10 and 18 ticks are the largest). Later runs show the same pattern (left 2026-2029, right 2029-2031). The goals are 2038/2041 (about 45 deg past open) and the lock ticks are 7-15 short; I did not check that against the script's arrival tolerance. Not in the log and not verified: that the YES prompt was answered, the CONFIRM list, the gripper opening before the turn, any noise or grinding, whether anything moved fast.",
+      "type": "automated",
+      "reference": "robot/calibration_data/replay_cycle_2026-11-12.jsonl, events 2026-11-13T00:23:15Z to 00:23:24Z",
+      "advanced": true,
+      "at": "2026-11-13T03:21:50.436Z"
+    },
+    {
+      "step": 5,
+      "note": "Step 5 (phases and regrips) recorded from the log, on the owner's instruction. Not owner-observed. The run started 2026-11-13T00:23:01Z logs frames 0 to 86 (frame 49 and 74 have no frame line; the lock events sit at those points). Left regrip: gripper_unlock left ticks 1608 (00:24:56Z), gripper_lock left LOCKED ticks 2028 (00:25:41Z). Right regrip: gripper_unlock right ticks 1589 (00:25:49Z), gripper_lock right LOCKED ticks 2031 (00:26:37Z). Frame 86 final ticks left [1973,1428,3083,1003,2060] and right [2065,1506,3029,966,2053]; the worst frame errors in this run are around 20 ticks. A second full run (start 00:51:59Z) shows the same pattern and ends in done at 00:59:48Z. No \"aborted\" event in these two runs. There is a gap of about 3.5 minutes between the right lock (00:55:32Z) and frame 75 (00:59:08Z) in the second run; the log does not say why. Other runs in the same file are different modes and abort on temperature: 'fluid tempo 0.5' (AA-50 fluid replay) with aborts \"left wrist_flex at 70 C\", \"left elbow_flex at 84 C\", \"right shoulder_lift at 76 C\", \"left shoulder_lift at 70 C\" and \"78 C\", and one \"ServoChecksumError: servo 2\" abort at 00:50:50Z. Later 'fluid' segments log max_temp_read_c values up to 150 C (left, 02:28:07Z), 128 and 109 on the left; whether these are real or bad reads is not known. These belong to other work, but they are in the same file. Not verified: smoothness, noise, contact, whether the owner pressed Enter at each prompt.",
+      "type": "automated",
+      "reference": "robot/calibration_data/replay_cycle_2026-11-12.jsonl, runs started 2026-11-13T00:23:01Z and 00:51:59Z (and aborted runs later in the file)",
+      "advanced": true,
+      "at": "2026-11-13T03:22:07.923Z"
+    },
+    {
+      "step": 6,
+      "note": "Step 6 (CYCLE COMPLETE, torque released) recorded from the log, on the owner's instruction. Not owner-observed. The first full run ends with {\"event\":\"done\"} at 2026-11-13T00:27:31Z and {\"event\":\"released\",\"errors\":{}} at 00:27:39Z. The second full run ends done at 00:59:48Z and released at 01:01:31Z, errors {} (about 1 min 43 s between done and released, which fits the owner supporting the arms before pressing Enter). Later runs also end in done then released with errors {}: 01:56:20Z/01:56:54Z, 02:28:07Z/02:28:13Z, 02:51:03Z/02:51:11Z, 02:52:32Z/02:54:54Z and 02:58:24Z/02:58:30Z. No torque-off sweep WARNING shows in the log (released errors are {} each time). Not in the log and not verified: the printed 'torque released. Log: ...' line, and that the arms went limp in the owner's hands.",
+      "type": "automated",
+      "reference": "robot/calibration_data/replay_cycle_2026-11-12.jsonl, done and released events at 00:27:31Z/00:27:39Z and 00:59:48Z/01:01:31Z",
+      "advanced": true,
+      "at": "2026-11-13T03:22:13.931Z"
     }
   ],
   "history": [

@@ -130,6 +130,31 @@ EEPROM_INSIDE_TICKS = 10   # commanded goals stay this far inside the servo's ow
 #: the elbow where the 2026-11-13 runs held it: at most these ticks (the old limit - 10).
 FOLD_ELBOW_CAP_TICKS = {"left": 3081, "right": 3036}
 
+# ---------------------------------------------------------------------------
+# AA-52 touching fold (owner delegated the choice 2026-11-13: "use your best judgement")
+# ---------------------------------------------------------------------------
+#: Hand-placed touching fold, elbow ticks measured 2026-11-13 (L 3120-3121, R 3075-3076).
+FOLD_CONTACT_TICKS = {"left": 3120, "right": 3075}
+#: Press goal = measured contact + 15 ticks (inside EEPROM Max - 10: L 3141, R 3096). The servo
+#: stalls on the shoulder before it gets there; the torque cap limits how hard it pushes.
+FOLD_PRESS_GOAL_TICKS = {"left": 3135, "right": 3090}
+FOLD_PRESS_TORQUE_LIMIT = 150      # of 1000 (15 %), only on the elbow, only while pressed
+FOLD_PRESS_SPEED_TICKS_S = 100     # ~9 deg/s
+FOLD_PRESS_SETTLE_MAX_S = 4.0      # wait at most this long for the elbow to stop
+FOLD_PRESS_STILL_S = 0.3           # "stopped" = no more than 1 tick of change for this long
+FOLD_PRESS_HOLD_S = 2.0            # then hold pressed this long and record load/current
+FOLD_PRESS_SHORT_WARN_TICKS = 20   # ending further short of the measured contact: WARNING (logged only)
+
+
+def fold_press_frame(cfg, frame: "Frame", goal: Optional[Dict[str, int]] = None) -> "Frame":
+    """``frame`` with each elbow at its press goal (ticks), every other joint unchanged."""
+    goal = goal or FOLD_PRESS_GOAL_TICKS
+    q = {a: frame.q[a].copy() for a in ARMS}
+    for a in ARMS:
+        cal = getattr(cfg.motion_guard.servo_calibration, f"{a}_arm")
+        q[a][2] = cal.elbow_flex_sign * math.radians(goal[a] * 360 / 4096 - cal.elbow_flex_zero_offset_deg)
+    return Frame(frame.index, f"{frame.step} (fold press)", q, dict(frame.locked))
+
 
 def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TICKS,
                     elbow_cap: Optional[Dict[str, int]] = None) -> Tuple[List[Frame], List[str]]:
@@ -249,6 +274,18 @@ def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, 
         if hits:
             return [f"adjustment move (t={t:.2f}): {hits[0]}"]
     return []
+
+
+def fold_press_preflight(cfg, frame: Frame, checker, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
+    """AA-52: the press move (elbows from ``frame`` to the press goal, both arms together, no
+    tube) against the soft limits, EEPROM limits and the cell mesh model. Empty = OK."""
+    press = fold_press_frame(cfg, frame)
+    problems = preflight(cfg, [frame, press], checker, samples=samples)
+    for a in ARMS:
+        hi = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits["elbow_flex"][1]
+        if FOLD_PRESS_GOAL_TICKS[a] > hi - EEPROM_INSIDE_TICKS:
+            problems.append(f"{a}: press goal {FOLD_PRESS_GOAL_TICKS[a]} past EEPROM Max - {EEPROM_INSIDE_TICKS}")
+    return problems
 
 
 def summary(frames: Sequence[Frame], vmax_ticks_s: int) -> str:
@@ -722,6 +759,103 @@ class ReplayRunner:
                   "read_errors": read_errors,
                   "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS},
                   "peak_abs_load": {a: [max(x, y) for x, y in zip(peak_load[a], peak2[a])] for a in ARMS}})
+
+    # -- AA-52 touching fold ---------------------------------------------
+    def _elbow_state(self, arm: str):
+        st = self._read_state(arm, self.arms[arm].ids["elbow_flex"])
+        return st, round(st.position_deg * 4096 / 360)
+
+    def fold_press(self, frame: Frame, where: str) -> dict:
+        """Rest each lower arm on its shoulder: the elbow alone drives slowly toward
+        :data:`FOLD_PRESS_GOAL_TICKS` at a 15 % torque limit and stalls on the shoulder.
+        The other joints keep ``frame``'s goals. Readings are logged, never acted on."""
+        press = fold_press_frame(self.cfg, frame)
+        for a in ARMS:
+            h = self.arms[a]
+            sid = h.ids["elbow_flex"]
+            h.bus.set_acceleration(sid, ARM_ACCEL)
+            h.bus.set_torque_limit(sid, FOLD_PRESS_TORQUE_LIMIT)
+            sp = [MIN_SPEED_TICKS_S] * 5
+            sp[2] = FOLD_PRESS_SPEED_TICKS_S
+            h.guarded.write_preflighted_ticks(q_to_ticks(self.cfg, a, press.q[a]), sp)
+        t0 = self.clock()
+        last = {a: None for a in ARMS}
+        still_since = {a: None for a in ARMS}
+        while True:
+            self._check_abort()
+            now = self.clock()
+            for a in ARMS:
+                try:
+                    _, t = self._elbow_state(a)
+                except Exception:  # noqa: BLE001 - a read error never stops the press
+                    continue
+                if last[a] is None or abs(t - last[a]) > 1:
+                    last[a], still_since[a] = t, now
+            if all(s is not None and now - s >= FOLD_PRESS_STILL_S for s in still_since.values()) \
+                    or now - t0 >= FOLD_PRESS_SETTLE_MAX_S:
+                break
+            self.sleep(0.02)
+        settle_s = self.clock() - t0
+        # hold pressed; record the elbow readings over the hold
+        samples = {a: [] for a in ARMS}
+        t1 = self.clock()
+        while self.clock() - t1 < FOLD_PRESS_HOLD_S:
+            self._check_abort()
+            for a in ARMS:
+                try:
+                    st, t = self._elbow_state(a)
+                except Exception:  # noqa: BLE001
+                    continue
+                samples[a].append((t, st.load_raw, st.current_raw, st.temperature_c))
+            self.sleep(0.05)
+        rec = {"event": "fold_press", "where": where, "settle_s": round(settle_s, 2),
+               "torque_limit": FOLD_PRESS_TORQUE_LIMIT, "speed_ticks_s": FOLD_PRESS_SPEED_TICKS_S,
+               "goal_ticks": dict(FOLD_PRESS_GOAL_TICKS), "contact_ticks": dict(FOLD_CONTACT_TICKS)}
+        warnings = []
+        for a in ARMS:
+            s = samples[a]
+            if not s:
+                rec[a] = {"readings": 0}
+                warnings.append(f"{a}: no elbow readings during the hold")
+                continue
+            ticks = [x[0] for x in s]
+            loads = [abs(x[1]) for x in s]
+            cur = [x[2] for x in s]
+            short = FOLD_CONTACT_TICKS[a] - ticks[-1]
+            rec[a] = {"elbow_ticks": ticks[-1], "elbow_ticks_range": [min(ticks), max(ticks)],
+                      "short_of_contact_ticks": short,
+                      "load_abs_mean": round(sum(loads) / len(loads), 1), "load_abs_max": max(loads),
+                      "current_raw_mean": round(sum(cur) / len(cur), 1), "current_raw_max": max(cur),
+                      "temp_c_max": max(x[3] for x in s), "readings": len(s)}
+            if short > FOLD_PRESS_SHORT_WARN_TICKS:
+                warnings.append(f"{a}: elbow {short} ticks short of the measured contact {FOLD_CONTACT_TICKS[a]}")
+        rec["warnings"] = warnings
+        self.log(rec)
+        return rec
+
+    def fold_unpress(self, frame: Frame) -> None:
+        """Leave the contact: goal := present elbow tick (no push), torque limit back to
+        normal, then drive the elbow back to ``frame`` (the capped fold) and wait."""
+        for a in ARMS:
+            h = self.arms[a]
+            sid = h.ids["elbow_flex"]
+            _, t = self._elbow_state(a)
+            goal = q_to_ticks(self.cfg, a, frame.q[a])
+            hold = list(goal)
+            hold[2] = t
+            h.guarded.write_preflighted_ticks(hold, [MIN_SPEED_TICKS_S] * 5)
+            h.bus.set_torque_limit(sid, self.arm_torque_limit)
+            sp = [MIN_SPEED_TICKS_S] * 5
+            sp[2] = FOLD_PRESS_SPEED_TICKS_S
+            h.guarded.write_preflighted_ticks(goal, sp)
+        goals = {a: q_to_ticks(self.cfg, a, frame.q[a]) for a in ARMS}
+        strict, self.abort_on_faults = self.abort_on_faults, False
+        try:
+            final, _, dt = self._wait_arrival(goals, 1.0, frame.index)
+        finally:
+            self.abort_on_faults = strict
+        self.log({"event": "fold_unpress", "took_s": round(dt, 2),
+                  "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS}})
 
     def hold(self):
         """Owner decision: e-stop HOLDS. Re-command present positions with torque on."""
