@@ -132,16 +132,7 @@ class TeleopCore:
 
     # -- target --------------------------------------------------------------
     def target(self, leader_ticks: Sequence[int], ref: Sequence[float]) -> tuple:
-        raw = map_unwrapped(self.mapping, leader_ticks)
-        goal, clamped = [], []
-        for k, j in enumerate(J5):
-            t = nearest_rep(raw[k], ref[k])
-            lo, hi = self.limits[j]
-            c = min(max(t, lo), hi)
-            if c != t:
-                clamped.append(j)
-            goal.append(c)
-        return goal, clamped
+        return self.target_from_follower_ticks(map_unwrapped(self.mapping, leader_ticks), ref)
 
     def start_problems(self) -> List[str]:
         present = self.follower_ticks()
@@ -188,7 +179,39 @@ class TeleopCore:
         if not self.energised:
             raise TeleopRefused("not energised")
         lt = self.leader_ticks()
-        goal, clamped = self.target(lt, self.last_goal)
+        out = self.command(map_unwrapped(self.mapping, lt))
+        out["leader"] = lt
+        return out
+
+    def target_from_follower_ticks(self, raw: Sequence[float], ref: Sequence[float]) -> tuple:
+        """Clamp follower-tick targets (any 4096 representative) to the limits, no seam jump."""
+        goal, clamped = [], []
+        for k, j in enumerate(J5):
+            t = nearest_rep(float(raw[k]), ref[k])
+            lo, hi = self.limits[j]
+            c = min(max(t, lo), hi)
+            if c != t:
+                clamped.append(j)
+            goal.append(c)
+        return goal, clamped
+
+    def gate_problems(self, raw: Sequence[float]) -> List[str]:
+        """Start gate for follower-tick targets (used by the LeRobot robot before energising)."""
+        present = self.follower_ticks()
+        goal, _ = self.target_from_follower_ticks(raw, present)
+        out = []
+        for k, j in enumerate(J5):
+            d = (goal[k] - present[k]) * DEG_PER_TICK
+            if abs(d) > self.start_max_deg:
+                out.append(f"{j}: target {d:+.1f} deg from the follower's pose (max {self.start_max_deg:g}); "
+                           "move the LEADER to match the follower")
+        return out
+
+    def command(self, raw: Sequence[float]) -> dict:
+        """Clamp, smooth and sync-write follower-tick targets for joints 1-5 (gripper never)."""
+        if not self.energised:
+            raise TeleopRefused("not energised")
+        goal, clamped = self.target_from_follower_ticks(raw, self.last_goal)
         for j in clamped:
             self.clamps[j] += 1
         goal = self._smooth(goal)            # filtered values stay inside the clamped interval
@@ -204,7 +227,7 @@ class TeleopCore:
             self.est[k] += max(-v * self.period_s, min(v * self.period_s, d))
         self.follower_bus.sync_write_goal_ticks(ticks, speeds)
         self.last_goal = goal
-        return {"leader": lt, "goal": [ticks[j] for j in J5], "clamped": clamped}
+        return {"goal": [ticks[j] for j in J5], "clamped": clamped}
 
 
 def eeprom_limits(read_bytes, inside: int = EEPROM_INSIDE_TICKS) -> Dict[str, tuple]:
@@ -226,6 +249,36 @@ def intersect(a: Dict[str, tuple], b: Dict[str, tuple]) -> Dict[str, tuple]:
             raise TeleopRefused(f"{j}: soft and EEPROM limits do not overlap ({a[j]} vs {b[j]})")
         out[j] = (lo, hi)
     return out
+
+
+def follower_preflight(cfg, follower: str, read_bytes) -> Dict[str, tuple]:
+    """Read-only follower checks before teleop; returns the clamp limits (ticks).
+
+    Refuses (``TeleopRefused``, ``.code`` 4 or 5) if any servo 1-6 has torque ON, if a drive
+    register of joints 1-5 reads 0, or if the limits do not overlap. Limits = soft limits
+    ∩ live EEPROM (10 ticks inside) ∩ hardware.yaml servo_tick_limits (10 ticks inside).
+    """
+    from inchworm.servo_checks import drive_config_faults
+    on = [s for s in range(1, 7) if read_bytes(s, REG_TORQUE_ENABLE, 1)[0]]
+    if on:
+        e = TeleopRefused(f"arm_{follower}: torque is ON on servos {on}; switch it off first"); e.code = 4
+        raise e
+    bad = [f"servo {s}: {f}" for s in range(1, 6) for f in drive_config_faults(read_bytes, s)
+           if not f.startswith("torque_limit")]
+    if bad:
+        e = TeleopRefused(f"arm_{follower} drive config: {bad}"); e.code = 5
+        raise e
+    yaml_ticks = getattr(cfg.motion_guard, f"{follower}_arm_limits").servo_tick_limits or {}
+    missing = [j for j in J5 if j not in yaml_ticks]
+    if missing:
+        e = TeleopRefused(f"hardware.yaml servo_tick_limits missing for {missing}"); e.code = 4
+        raise e
+    yaml_lim = {j: (yaml_ticks[j][0] + EEPROM_INSIDE_TICKS, yaml_ticks[j][1] - EEPROM_INSIDE_TICKS) for j in J5}
+    try:
+        return intersect(intersect(soft_limit_ticks(cfg, follower), eeprom_limits(read_bytes)), yaml_lim)
+    except TeleopRefused as e:
+        e.code = 4
+        raise
 
 
 def run_loop(core: TeleopCore, *, hz: float, should_stop: Callable[[], bool],

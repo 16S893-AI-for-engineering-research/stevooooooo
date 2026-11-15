@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 05:03'
+updated_date: '2026-11-15 06:06'
 labels:
   - hardware
 dependencies:
@@ -36,6 +36,12 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split out of step() so send_action reuses clamp/no-seam/Goal_Speed. 2. robot/lerobot_plugins: dist lerobot_robot_inchworm registering robot 'inchworm_follower' (joints 1-5 deg = ticks*360/4096, wrist cam via arbiter, same preflight/limits/start gate as teleop_live, HOLD then release on disconnect, gripper never written, optional tube_support=locked_arm check of the other arm read-only) and teleoperator 'inchworm_leader' (read-only leader + leader map). 3. scripts/lerobot_calibration_from_eeprom.py (read-only). 4. Tests on simulated servos in lerobot_env/tests; main suite passes. Live use needs a supervised run.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -71,4 +77,11 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15 04:31-04:40Z owner tuning runs (6 sessions, all Ctrl-C hold then release; log teleop_live_2026-11-14.jsonl): speed 150 x smooth 0.35 (x3), 250 x 0.35, 250 x 1.0, 250 x 0.2. Owner: best with no smoother and speed 250. Defaults changed: DEFAULT_SPEED_TICKS_S 250 (cap; distance-based Goal_Speed below it), DEFAULT_SMOOTH_ALPHA 1.0 (off; deadband inactive at 1.0 since the filter passes through). Accel 100 while following kept.
 
 2026-11-15 owner: teleop 'only seems to move one joint at a time'. Log shows it: with a fast leader move each lagging joint ran at the 250 cap independently, so short moves finished first (e.g. wrist_flex lag up to 1223 ticks while elbow finished). Fix written and tested but NOT run live, parked on branch aa-44-coordinated-speed (commit c653de7, pushed): Goal_Speed scaled per joint by its share of the largest remaining distance so all joints arrive together; new test fails on main and passes on the branch. Owner: good enough for now; may come back to it.
+
+2026-11-15 LeRobot plugins, PARTIAL (session paused for context):
+- Done + tested (main suite passes): teleop_live.TeleopCore split: command(raw follower ticks) / target_from_follower_ticks / gate_problems (step() = leader read + command, unchanged behaviour). teleop_live.follower_preflight(cfg, follower, read_bytes) = torque-off + drive-register + soft∩EEPROM∩yaml limit checks, used by scripts/teleop_live.py (same refusals/exit codes). drive_config_faults moved to src/inchworm/servo_checks.py (gripper_lock_probe re-exports it).
+- lerobot_env: added the lerobot[dataset] extra (pyproject + uv.lock; datasets was missing, so lerobot-record could not run). torchcodec fails to load and LeRobot falls back to pyav (works).
+- MEASURED: LeRobot 0.6.1 treats an (H,W,1) camera as a DEPTH map, and the image writer REJECTS uint8 single-channel frames ('Unsupported single-channel image dtype: uint8'), so recording with the AA-22 adapter's (H,W,1) mono shape fails. An (H,W,3) grey frame round-trips (mean abs err 1.8/255 through AV1 video). Plan: the plugin sends grey copied into 3 channels (camera_channels=3). Ask the owner if a different choice is wanted.
+- Started (not installed, not tested): robot/lerobot_plugins/lerobot_robot_inchworm/ (pyproject, config_inchworm.py with InchwormFollowerConfig 'inchworm_follower' and InchwormLeaderConfig 'inchworm_leader').
+- TODO next: inchworm_follower.py (connect = follower_preflight + start gate on the first leader action + YES confirm + energise; send_action deg->ticks via TeleopCore.command; get_observation = follower ticks->deg + wrist cam via CameraArbiter/open_capture/grab_valid as 3-channel grey; disconnect = HOLD, operator Enter, then torque-off joints 1-5; gripper never written; tube_support no_tube|locked_arm read-only check of the other gripper band); inchworm_leader.py (read-only leader, leader map -> follower deg); 'uv add --editable ../lerobot_plugins/lerobot_robot_inchworm' in lerobot_env; tests in lerobot_env/tests on simulated servos (scripts/replay_sim.SimArmBus); scripts/lerobot_calibration_from_eeprom.py (read-only; only needed if LeRobot's own so101 classes are ever used, since the plugin does not use LeRobot's Feetech bus).
 <!-- SECTION:NOTES:END -->

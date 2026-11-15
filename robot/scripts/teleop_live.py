@@ -56,7 +56,6 @@ def main(argv=None) -> int:
     from inchworm.backends import live_backend
     from inchworm.config import load_config
     from inchworm.servo_bus import ArmServoBus, _ServoBus
-    from gripper_lock_probe import drive_config_faults
 
     cfg = load_config()
     if a.live:
@@ -90,21 +89,10 @@ def main(argv=None) -> int:
     lraw, fraw = _ServoBus(tlead), fbus._bus
     rc = 0
     try:
-        on = [s for s in range(1, 7) if fraw.read_bytes(s, tl.REG_TORQUE_ENABLE, 1)[0]]
-        if on:
-            print(f"REFUSED: {role}: torque is ON on servos {on}; switch it off first"); return 4
-        bad = [f"servo {s}: {f}" for s in range(1, 6) for f in drive_config_faults(fraw.read_bytes, s)
-               if not f.startswith("torque_limit")]
-        if bad:
-            print(f"REFUSED: {role} drive config: {bad}"); return 5
         try:
-            yaml_ticks = getattr(cfg.motion_guard, f"{a.follower}_arm_limits").servo_tick_limits or {}
-            yaml_lim = {j: (yaml_ticks[j][0] + tl.EEPROM_INSIDE_TICKS, yaml_ticks[j][1] - tl.EEPROM_INSIDE_TICKS)
-                        for j in tl.J5}   # hardware.yaml tick limits (tighter than EEPROM on pan/lift)
-            limits = tl.intersect(tl.intersect(tl.soft_limit_ticks(cfg, a.follower), tl.eeprom_limits(fraw.read_bytes)),
-                                  yaml_lim)
+            limits = tl.follower_preflight(cfg, a.follower, fraw.read_bytes)
         except tl.TeleopRefused as e:
-            print(f"REFUSED: {e}"); return 4
+            print(f"REFUSED: {e}"); return getattr(e, "code", 4)
         core = tl.TeleopCore(leader_read=lraw.read_bytes_tolerating, follower_bus=fbus, mapping=mapping,
                              limits=limits, speed_ticks_s=a.speed, log=log,
                              smooth_alpha=a.smooth if a.smooth is not None else tl.DEFAULT_SMOOTH_ALPHA)
