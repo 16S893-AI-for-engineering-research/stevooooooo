@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 21:53'
+updated_date: '2026-11-15 22:03'
 labels: []
 milestone: m-3
 dependencies:
@@ -159,6 +159,9 @@ Physical state at this note: after the with-tube cycle, the right arm holds the 
 2026-11-15 owner-approved reset helper: robot/reset_start.sh (show state, typed YES that the tube is out of the grippers or hand-held, hold_tube release --gripper-off on both arms (each asks its own YES), open any non-open gripper via gripper_ends --action open --no-tube, then loop: owner folds by hand + read-only scripts/start_check.py until READY). start_check.py is read-only (torque, gripper band, each joint within 10 deg of clamped frame 0); tests/test_start_check.py. reset_start.sh itself not yet run live. A start_check run at ~21:10Z read READY (all 12 torque 0, both grippers open, left/right within 10 deg).
 
 2026-11-15 21:37Z FIRST live record_handoff session (owner): cycle to frame 42 OK (21:36:59Z), connect + adopt OK with camera, episode 0 started 21:38:26, catch-up done in 7 s (122 mesh checks, 5.5 ms mean), followed ~47 s with 0 collision holds / 0 clamps. Owner: pressing q could not stop the recording (by design q was idle-only; s/d were the episode keys). Ended with Ctrl-C: hold, then released joints 1-5 of both arms; dataset insert_left_20261115T213741Z has 0 episodes (unfinished episode discarded). No automatic return ran. FIX: q while recording now = save the episode and quit (no return; arms hold, then the release prompt); help + on-screen prompt updated; test added. Also: start_check.py gets --live (read-only; dry-run without it, as the script smoke tests require); reset_start.sh uses --live. Main 1860 passed, plugin 45 passed.
+
+2026-11-15 21:56-22:02Z FIRST SUCCESSFUL live rapid-fire session (owner): reset_start (both grippers torque off; right still read locked 2036 but cycle started with it open 1557, i.e. it was opened in between), cycle to frame 42 OK (worst path 33/30 then 16/5 ticks), record_handoff with camera: 2 episodes SAVED (583 + 1060 frames, 37 s + 68 s), datasets/insert_left_20261115T215810Z (2 episodes, 1643 frames, wrist video 4 MB). Both automatic returns ran clean: ep0 left straight out 50 mm (worst track 19 ticks) + joint line (18); ep1 out 43 mm (stop-height cap) (16) + line (13). Right arm drift < 10 ticks both times, so no right leg was needed. 0 collision holds, 0 clamps all session; ended idle with q, released joints 1-5 of both arms.
+OBSERVATION (data quality, to raise with the owner): episode 1 catch-up lasted 25 s (1011 mesh checks): the leader kept moving faster than 5 deg/s, so the follower stayed rate-limited and the recorded ACTION (leader) differed from what the arm did for that time. Options: move the leader to the follower before r (owner's plan), a faster catch-up (max 10 deg/s), or start recording only after catch-up. Also the 3 s settle wait ran out on the first retract (final error 13 > 10 ticks): harmless, adds ~3 s per return.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
