@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 20:00'
+updated_date: '2026-11-15 20:12'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 19:50Z. **Demo-start handoff WITH tube: cycle to frame 42 OK live** (19:31Z, after one aborted attempt on servo checksum errors that a plain rerun cleared). Handoff teleop with the tube not yet confirmed. **Next: build `record_handoff.py`** to the owner's spec in AA-23 notes (r/s/d/q keys, insertion demos, automatic straight retract + return of BOTH arms), after confirming open points (a)-(d) there. Suites pass.
+**Last verified:** 2026-11-15 19:50Z. **Demo-start handoff WITH tube: cycle to frame 42 OK live** (19:31Z, after one aborted attempt on servo checksum errors that a plain rerun cleared). Handoff teleop with the tube OK live 19:34Z (catch-up 3 s, 0 collision holds, 0 clamps). **Next: build `record_handoff.py`** to the owner's spec in AA-23 notes (r/s/d/q keys, insertion demos, automatic straight retract + return of BOTH arms), after confirming open points (a)-(d) there. Suites pass.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -35,7 +35,8 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
   - **2026-11-15 18:30-18:38Z no-tube LIVE rehearsal OK** (AA-23 notes): stop worst path error 17/3 ticks; hold after exit measured (<= 6 ticks drift); catch-up 2 s, mesh check mean 8.9 ms; release of both arms OK. lerobot_env now installs `inchworm-robot[model]` (fcl was missing; the gate refused safely).
   - Start-up gotchas: every servo incl. both grippers must be torque OFF before replay_cycle (`hold_tube.py release --gripper-off`); each joint within 10 deg of the fold start pose (place by hand).
   - **2026-11-15 WITH tube:** 19:28Z abort ~4 s after YES on ServoChecksumError (servo 2 0x7B->0xFB, then right servo 5 on the hold; single-bit-like; 2nd ever, first 2026-11-12, also servo 2), nothing moved, released. 19:31Z rerun OK: both grippers locked on the keys (L 2027, R 2029), carry worst path error 36/34 ticks, left unlocked, stop at frame 42 (present within 13 ticks). If checksum aborts recur, the owner chose rerun; offered options: check cabling/power, or a bounded read retry (needs owner approval).
-  - **Next:** `bash robot/lerobot_env/teleop_handoff.sh` with the tube (owner-run), then build `record_handoff.py` (spec + open points in AA-23 notes, 2026-11-15 'OWNER SPEC').
+  - 19:34Z `teleop_handoff.sh` WITH tube OK (see AA-23 notes).
+  - **Next:** build `record_handoff.py` (spec + open points in AA-23 notes, 2026-11-15 'OWNER SPEC').
 
 ### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware
 - `robot/lerobot_plugins/lerobot_robot_inchworm/` (robot `inchworm_follower`, teleoperator `inchworm_leader`) is installed editable in `robot/lerobot_env`. It does NOT use LeRobot's Feetech bus, so it never writes servo memory and no LeRobot calibration file is needed.

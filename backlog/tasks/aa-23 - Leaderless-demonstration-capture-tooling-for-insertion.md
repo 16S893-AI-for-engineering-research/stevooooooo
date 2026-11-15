@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 20:00'
+updated_date: '2026-11-15 20:12'
 labels: []
 milestone: m-3
 dependencies:
@@ -143,6 +143,8 @@ Open points to confirm with the owner before building:
 (c) frames 48/49 (inserted) pass the mesh gate in the model, but real near-key poses could be flagged and held during demos; watch the collision_hold events on the first runs.
 (d) return speed proposal 10 deg/s; first live return owner-supervised (dry-run rule).
 Physical state at this note: after the with-tube cycle, the right arm holds the tube alone (both arms torque on) unless the owner has since run teleop_handoff.sh and released.
+
+2026-11-15 19:34Z WITH-tube handoff teleop OK (owner-run teleop_handoff.sh): connect checks passed (right gripper 2036 ticks = locked band, both arms on stop pose: left read [1973,2198,2196,1172,2060]), adopted without torque cut, catch-up done in 3 s (104 mesh checks, mean 10.9 ms), followed the leader ~2 min with 0 collision holds and 0 clamps, released joints 1-5 of both arms, right gripper left locked. Demo-start handoff with the tube is now working end to end.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
