@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 15:57'
+updated_date: '2026-11-15 16:05'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 (later). AA-44: LeRobot plugins WRITTEN and tested on simulated servos, including LeRobot's real record(); NOT run on hardware. **Next: supervised `lerobot-teleoperate` on hardware, see 'In flight: LeRobot plugins' below (fresh session).** Suites pass (1823 + lerobot_env 30).
+**Last verified:** 2026-11-15 16:05Z. AA-44: first live `lerobot-teleoperate` with the plugin WORKED (owner supervised, camera off, no tube; `robot/lerobot_env/teleop_left.sh`). **Next: same with the wrist camera, then a local `lerobot-record` without the tube (see 'In flight: LeRobot plugins').**
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -31,7 +31,8 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
   - Stop file `robot/out/STOP_TELEOP` = Ctrl-C. Disconnect = HOLD, Enter, torque off joints 1-5. The gripper is never in action or observation.
   - Wrist cam via the arbiter: grey copied to 3 channels (LeRobot 0.6.1 rejects (H,W,1) uint8; tell the owner). Log `calibration_data/teleop_lerobot_<date>.jsonl`.
 - Tests: `cd robot/lerobot_env && uv run pytest tests/` (18 plugin tests incl. LeRobot's teleop_loop and real record() to a local video dataset).
-- **Next (owner supervising, dry/read-only first):** from `robot/lerobot_env`, run with the cell as for teleop_live (no tube, other arm torque-off):
+- **2026-11-15 16:03Z live run OK** (owner: 'it worked'; log `calibration_data/teleop_lerobot_2026-11-15.jsonl`, hold then release, no errors). Launch with `bash robot/lerobot_env/teleop_left.sh` (pasted multi-line commands broke; extra flags pass through, e.g. `--robot.camera=true`).
+- **Next:** camera run, then `lerobot-record` no_tube, then locked_arm (no tool yet locks and holds the right arm during recording; build it first). Original command, for reference: from `robot/lerobot_env`, run with the cell as for teleop_live (no tube, other arm torque-off):
   `uv run lerobot-teleoperate --robot.type=inchworm_follower --robot.id=left --robot.camera=false --robot.tube_support=no_tube --robot.no_collision_check="owner 2026-11-13: first teleop without mesh check" --robot.allow_unverified_soft_limits="owner <date>: <reason>" --teleop.type=inchworm_leader --teleop.id=leader --fps=30`
   Then with the camera, then `lerobot-record ... --dataset.push_to_hub=false --dataset.repo_id=local/<name> --dataset.single_task="..."` with the right arm LOCKED (`--robot.tube_support=locked_arm`; needs `--robot.follower=left`).
 - Not checked: the read-only `scripts/teleop_live.py --check` start gate is the quickest pre-check; LeRobot's own loop calls get_observation before the first action, so a refused start gate raises after connect (nothing energised).

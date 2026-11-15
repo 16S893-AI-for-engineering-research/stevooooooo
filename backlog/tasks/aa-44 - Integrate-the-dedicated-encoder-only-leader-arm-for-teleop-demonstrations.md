@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 15:57'
+updated_date: '2026-11-15 16:05'
 labels:
   - hardware
 dependencies:
@@ -93,4 +93,6 @@ LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split ou
 - CLI check (no hardware): lerobot-teleoperate --robot.type=inchworm_follower --teleop.type=inchworm_leader without flags -> REFUSED listing the three missing statements.
 - Calibration file from EEPROM NOT written: not needed (the plugin never uses LeRobot's Feetech bus or calibration).
 - Next: supervised lerobot-teleoperate on hardware (no_tube, camera=false first), then lerobot-record local with right arm LOCKED (tube_support=locked_arm).
+
+2026-11-15 16:03-16:04Z FIRST LIVE lerobot-teleoperate (owner supervised, robot/lerobot_env/teleop_left.sh: left follower, camera off, no_tube). Owner: 'it worked'. Log calibration_data/teleop_lerobot_2026-11-15.jsonl: connect -> energised (start gate passed) -> 51 s following -> hold (no errors) -> released. Clamps: shoulder_lift 601 and wrist_flex 486 steps at the limit (as in the teleop_live runs). Next: same with the wrist camera, then lerobot-record (local) — first no_tube, then with the right arm LOCKED (needs a way to lock+hold the right arm during recording; not built yet).
 <!-- SECTION:NOTES:END -->
