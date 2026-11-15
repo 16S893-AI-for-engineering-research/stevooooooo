@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 18:16'
+updated_date: '2026-11-15 18:39'
 labels: []
 milestone: m-3
 dependencies:
@@ -119,6 +119,13 @@ Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms
 - Next (owner present): 1) dry-run printout review; 2) first live step WITHOUT the tube: replay_cycle.py --stop-after-frame 42 --live ..., check both arms keep holding after exit (read-only hold_tube.py status --arm left/right), then a handoff teleop run with TUBE=... (needs a launcher flag set: --robot.tube_support=handoff, no no_collision_check); 3) then with the tube (--tube-in-grippers).
 
 2026-11-15 owner decision: do not collision-check the DexArm on the demo-start path; it will be out of the way (prompt text updated). Added robot/lerobot_env/teleop_handoff.sh. No-tube dry-run of --stop-after-frame 42 re-run: preflight 0, fluid 0, sim OK, both arms holding.
+
+2026-11-15 FIRST LIVE no-tube demo-start rehearsal (owner present): OK.
+- 18:28 first attempt refused (left shoulder_lift +10.3 deg to start; owner placed the arm by hand). Earlier refusal: right gripper torque left on by hold_tube release without --gripper-off (released with --gripper-off).
+- 18:30 replay_cycle.py --stop-after-frame 42 --live: frames 0..42 fluid, worst path error 17 ticks (left) / 3 (right), handoff_stop, state written; script exited, both arms holding.
+- Found: lerobot_env lacked python-fcl -> handoff refused safely (mesh model not loaded). Fixed: lerobot_env depends on inchworm-robot[model].
+- 18:37 teleop_handoff.sh: connect checks passed ~6.5 min after the stop: left [1973,2198,2196,1170,2060] vs stop present [1973,2192,2197,1170,2060] (max drift 6 ticks); right [2064,1727,1944,1862,2054] vs [2064,1728,1944,1862,2054] (1 tick); right gripper 2036 (locked band). The servos DO hold after the script exits (measured, no tube load). handoff_adopted, catch-up done in ~2 s (84 mesh checks, mean 8.9 ms), followed the leader ~36 s, no collision_hold, no clamps; hold -> released, joints 1-5 of both arms off, grippers untouched. Owner: 'it worked'. Logs: calibration_data/replay_cycle_2026-11-15.jsonl, teleop_lerobot_2026-11-15.jsonl.
+- Next: the same with the tube (--tube-in-grippers), owner present.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
