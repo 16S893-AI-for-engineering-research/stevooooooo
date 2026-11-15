@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 17:15'
+updated_date: '2026-11-15 18:06'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 17:20Z. AA-44: live `lerobot-teleoperate` works (with camera, 30 Hz). **Owner decided the demo start (see 'Owner decisions 2026-11-15: demo start' below); both points confirmed; next: build the cycle stop (`--stop-after-frame 42`) + plugin handoff mode (fresh session).** `hold_tube.py` is NOT the route for demos (it holds an arm where it is; do not run `lock` on the folded right arm). Suites pass (1835 + 31).
+**Last verified:** 2026-11-15 18:00Z. **Demo-start handoff BUILT + sim-tested, NOT run on hardware** (see 'Owner decisions 2026-11-15: demo start' below and AA-23 notes). Next: owner reviews the dry-run, then the first live step WITHOUT the tube. `hold_tube.py` is NOT the route for demos (do not run `lock` on the folded right arm). Suites pass (~1847 + 40).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -28,7 +28,11 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - Route A: the real cycle (`replay_cycle.py`) carries the tube to the left-regrip handoff and STOPS; right arm extended and LOCKED on the tube (pan 0, lift ~-69, elbow ~-8, wrist_flex ~-11, roll 0 deg; tube ~170 mm up). Tube available; attachment point = simulation.
 - The left arm starts where the LEADER is: slow catch-up (~5 deg/s proposed) of the powered left arm to the leader, replacing the 10 deg start gate on this path, with the mesh collision check ON (tube where the cycle left it).
 - CONFIRMED by the owner 2026-11-15: stop frame 42; end of session = support tube + right arm, joints of both arms off, right gripper stays LOCKED (re-lock / finish the cycle = separate task).
-- Build (not started): `--stop-after-frame N` leaving both arms holding; plugin handoff mode (no torque cut; refuses unless right arm at regrip pose + LOCKED); sim tests + dry-run; first live step WITHOUT the tube to measure that servos hold after the script exits (assumed, unmeasured).
+- **BUILT 2026-11-15 (sim-tested, dry-run OK, NOT live):**
+  - `cd robot && uv run python scripts/replay_cycle.py --stop-after-frame 42 [--tube-in-grippers]` (add `--live --allow-unverified-soft-limits "..."`) plays frames 0..42 fluidly and stops. Both arms stay holding after exit. It writes `robot/out/handoff_state.json`. `--tube-in-grippers` models the tube in every preflight, skips the fold press, and never switches a gripper off.
+  - The LeRobot follower `--robot.tube_support=handoff` (WITHOUT `--robot.no_collision_check`) uses `inchworm.handoff`. It has no torque cut. It refuses unless both arms hold at the stop pose (+-34 ticks, UNVERIFIED placeholder), the right gripper is in its locked band and the left is not. Catch-up runs at `--robot.catchup_deg_s` (5), with a mesh check per goal (tube where the cycle left it; ~3 ms). A hit = hold. At the end, joints 1-5 of BOTH arms go off and the grippers are untouched. There is no launcher script yet (`teleop_left.sh` hard-codes no_collision_check; pass args or add `teleop_handoff.sh`).
+  - **Ask the owner:** with the tube modelled, the DexArm head in its MODEL pose intersects the tube at the fold. The tube preflight checks SO-101 pairs only, and the YES prompt asks the owner to confirm the DexArm head is clear.
+  - **Next (owner present):** (1) the dry-run above; (2) live WITHOUT the tube, then `hold_tube.py status --arm left|right --live` to confirm both arms still hold after exit; then one handoff teleop run (no tube); (3) then with the tube.
 
 ### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware
 - `robot/lerobot_plugins/lerobot_robot_inchworm/` (robot `inchworm_follower`, teleoperator `inchworm_leader`) is installed editable in `robot/lerobot_env`. It does NOT use LeRobot's Feetech bus, so it never writes servo memory and no LeRobot calibration file is needed.

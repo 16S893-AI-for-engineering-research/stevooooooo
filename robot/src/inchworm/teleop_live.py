@@ -160,6 +160,20 @@ class TeleopCore:
         self.est = list(self.last_goal)           # estimated servo position (for Goal_Speed)
         self.energised = True
 
+    def adopt_holding(self, torque_limit: int = DEFAULT_TORQUE_LIMIT) -> None:
+        """Take over an arm that is ALREADY holding (torque on), without a torque cut or a
+        goal write (AA-23 demo start: the cycle replay left it holding). Only the drive
+        profile registers are written; the servo keeps its present goal until command()."""
+        b = self.follower_bus
+        for s in range(1, 6):
+            b.set_goal_speed(s, MIN_SPEED_TICKS_S)
+            b.set_acceleration(s, STREAM_ACCEL)
+            b.set_torque_limit(s, torque_limit)
+        self.last_goal = [float(t) for t in self.follower_ticks()]
+        self.filtered = list(self.last_goal)
+        self.est = list(self.last_goal)
+        self.energised = True
+
     def _smooth(self, goal: List[float]) -> List[float]:
         """Deadband + exponential filter on the (clamped, unwrapped) goal."""
         if self.filtered is None:
@@ -251,15 +265,16 @@ def intersect(a: Dict[str, tuple], b: Dict[str, tuple]) -> Dict[str, tuple]:
     return out
 
 
-def follower_preflight(cfg, follower: str, read_bytes) -> Dict[str, tuple]:
+def follower_preflight(cfg, follower: str, read_bytes, require_torque_off: bool = True) -> Dict[str, tuple]:
     """Read-only follower checks before teleop; returns the clamp limits (ticks).
 
-    Refuses (``TeleopRefused``, ``.code`` 4 or 5) if any servo 1-6 has torque ON, if a drive
+    Refuses (``TeleopRefused``, ``.code`` 4 or 5) if any servo 1-6 has torque ON (unless
+    ``require_torque_off`` is False: the AA-23 handoff takes over a holding arm), if a drive
     register of joints 1-5 reads 0, or if the limits do not overlap. Limits = soft limits
     ∩ live EEPROM (10 ticks inside) ∩ hardware.yaml servo_tick_limits (10 ticks inside).
     """
     from inchworm.servo_checks import drive_config_faults
-    on = [s for s in range(1, 7) if read_bytes(s, REG_TORQUE_ENABLE, 1)[0]]
+    on = [s for s in range(1, 7) if read_bytes(s, REG_TORQUE_ENABLE, 1)[0]] if require_torque_off else []
     if on:
         e = TeleopRefused(f"arm_{follower}: torque is ON on servos {on}; switch it off first"); e.code = 4
         raise e

@@ -23,9 +23,16 @@ class InchwormFollowerConfig(RobotConfig):
     allow_unverified_soft_limits: str = ""
     #: Owner reason for running without the mesh collision check (logged). Required.
     no_collision_check: str = ""
-    #: "no_tube" (operator states the cell has no tube) or "locked_arm" (the other arm holds the
-    #: tube: its gripper reads inside the locked band with torque on, checked read-only).
+    #: "no_tube" (operator states the cell has no tube), "locked_arm" (the other arm holds the
+    #: tube: its gripper reads inside the locked band with torque on, checked read-only) or
+    #: "handoff" (the cycle replay stopped and left BOTH arms holding; mesh check ON, see
+    #: inchworm.handoff).
     tube_support: str = ""
+    #: tube_support=handoff (AA-23 demo start, owner 2026-11-15): handoff state written by
+    #: ``scripts/replay_cycle.py --stop-after-frame N``; empty = robot/out/handoff_state.json.
+    handoff_state: str = ""
+    #: handoff: catch-up speed from the stop pose to the leader (deg/s per joint; max 10).
+    catchup_deg_s: float = 5.0
     speed_ticks_s: int = 250
     smooth_alpha: float = 1.0
     #: Wrist camera through the AA-6 arbiter. False = joints only (e.g. a first teleoperate run).

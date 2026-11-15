@@ -349,3 +349,157 @@ def test_real_camera_path_opens_v4l2_only_under_the_arbiter_lock(monkeypatch):
     monkeypatch.setenv(be.BACKEND_ENV_VAR, "mock")
     with pytest.raises(be.BackendError):
         fmod.camera_backend(CFG)
+
+
+# ---------------------------------------------------------------------------
+# tube_support=handoff (AA-23 demo start, owner 2026-11-15)
+# ---------------------------------------------------------------------------
+from inchworm import handoff as ho  # noqa: E402
+
+OTHER_TICKS = [2063, 1730, 1941, 1865, 2055]       # right arm at its regrip pose (timeline frame 42)
+OPEN_GRIP = 1558                                   # left gripper open
+
+
+class HandoffHW(FakeHW):
+    """Both arms holding: the follower torque ON at F_TICKS, the other arm simulated too."""
+
+    def __init__(self, clock, other_grip=2038, follower_grip=OPEN_GRIP, other_torque=True):
+        super().__init__(clock=clock)
+        self.bus.pos[6] = float(follower_grip)
+        for s in range(1, 6):
+            self.bus.set_torque_enable(s, True)
+        self.other_bus = sim.SimArmBus("arm_right", OTHER_TICKS + [other_grip], clock)
+        for s in range(1, 7):
+            if other_torque or s == 6:
+                self.other_bus.set_torque_enable(s, True)
+        self.other = self.other_bus._read_bytes
+
+    def other_arm_bus(self, other):
+        assert other == "right"
+        return self.other_bus._read_bytes, self.other_bus._write_bytes, lambda: None
+
+
+class Gate:
+    """Mesh-gate stand-in: contact when shoulder_lift goes above ``hit_above`` ticks."""
+
+    def __init__(self, hit_above=None):
+        self.hit_above, self.checks, self.ms_total, self.poses = hit_above, 0, 0.0, []
+
+    def pose_problem(self, ticks):
+        self.checks += 1
+        self.poses.append(list(ticks))
+        if self.hit_above is not None and ticks[1] > self.hit_above:
+            return "mesh collision: left_wrist vs tube_1"
+        return None
+
+    def step_problem(self, a, b):
+        return self.pose_problem(b)
+
+
+def _handoff_robot(tmp_path, monkeypatch, hw, gate=None, state_kw=None, **kw):
+    st = dict(stop_frame=42, step="left regrip near point", timeline_digest="x", tube_in_grippers=True,
+              goal_ticks={"left": F_TICKS, "right": OTHER_TICKS},
+              present_ticks={"left": F_TICKS, "right": OTHER_TICKS},
+              gripper_ticks={"left": OPEN_GRIP, "right": 2038}, locked={"left": False, "right": True},
+              q_rad={"left": [0.0] * 5, "right": [0.0] * 5}, tube_pose=np.eye(4))
+    st.update(state_kw or {})
+    ho.write_state(tmp_path / "handoff.json", **st)
+    r, _ = _robot(tmp_path, monkeypatch, hw=hw, tube_support="handoff", no_collision_check="",
+                  handoff_state=str(tmp_path / "handoff.json"), **kw)
+    g = gate or Gate()
+    r._make_gate = lambda *a: g
+    return r, g
+
+
+def test_handoff_refuses_the_no_collision_check_flag(tmp_path, monkeypatch):
+    r, _ = _robot(tmp_path, monkeypatch, tube_support="handoff", no_collision_check="x")
+    with pytest.raises(InchwormRefused, match="mesh collision check"):
+        r.connect()
+
+
+@pytest.mark.parametrize("hw_kw, state_kw, needle", [
+    (dict(other_grip=1550), {}, "locked band"),                       # other gripper not locked
+    (dict(other_torque=False), {}, "torque OFF"),                     # other arm limp
+    (dict(follower_grip=2036), {}, "LOCKED band"),                    # follower still locked on the tube
+    ({}, dict(goal_ticks={"left": [t + 60 for t in F_TICKS], "right": OTHER_TICKS}), "stop pose"),
+    ({}, dict(locked={"left": True, "right": True}), "LOCKED"),
+])
+def test_handoff_refusals_change_nothing(tmp_path, monkeypatch, hw_kw, state_kw, needle):
+    clock = sim.SimClock()
+    hw = HandoffHW(clock, **hw_kw)
+    r, _ = _handoff_robot(tmp_path, monkeypatch, hw, state_kw=state_kw)
+    before = (dict(hw.bus.torque), dict(hw.bus.goal), dict(hw.other_bus.torque))
+    with pytest.raises(InchwormRefused, match=needle):
+        r.connect()
+    assert (dict(hw.bus.torque), dict(hw.bus.goal), dict(hw.other_bus.torque)) == before   # still holding
+    assert hw.closed and not r.is_connected
+
+
+def test_handoff_refuses_when_the_present_pose_fails_the_cell_check(tmp_path, monkeypatch):
+    hw = HandoffHW(sim.SimClock())
+    r, _ = _handoff_robot(tmp_path, monkeypatch, hw, gate=Gate(hit_above=0))
+    with pytest.raises(InchwormRefused, match="cell check"):
+        r.connect()
+    assert all(hw.bus.torque[s] for s in range(1, 6))
+
+
+def test_handoff_catches_up_slowly_then_follows_and_releases_both_arms(tmp_path, monkeypatch):
+    clock = sim.SimClock()
+    hw = HandoffHW(clock)
+    r, gate = _handoff_robot(tmp_path, monkeypatch, hw, catchup_deg_s=5.0)
+    grip0 = (hw.bus.goal[6], hw.bus.torque[6])
+    r.connect()
+    assert all(hw.bus.torque[s] for s in range(1, 6))                   # never cut
+    leader_target = list(F_TICKS); leader_target[1] += 228; leader_target[3] += 114   # 20 deg / 10 deg away
+    t, lead = _leader(tmp_path, _leader_ticks_for(leader_target))
+    t.connect()
+    step_ticks = 5.0 / 30 / tl.DEG_PER_TICK
+    prev = None
+    n = 0
+    while True:
+        sent = r.send_action(t.get_action()); clock.sleep(1 / 30); n += 1
+        goal = [sent[f"{j}.pos"] / tl.DEG_PER_TICK for j in tl.J5]
+        if prev is not None:
+            assert max(abs(a - b) for a, b in zip(goal, prev)) <= step_ticks + 1.0   # <= 5 deg/s
+        prev = goal
+        if not r._handoff["catching_up"]:
+            break
+        assert n < 200
+    assert 115 <= n <= 125                                              # 20 deg at 5 deg/s = 4 s
+    # then normal following: a leader move is followed at the teleop speed, not 5 deg/s
+    lead.ticks[0] = (lead.ticks[0] + 100) % 4096
+    for _ in range(30):
+        r.send_action(t.get_action()); clock.sleep(1 / 30)
+    assert abs(hw.bus.pos[1] - (F_TICKS[0] + 100)) <= 3
+    assert gate.checks >= n + 30                                       # every goal was checked
+    assert (hw.bus.goal[6], hw.bus.torque[6]) == grip0                 # gripper never written
+    r.disconnect(); t.disconnect()
+    assert not any(hw.bus.torque[s] for s in range(1, 6))
+    assert not any(hw.other_bus.torque[s] for s in range(1, 6))
+    assert hw.other_bus.torque[6]                                      # other gripper stays LOCKED (torque on)
+    ev = [e for e in _log(tmp_path)]
+    names = [e["event"] for e in ev]
+    assert "handoff_adopted" in names and "catchup_done" in names and "energised" not in names
+    assert ev[-1]["event"] == "released" and ev[-1]["other_joints_off"] == [1, 2, 3, 4, 5]
+
+
+def test_handoff_holds_on_a_collision_and_catches_up_again(tmp_path, monkeypatch):
+    clock = sim.SimClock()
+    hw = HandoffHW(clock)
+    limit = F_TICKS[1] + 40
+    r, gate = _handoff_robot(tmp_path, monkeypatch, hw, gate=Gate(hit_above=limit))
+    r.connect()
+    tgt = list(F_TICKS); tgt[1] += 200
+    t, lead = _leader(tmp_path, _leader_ticks_for(tgt))
+    t.connect()
+    for _ in range(150):
+        r.send_action(t.get_action()); clock.sleep(1 / 30)
+    assert hw.bus.goal[2] <= limit and hw.bus.pos[2] <= limit + 1        # never sent into the contact
+    assert r._handoff["held"] > 0 and r._handoff["catching_up"]
+    lead.ticks = _leader_ticks_for(F_TICKS)                              # leader back to a clear pose
+    for _ in range(60):
+        sent = r.send_action(t.get_action()); clock.sleep(1 / 30)
+    assert r._handoff["held"] == 0
+    r.disconnect(); t.disconnect()
+    names = [e["event"] for e in _log(tmp_path)]
+    assert names.count("collision_hold") == 1 and "collision_clear" in names

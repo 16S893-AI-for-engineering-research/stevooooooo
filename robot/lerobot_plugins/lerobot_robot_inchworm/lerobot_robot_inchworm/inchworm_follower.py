@@ -20,6 +20,15 @@ Safety (same as ``scripts/teleop_live.py``):
 * The stop file ``robot/out/STOP_TELEOP`` raises KeyboardInterrupt (same as Ctrl-C).
 * disconnect(): HOLD in place (torque on), wait for the operator (Enter), then torque off on
   joints 1-5 only. Idempotent; runs on every LeRobot exit path.
+* ``tube_support=handoff`` (AA-23 demo start, owner 2026-11-15; see ``inchworm.handoff``):
+  the cycle replay stopped and left BOTH arms holding the tube. connect() refuses unless the
+  handoff state matches the servos (both arms torque ON at the stop pose, the other gripper
+  torque ON in its locked band, this gripper not locked); it never cuts torque. The mesh
+  collision check is ON (tube where the cycle left it, other arm where it reads). The first
+  actions CATCH UP slowly (catchup_deg_s, default 5 deg/s) from the stop pose to the leader
+  (replaces the 10 deg start gate); a goal that touches anything is not sent (the arm holds,
+  then catches up again). disconnect(): support the tube and both arms, Enter, joints 1-5 of
+  BOTH arms torque OFF; the grippers are never touched (the other one stays LOCKED).
 * Camera: the arm's wrist camera through the AA-6 arbiter (global one-camera lock held for the
   whole connection); damaged frames are skipped (grab_valid), never raised.
 """
@@ -38,7 +47,7 @@ from .config_inchworm import InchwormFollowerConfig
 
 ROBOT_ROOT = Path(__file__).resolve().parents[3]          # robot/
 STOP_FILE = ROBOT_ROOT / "out" / "STOP_TELEOP"
-TUBE_SUPPORT = ("no_tube", "locked_arm")
+TUBE_SUPPORT = ("no_tube", "locked_arm", "handoff")
 CAMERA_KEY = "wrist"
 
 
@@ -80,6 +89,14 @@ class FollowerHardware:
         self.read_bytes = self.bus._bus.read_bytes
         self.write_bytes = self.bus._bus.write_bytes
         self._cam = None
+
+    def other_arm_bus(self, other: str) -> tuple:
+        """(read_bytes, write_bytes, close) for the other arm: handoff end-of-session torque-off
+        of joints 1-5 only (inchworm.handoff.joints_off never touches servo 6)."""
+        from inchworm.servo_bus import _ServoBus
+        t = self._be.open_serial(f"arm_{other}")
+        b = _ServoBus(t)
+        return b.read_bytes, b.write_bytes, t.close
 
     def other_arm_read_bytes(self, other: str) -> tuple:
         """(read_bytes, close) for the other arm, read-only use only."""
@@ -129,6 +146,7 @@ class InchwormFollower(Robot):
         self._grab: Optional[Callable[[], Any]] = None
         self._last_frame: Optional[np.ndarray] = None
         self._log_fh = None
+        self._handoff: Optional[dict] = None      # handoff mode: state, gate, catch-up flags
 
     def prompt(self, msg: str) -> str:                 # tests replace it
         return input(msg)
@@ -197,7 +215,12 @@ class InchwormFollower(Robot):
         if c.follower not in ("left", "right"):
             out.append(f"follower must be 'left' or 'right', not {c.follower!r}")
             return out
-        if not c.no_collision_check:
+        if c.tube_support == "handoff":
+            if c.no_collision_check:
+                out.append("tube_support=handoff runs the mesh collision check; drop --robot.no_collision_check")
+            if not 0.5 <= float(c.catchup_deg_s) <= 10.0:
+                out.append("catchup_deg_s must be 0.5..10")
+        elif not c.no_collision_check:
             out.append("this path has no mesh collision check; set --robot.no_collision_check=\"<owner reason>\"")
         lim = getattr(cfg.motion_guard, f"{c.follower}_arm_limits")
         if getattr(lim, "unverified", True) and not c.allow_unverified_soft_limits:
@@ -249,10 +272,19 @@ class InchwormFollower(Robot):
         self._open_log()
         self.hw = self._open_hardware(cfg)
         try:
-            limits = tl.follower_preflight(cfg, c.follower, self.hw.read_bytes)
+            handoff = c.tube_support == "handoff"
+            limits = tl.follower_preflight(cfg, c.follower, self.hw.read_bytes, require_torque_off=not handoff)
             tube = {"tube_support": c.tube_support}
-            if c.tube_support == "locked_arm":
+            if c.tube_support in ("locked_arm", "handoff"):
                 tube.update(self._check_locked_arm(cfg))
+            if handoff:
+                tube.update(self._check_handoff(cfg))
+                now = [int.from_bytes(self.hw.read_bytes(s, tl.REG_PRESENT_POSITION, 2), "little") for s in range(1, 6)]
+                out = [f"{j} at {t} outside {round(limits[j][0])}..{round(limits[j][1])}"
+                       for j, t in zip(tl.J5, now) if not limits[j][0] <= t <= limits[j][1]]
+                if out:   # the first clamped command would jump to the limit
+                    raise InchwormRefused("tube_support=handoff: the stop pose is outside the teleop limits: "
+                                          + "; ".join(out))
             self.core = tl.TeleopCore(leader_read=_no_leader, follower_bus=self.hw.bus, mapping={},
                                       limits=limits, speed_ticks_s=c.speed_ticks_s, log=self._log,
                                       smooth_alpha=c.smooth_alpha)
@@ -266,7 +298,18 @@ class InchwormFollower(Robot):
                        "limits": {j: [round(x) for x in v] for j, v in limits.items()},
                        "soft_limits_override": c.allow_unverified_soft_limits,
                        "no_collision_check": c.no_collision_check, **tube})
-            if c.confirm:
+            if c.confirm and handoff:
+                print("\nCONFIRM before anything moves (demo start, both arms are holding now):\n"
+                      "  - the other arm is LOCKED on the tube, torque on; it will not be commanded\n"
+                      f"  - the {c.follower} arm will move SLOWLY (~{c.catchup_deg_s:g} deg/s) from where it holds to "
+                      "where the LEADER is, then follow it; every goal is checked against the cell model "
+                      "(tube where the cycle left it)\n"
+                      f"  - hands and cables clear of the {c.follower} follower; you are at the power switch\n"
+                      "Ctrl-C = hold. At the end: support the TUBE and BOTH arms; joints of both arms go "
+                      "torque OFF, the grippers stay as they are.")
+                if self.prompt("Type YES to continue: ").strip() != "YES":
+                    raise InchwormRefused("not confirmed; nothing changed (both arms still holding)")
+            elif c.confirm:
                 print("\nCONFIRM before anything moves:\n"
                       + ("  - NO tube in the cell\n" if c.tube_support == "no_tube" else
                          "  - the other arm is LOCKED on the tube, torque on; it will not be commanded\n")
@@ -276,6 +319,9 @@ class InchwormFollower(Robot):
                 if self.prompt("Type YES to continue: ").strip() != "YES":
                     raise InchwormRefused("not confirmed; nothing energised")
             STOP_FILE.unlink(missing_ok=True)
+            if handoff:
+                self.core.adopt_holding()          # no torque cut, no goal write
+                self._log({"event": "handoff_adopted", "follower_ticks": self.core.follower_ticks()})
         except BaseException as exc:
             self._log({"event": "refused", "reason": f"{type(exc).__name__}: {exc}"})
             self._close_all()
@@ -283,6 +329,68 @@ class InchwormFollower(Robot):
                 raise InchwormRefused(f"REFUSED: {exc}") from exc
             raise
         self._connected = True
+
+    def _check_handoff(self, cfg) -> dict:
+        """Read-only: the handoff state matches the servos (inchworm.handoff). Builds the mesh gate."""
+        from inchworm import handoff as ho
+        from inchworm.so101_pose_reader import ticks_to_q
+        c, tl = self.config, self._tl
+        other = "right" if c.follower == "left" else "left"
+        st = ho.load_state(Path(c.handoff_state) if c.handoff_state else ho.STATE_PATH)
+        probs = ho.state_problems(st, c.follower) + ho.arm_problems(c.follower, self.hw.read_bytes, st)
+        read, close = self.hw.other_arm_read_bytes(other)
+        try:
+            probs += ho.arm_problems(other, read, st)
+            other_ticks = [int.from_bytes(read(s, tl.REG_PRESENT_POSITION, 2), "little") for s in range(1, 6)]
+        finally:
+            close()
+        bands = getattr(cfg.gripper_lock, f"arm_{c.follower}", None)
+        g = int.from_bytes(self.hw.read_bytes(6, tl.REG_PRESENT_POSITION, 2), "little") * tl.DEG_PER_TICK
+        if (bands is not None and bands.locked_low_deg is not None
+                and bands.locked_low_deg <= g <= bands.locked_high_deg):
+            probs.append(f"the {c.follower} gripper reads {g:.1f} deg, inside its LOCKED band (it holds the tube)")
+        if probs:
+            raise InchwormRefused("tube_support=handoff: " + "; ".join(probs))
+        gate = self._make_gate(cfg, c.follower, ticks_to_q(cfg, other, other_ticks), np.asarray(st["tube_pose"]))
+        present = [int.from_bytes(self.hw.read_bytes(s, tl.REG_PRESENT_POSITION, 2), "little") for s in range(1, 6)]
+        p = gate.pose_problem(present)
+        if p is not None:
+            raise InchwormRefused(f"tube_support=handoff: the {c.follower} arm's present pose fails the cell check: {p}")
+        self._handoff = {"state": st, "gate": gate, "catching_up": True, "held": 0, "other": other}
+        return {"handoff_stop_frame": st["stop_frame"], "handoff_state_utc": st["utc"],
+                "handoff_tube_in_grippers": st["tube_in_grippers"], "other_arm_ticks": other_ticks,
+                "catchup_deg_s": c.catchup_deg_s}
+
+    def _make_gate(self, cfg, follower, other_q, tube):          # tests replace it
+        from inchworm.handoff import CollisionGate
+        return CollisionGate(cfg, follower, other_q, tube)
+
+    def _handoff_goal(self, raw: list) -> Optional[list]:
+        """Handoff mode: rate-limited catch-up, then the leader target; every step mesh-checked.
+        Returns the follower-tick goal to command, or None = hold the last goal."""
+        from inchworm import handoff as ho
+        h, tl, c = self._handoff, self._tl, self.config
+        target, _ = self.core.target_from_follower_ticks(raw, self.core.last_goal)
+        goal = target
+        if h["catching_up"]:
+            step = c.catchup_deg_s / c.control_hz / tl.DEG_PER_TICK
+            goal, done = ho.catch_up_target(self.core.last_goal, target, step)
+            if done:
+                h["catching_up"] = False
+                self._log({"event": "catchup_done", "goal": [round(x) for x in goal],
+                           "mesh_checks": h["gate"].checks,
+                           "mesh_ms_mean": round(h["gate"].ms_total / max(1, h["gate"].checks), 2)})
+        p = h["gate"].step_problem(self.core.last_goal, goal)
+        if p is not None:
+            if h["held"] == 0:
+                self._log({"event": "collision_hold", "problem": p, "goal": [round(x) for x in goal]})
+            h["held"] += 1
+            h["catching_up"] = True              # when clear again: slow catch-up, never a jump
+            return None
+        if h["held"]:
+            self._log({"event": "collision_clear", "held_steps": h["held"]})
+            h["held"] = 0
+        return goal
 
     def _frame(self) -> np.ndarray:
         c = self.config
@@ -321,6 +429,12 @@ class InchwormFollower(Robot):
             self._log({"event": "stop_file"})
             raise KeyboardInterrupt("stop file")
         raw = [float(action[f"{j}.pos"]) / tl.DEG_PER_TICK for j in self.joints]
+        if self._handoff is not None:
+            goal = self._handoff_goal(raw)
+            if goal is None:
+                return {f"{j}.pos": g * tl.DEG_PER_TICK for j, g in zip(self.joints, self.core.last_goal)}
+            out = self.core.command(goal)
+            return {f"{j}.pos": g * tl.DEG_PER_TICK for j, g in zip(self.joints, out["goal"])}
         if not self.core.energised:
             probs = self.core.gate_problems(raw)
             if probs:
@@ -342,8 +456,11 @@ class InchwormFollower(Robot):
                 self._log({"event": "hold", "hold": {k: str(v) for k, v in held.items()},
                            "clamps": dict(self.core.clamps)})
                 print(f"\nHolding the {self.config.follower} arm in place (torque on).")
+                msg = ("Support the TUBE and BOTH arms, then press Enter (or Ctrl-C): joints 1-5 of both arms "
+                       "go torque OFF, the grippers stay as they are: " if self._handoff is not None else
+                       "Support the arm, then press Enter (or Ctrl-C) to release torque: ")
                 try:
-                    self.prompt("Support the arm, then press Enter (or Ctrl-C) to release torque: ")
+                    self.prompt(msg)
                 except (KeyboardInterrupt, EOFError):
                     pass
         finally:
@@ -351,13 +468,22 @@ class InchwormFollower(Robot):
                 for s in range(1, 6):
                     if self.hw.read_bytes(s, tl.REG_TORQUE_ENABLE, 1)[0]:
                         self.hw.write_bytes(s, tl.REG_TORQUE_ENABLE, b"\x00")
-                self._log({"event": "released"})
+                extra = {}
+                if self._handoff is not None:   # owner 2026-11-15: joints of BOTH arms off, grippers untouched
+                    from inchworm.handoff import joints_off
+                    r, w, close = self.hw.other_arm_bus(self._handoff["other"])
+                    try:
+                        extra = {"other_arm": self._handoff["other"], "other_joints_off": joints_off(r, w)}
+                    finally:
+                        close()
+                self._log({"event": "released", **extra})
             except Exception as exc:  # noqa: BLE001
                 print(f"WARNING: final torque-off sweep failed: {exc}")
                 self._log({"event": "release_failed", "error": str(exc)})
             finally:
                 if self.core is not None:
                     self.core.energised = False
+                self._handoff = None
                 self._connected = False
                 self._close_all()
 

@@ -63,6 +63,10 @@ class Frame:
     step: str
     q: Dict[str, np.ndarray]          # arm -> 5 joint radians
     locked: Dict[str, bool]
+    #: Planned tube pose (4x4 rigid motion from its CAD placement: pose = tube @ P_cad), from
+    #: the timeline's tube_motion @ tube_base; None if the timeline has none. Used only when
+    #: the run is told the tube is in the grippers (AA-23 demo start, owner 2026-11-15).
+    tube: Optional[np.ndarray] = None
 
 
 def load_timeline(path: Path) -> List[Frame]:
@@ -74,8 +78,15 @@ def load_timeline(path: Path) -> List[Frame]:
         q = {a: np.asarray(d[a], dtype=np.float64) for a in ARMS}
         if any(v.shape != (5,) or not np.all(np.isfinite(v)) for v in q.values()):
             raise ValueError(f"{path}: frame {i} needs 5 finite joint values per arm")
+        tube = None
+        if d.get("tube_motion") is not None:
+            tube = np.asarray(d["tube_motion"], dtype=np.float64)
+            if d.get("tube_base") is not None:
+                tube = tube @ np.asarray(d["tube_base"], dtype=np.float64)
+            if tube.shape != (4, 4) or not np.all(np.isfinite(tube)):
+                raise ValueError(f"{path}: frame {i} tube pose is not a finite 4x4")
         frames.append(Frame(len(frames), d.get("step", ""), q,
-                            {a: bool(d[f"{a}_locked"]) for a in ARMS}))
+                            {a: bool(d[f"{a}_locked"]) for a in ARMS}, tube))
     if not frames:
         raise ValueError(f"{path}: empty timeline")
     if not all(frames[0].locked.values()):
@@ -153,7 +164,7 @@ def fold_press_frame(cfg, frame: "Frame", goal: Optional[Dict[str, int]] = None)
     for a in ARMS:
         cal = getattr(cfg.motion_guard.servo_calibration, f"{a}_arm")
         q[a][2] = cal.elbow_flex_sign * math.radians(goal[a] * 360 / 4096 - cal.elbow_flex_zero_offset_deg)
-    return Frame(frame.index, f"{frame.step} (fold press)", q, dict(frame.locked))
+    return Frame(frame.index, f"{frame.step} (fold press)", q, dict(frame.locked), frame.tube)
 
 
 def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TICKS,
@@ -186,12 +197,55 @@ def clamp_to_eeprom(cfg, frames: Sequence[Frame], inside: int = EEPROM_INSIDE_TI
                              f"({math.degrees(q[a][k] - f.q[a][k]):+.1f} deg, EEPROM {lim[j]}"
                              + (f", fold cap {elbow_cap[a]}" if j == "elbow_flex" and elbow_cap and a in elbow_cap else "")
                              + ")")
-        out.append(Frame(f.index, f.step, q, dict(f.locked)))
+        out.append(Frame(f.index, f.step, q, dict(f.locked), f.tube))
     return out, notes
 
 
-def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
-    """Offline check of the whole replay with no tube in the cell. Returns problems (empty = OK)."""
+# ---------------------------------------------------------------------------
+# Tube in the grippers (AA-23 demo start, owner 2026-11-15): the preflights model the tube
+# where the timeline puts it, interpolated rigidly between frames.
+# ---------------------------------------------------------------------------
+
+def interp_rigid(A: np.ndarray, B: np.ndarray, t: float) -> np.ndarray:
+    """Rigid 4x4 between A (t=0) and B (t=1): rotation slerp, translation lerp."""
+    from scipy.spatial.transform import Rotation, Slerp
+    t = min(max(float(t), 0.0), 1.0)
+    if np.allclose(A, B):
+        return np.array(A, dtype=np.float64)
+    r = Slerp([0.0, 1.0], Rotation.from_matrix(np.stack([A[:3, :3], B[:3, :3]])))([t])
+    out = np.eye(4)
+    out[:3, :3] = r.as_matrix()[0]
+    out[:3, 3] = (1 - t) * np.asarray(A[:3, 3]) + t * np.asarray(B[:3, 3])
+    return out
+
+
+def tube_at(frames: Sequence[Frame], s: float) -> np.ndarray:
+    """Tube pose at fractional timeline position ``s`` (frame index units)."""
+    s = min(max(float(s), float(frames[0].index)), float(frames[-1].index))
+    k0 = int(math.floor(s)) - frames[0].index
+    k1 = min(k0 + 1, len(frames) - 1)
+    a, b = frames[k0].tube, frames[k1].tube
+    if a is None or b is None:
+        raise ValueError(f"timeline frame {frames[k0].index if a is None else frames[k1].index} has no tube pose")
+    return interp_rigid(a, b, s - math.floor(s))
+
+
+def cell_state(ql, qr, tube: Optional[np.ndarray]):
+    """CellState with the tube at ``tube`` (pose = tube @ P_cad) or no tube (None)."""
+    from inchworm.system_model.collision import CellState
+    if tube is None:
+        return CellState(left_q=ql, right_q=qr, dexarm_q={}, tube_advance_m=None)
+    return CellState(left_q=ql, right_q=qr, dexarm_q={}, tube_advance_m=0.0, tube_transform=tube)
+
+
+def tube_problems(frames: Sequence[Frame]) -> List[str]:
+    return [f"frame {f.index}: the timeline has no tube pose" for f in frames if f.tube is None]
+
+
+def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SAMPLES,
+              tube: bool = False) -> List[str]:
+    """Offline check of the whole replay. ``tube`` False = no tube in the cell; True = the tube
+    is in the grippers where the timeline puts it. Returns problems (empty = OK)."""
     from inchworm.inchworm_plan import configured_soft_limits
     from inchworm.system_model.collision import CellState
 
@@ -213,13 +267,17 @@ def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SA
     if checker is None:
         problems.append("mesh collision model unavailable")
         return problems
+    if tube:
+        problems += tube_problems(frames)
+        if problems:
+            return problems
     for prev, cur in zip(frames, frames[1:]):
         for k in range(1, samples + 1):
             t = k / samples
             ql = (1 - t) * prev.q["left"] + t * cur.q["left"]
             qr = (1 - t) * prev.q["right"] + t * cur.q["right"]
-            st = CellState(left_q=ql, right_q=qr, dexarm_q={}, tube_advance_m=None)
             try:
+                st = cell_state(ql, qr, interp_rigid(prev.tube, cur.tube, t) if tube else None)
                 hits = [c for a in ARMS for c in checker.check(st, arm=a)]
             except Exception as exc:  # noqa: BLE001 - fail closed
                 problems.append(f"move {prev.index}->{cur.index}: collision check failed: {exc}")
@@ -238,7 +296,8 @@ APPROACH_MAX_DEG = 10.0
 
 
 def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, checker,
-                      max_deg: float = APPROACH_MAX_DEG, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
+                      max_deg: float = APPROACH_MAX_DEG, samples: int = PREFLIGHT_SAMPLES,
+                      tube: bool = False) -> List[str]:
     """Check the automatic final adjustment from the measured pose to frame 0.
 
     Refuses when any joint is more than ``max_deg`` away, or when the straight-line move
@@ -262,13 +321,15 @@ def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, 
         return problems
     if checker is None:
         return ["mesh collision model unavailable"]
+    if tube and frame0.tube is None:
+        return ["frame 0: the timeline has no tube pose"]
     for k in range(samples + 1):
         t = k / samples
         ql = (1 - t) * q0["left"] + t * frame0.q["left"]
         qr = (1 - t) * q0["right"] + t * frame0.q["right"]
         try:
             hits = [c for a in ARMS for c in checker.check(
-                CellState(left_q=ql, right_q=qr, dexarm_q={}, tube_advance_m=None), arm=a)]
+                cell_state(ql, qr, frame0.tube if tube else None), arm=a)]
         except Exception as exc:  # noqa: BLE001 - fail closed
             return [f"adjustment move: collision check failed: {exc}"]
         if hits:
@@ -276,11 +337,12 @@ def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, 
     return []
 
 
-def fold_press_preflight(cfg, frame: Frame, checker, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
+def fold_press_preflight(cfg, frame: Frame, checker, samples: int = PREFLIGHT_SAMPLES,
+                         tube: bool = False) -> List[str]:
     """AA-52: the press move (elbows from ``frame`` to the press goal, both arms together, no
-    tube) against the soft limits, EEPROM limits and the cell mesh model. Empty = OK."""
+    tube unless ``tube``) against the soft limits, EEPROM limits and the cell mesh model."""
     press = fold_press_frame(cfg, frame)
-    problems = preflight(cfg, [frame, press], checker, samples=samples)
+    problems = preflight(cfg, [frame, press], checker, samples=samples, tube=tube)
     for a in ARMS:
         hi = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits["elbow_flex"][1]
         if FOLD_PRESS_GOAL_TICKS[a] > hi - EEPROM_INSIDE_TICKS:
@@ -334,6 +396,8 @@ class Segment:
     before: List[Tuple[str, str]]    # gripper actions done (arms still) before this segment
     duration_s: float
     path: Dict[str, Callable[[float], np.ndarray]]   # arm -> q(t), t in [0, duration_s]
+    #: timeline position (frame index, fractional) at time t; used to place the tube
+    s_at: Optional[Callable[[float], float]] = None
 
     def q(self, t: float) -> Dict[str, np.ndarray]:
         t = min(max(float(t), 0.0), self.duration_s)
@@ -387,7 +451,8 @@ def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO,
         before = ev.get(a0 + 1, []) if i else []
         n = a1 - a0
         if n <= 0 or all(np.allclose(frames[a0].q[a], frames[k].q[a]) for k in range(a0, a1 + 1) for a in ARMS):
-            segs.append(Segment(a0, a1, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS}))
+            segs.append(Segment(a0, a1, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS},
+                                (lambda t, e=float(frames[a1].index): e)))
             continue
         fs = {}
         for a in ARMS:
@@ -403,7 +468,8 @@ def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO,
         s_of_t, T = _time_law(rate_cap, n, V)
         paths = {a: (lambda t, f=fs[a], s_of_t=s_of_t: np.asarray(f(s_of_t(t)), dtype=np.float64))
                  for a in ARMS}
-        segs.append(Segment(a0, a1, before, T, paths))
+        base = float(frames[a0].index)
+        segs.append(Segment(a0, a1, before, T, paths, (lambda t, s_of_t=s_of_t, base=base: base + s_of_t(t))))
     return segs
 
 
@@ -427,10 +493,11 @@ def peak_speed_ticks_s(segs: Sequence[Segment]) -> float:
     return peak
 
 
-def stream_preflight(cfg, segs: Sequence[Segment], checker) -> List[str]:
-    """Owner option (b), 2026-11-13: the WHOLE fluid path, both arms together, no tube, every
-    25 ms of path time: soft limits, EEPROM tick limits, the cell mesh model, and the speed
-    ceiling. Refuse on any problem. (Live, each streamed point also gets the full pose check.)"""
+def stream_preflight(cfg, segs: Sequence[Segment], checker, frames: Optional[Sequence[Frame]] = None) -> List[str]:
+    """Owner option (b), 2026-11-13: the WHOLE fluid path, both arms together, every
+    20 ms of path time: soft limits, EEPROM tick limits, the cell mesh model, and the speed
+    ceiling. Refuse on any problem. No tube unless ``frames`` is given (AA-23 demo start:
+    the tube is in the grippers where the timeline puts it at that moment of the path)."""
     from inchworm.inchworm_plan import configured_soft_limits
     from inchworm.system_model.collision import CellState
 
@@ -440,6 +507,10 @@ def stream_preflight(cfg, segs: Sequence[Segment], checker) -> List[str]:
         return ["soft limits not configured"]
     if checker is None:
         return ["mesh collision model unavailable"]
+    if frames is not None:
+        problems += tube_problems(frames)
+        if problems:
+            return problems
     peak = peak_speed_ticks_s(segs)
     if peak > MAX_STREAM_SPEED_TICKS_S:
         problems.append(f"planned joint speed {peak:.0f} ticks/s above the {MAX_STREAM_SPEED_TICKS_S} ceiling")
@@ -459,8 +530,14 @@ def stream_preflight(cfg, segs: Sequence[Segment], checker) -> List[str]:
                         bad = f"{where}: {a} {j} tick {tk} outside EEPROM {lim[j]}"
             if bad is None:
                 try:
-                    hits = checker.check(CellState(left_q=q["left"], right_q=q["right"], dexarm_q={},
-                                                   tube_advance_m=None))
+                    tube = None if frames is None else tube_at(frames, seg.s_at(t))
+                    st = cell_state(q["left"], q["right"], tube)
+                    if tube is None:
+                        hits = checker.check(st)
+                    else:
+                        # Pairs with an SO-101 link, as the AA-45 plan validation and preflight():
+                        # the DexArm's real pose is unknown (model pose; the owner parks it clear).
+                        hits = [c for a in ARMS for c in checker.check(st, arm=a)]
                 except Exception as exc:  # noqa: BLE001 - fail closed
                     hits = [f"collision check failed: {exc}"]
                 if hits:
@@ -862,10 +939,14 @@ class ReplayRunner:
         from inchworm.torque import TorqueManager
         return TorqueManager({f"arm_{a}": h.bus for a, h in self.arms.items()}).hold_all()
 
-    def release(self):
-        """Torque OFF on all arm joints and grippers (the owner supports the arms first)."""
+    def release(self, grippers: bool = True):
+        """Torque OFF on all arm joints and (unless ``grippers`` is False) the grippers.
+        The owner supports the arms first. With the tube in the grippers the caller passes
+        grippers=False: a locked gripper stays locked (owner 2026-11-15)."""
         from inchworm.torque import TorqueManager
         errs = TorqueManager({f"arm_{a}": h.bus for a, h in self.arms.items()}).disable_all()
+        if not grippers:
+            return errs
         for a, h in self.arms.items():
             try:
                 h.sm.release(tube_attached=False)

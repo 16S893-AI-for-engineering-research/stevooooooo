@@ -157,7 +157,8 @@ class SimClock:
 
 
 def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_ticks=None,
-             stall=None, log=lambda r: None, segments=None, fold_press=False, contact=None) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
+             stall=None, log=lambda r: None, segments=None, fold_press=False, contact=None,
+             end_press=True) -> Tuple[ReplayRunner, Dict[str, "SimArmBus"]]:
     """Run the full replay sequence against simulated servos (same code as live)."""
     clock = SimClock()
     buses = {}
@@ -179,6 +180,6 @@ def simulate(cfg, frames, *, vmax_ticks_s: int = DEFAULT_VMAX_TICKS_S, start_tic
         r.run()
     else:
         r.run_fluid(segments)
-    if fold_press:
+    if fold_press and end_press:
         r.fold_press(frames[-1], "end")
     return r, buses

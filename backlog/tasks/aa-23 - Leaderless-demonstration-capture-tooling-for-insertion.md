@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 17:15'
+updated_date: '2026-11-15 18:06'
 labels: []
 milestone: m-3
 dependencies:
@@ -58,6 +58,8 @@ Software implementation plan:
 6. tests/test_teleop_capture.py: mock bus + camera, synthetic dataset, inspector output.
 7. robot/docs/tube_fixture.md: fixture spec (owner deliverable, no invented dimensions).
 ACs #1, #4, #5 need hardware; left unchecked with commands listed.
+
+2026-11-15 demo-start handoff build (owner decisions 2026-11-15): A) cycle_replay: Frame keeps the timeline tube state; preflights (frame, stream, start adjustment) can model the tube (interpolated between frames). B) replay_cycle.py --stop-after-frame N [--tube-in-grippers]: runs frames 0..N, no end fold press, exits with both arms holding (no torque-off sweep), writes out/handoff_state.json (goal/final ticks, q, locks, tube transform). With the tube the abort release never touches the grippers. C) inchworm.handoff (no LeRobot): state load/validation, holding-pose check, rate-limited catch-up (5 deg/s), mesh check of each goal segment with the tube where the cycle left it. D) plugin tube_support=handoff: no torque-cut, refuses unless both arms torque ON at the state pose (tol placeholder 3 deg) and the right gripper LOCKED; catch-up replaces the start gate; mesh hits hold the last goal; disconnect = support tube + both arms, Enter, joints 1-5 of BOTH arms off, grippers untouched. E) sim tests + dry-run; no live run (first live step without the tube, owner present).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -105,6 +107,16 @@ STILL TO CONFIRM with the owner: (a) stop frame = 42 (end of left 'move under ta
 Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms holding on exit; plugin 'handoff' mode taking over the powered left arm (no torque cut; refuses unless the right arm reads its regrip pose and LOCKED) with the slow catch-up under the mesh check; sim tests + dry-run; first live step WITHOUT the tube to measure that servos keep holding after the script exits (assumed, not measured).
 
 2026-11-15 owner confirmed both: (a) stop frame 42 (end of left 'move under target', 50 mm standoff); (b) end of session = support tube + right arm, joints of both arms torque-off, right gripper stays LOCKED on the key; re-lock / finishing the cycle is a separate task.
+
+2026-11-15 demo-start handoff BUILT + sim-tested (NOT run on hardware):
+- cycle_replay: Frame.tube (timeline tube_motion @ tube_base); preflight/approach_problems/fold_press_preflight(tube=...) and stream_preflight(frames=...) model the tube where the timeline puts it (rigid slerp between frames). Segment.s_at for the tube position on the fluid path. ReplayRunner.release(grippers=False) never touches the grippers.
+- scripts/replay_cycle.py --stop-after-frame 42 [--tube-in-grippers]: plays frames 0..42 (fluid), stops, writes out/handoff_state.json, exits with BOTH arms holding (final torque-off sweep skipped only on that deliberate stop). Refuses a stop frame that is not one-gripper-open or has no tube pose; --tube-in-grippers needs --stop-after-frame and the fluid mode; it skips the fold press, and the abort path releases joints only. Dry-run both variants: preflights 0 problems, sim stop with both arms torque on.
+- FOUND: with the tube modelled, the DexArm head in its MODEL pose intersects the tube at the fold (GripperAxis/GripperFinger* vs tube_1 at frames 0-5). The tube-aware stream preflight checks SO-101 pairs only (as AA-45 plan validation and preflight()), and the YES prompt asks the owner to confirm the DexArm head is clear of the tube and its lift path. Owner should confirm this choice.
+- src/inchworm/handoff.py: state file (schema inchworm.handoff/1), arm_problems (joints 1-5 torque ON, within POSE_TOL_TICKS=34 (~3 deg, UNVERIFIED placeholder) of the stop pose), state_problems, catch_up_target, CollisionGate (real cell mesh, tube at the stop pose, other arm where it reads; fail closed; samples every 2 deg), joints_off (never servo 6).
+- Plugin tube_support=handoff: refuses --robot.no_collision_check; follower_preflight without the torque-off requirement; locked_arm check of the other arm + handoff checks + follower gripper NOT in its locked band + present pose clear in the model + stop pose inside the teleop limits. YES prompt, then TeleopCore.adopt_holding (speed/accel/torque-limit registers only, no torque cut, no goal write). Catch-up at catchup_deg_s (default 5, max 10) replaces the start gate; a mesh hit holds the last goal and later resumes with a slow catch-up. disconnect: support tube + both arms, Enter, joints 1-5 of BOTH arms off, grippers untouched.
+- Tests: tests/test_handoff.py (12), lerobot_env plugin tests +9 (40 total). Main suite passes.
+- Measured mesh check at the stop pose (real model, tube): median 2.9 ms, p95 6 ms per pose.
+- Next (owner present): 1) dry-run printout review; 2) first live step WITHOUT the tube: replay_cycle.py --stop-after-frame 42 --live ..., check both arms keep holding after exit (read-only hold_tube.py status --arm left/right), then a handoff teleop run with TUBE=... (needs a launcher flag set: --robot.tube_support=handoff, no no_collision_check); 3) then with the tube (--tube-in-grippers).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
