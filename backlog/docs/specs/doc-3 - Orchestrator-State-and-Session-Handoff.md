@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 17:13'
+updated_date: '2026-11-15 17:15'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 17:20Z. AA-44: live `lerobot-teleoperate` works (with camera, 30 Hz). **Owner decided the demo start (see 'Owner decisions 2026-11-15: demo start' below); next: confirm stop frame 42 + end-of-session with the owner, then build the cycle stop + plugin handoff mode (fresh session).** `hold_tube.py` is NOT the route for demos (it holds an arm where it is; do not run `lock` on the folded right arm). Suites pass (1835 + 31).
+**Last verified:** 2026-11-15 17:20Z. AA-44: live `lerobot-teleoperate` works (with camera, 30 Hz). **Owner decided the demo start (see 'Owner decisions 2026-11-15: demo start' below); both points confirmed; next: build the cycle stop (`--stop-after-frame 42`) + plugin handoff mode (fresh session).** `hold_tube.py` is NOT the route for demos (it holds an arm where it is; do not run `lock` on the folded right arm). Suites pass (1835 + 31).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -27,7 +27,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### Owner decisions 2026-11-15: demo start with the tube (AA-23/AA-44; full text in both tasks' notes)
 - Route A: the real cycle (`replay_cycle.py`) carries the tube to the left-regrip handoff and STOPS; right arm extended and LOCKED on the tube (pan 0, lift ~-69, elbow ~-8, wrist_flex ~-11, roll 0 deg; tube ~170 mm up). Tube available; attachment point = simulation.
 - The left arm starts where the LEADER is: slow catch-up (~5 deg/s proposed) of the powered left arm to the leader, replacing the 10 deg start gate on this path, with the mesh collision check ON (tube where the cycle left it).
-- Still to confirm: stop frame 42; end of session = support tube + right arm, joints off, right gripper stays LOCKED.
+- CONFIRMED by the owner 2026-11-15: stop frame 42; end of session = support tube + right arm, joints of both arms off, right gripper stays LOCKED (re-lock / finish the cycle = separate task).
 - Build (not started): `--stop-after-frame N` leaving both arms holding; plugin handoff mode (no torque cut; refuses unless right arm at regrip pose + LOCKED); sim tests + dry-run; first live step WITHOUT the tube to measure that servos hold after the script exits (assumed, unmeasured).
 
 ### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware

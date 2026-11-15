@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 17:13'
+updated_date: '2026-11-15 17:15'
 labels:
   - hardware
 dependencies:
@@ -106,4 +106,6 @@ LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split ou
 3. Catch-up = option A (owner, replacing the 10 deg start gate on this path): the powered left arm moves slowly (proposed ~5 deg/s) from its handoff pose to the leader's pose, then follows normally. The agent's proposal accepted with it: the mesh collision check is ON for this path, with the tube modelled where the cycle left it (~2 ms/step). Owner: 'In real life I'll try to start as close to the real pose as possible but this way it's easier for me.'
 STILL TO CONFIRM with the owner: (a) stop frame = 42 (end of left 'move under target', 50 mm standoff, left gripper unlocked and clear); (b) end of session = support tube + right arm, joints torque-off with the right gripper still LOCKED on the key (re-lock/finish the cycle is a separate task).
 Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms holding on exit; plugin 'handoff' mode taking over the powered left arm (no torque cut; refuses unless the right arm reads its regrip pose and LOCKED) with the slow catch-up under the mesh check; sim tests + dry-run; first live step WITHOUT the tube to measure that servos keep holding after the script exits (assumed, not measured).
+
+2026-11-15 owner confirmed both: (a) stop frame 42 (end of left 'move under target', 50 mm standoff); (b) end of session = support tube + right arm, joints of both arms torque-off, right gripper stays LOCKED on the key; re-lock / finishing the cycle is a separate task.
 <!-- SECTION:NOTES:END -->
