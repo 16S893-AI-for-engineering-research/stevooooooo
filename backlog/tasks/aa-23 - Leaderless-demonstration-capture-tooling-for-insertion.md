@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 21:37'
+updated_date: '2026-11-15 21:53'
 labels: []
 milestone: m-3
 dependencies:
@@ -157,6 +157,8 @@ Physical state at this note: after the with-tube cycle, the right arm holds the 
 - Next (owner present): replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ..., then record_handoff.sh; first return supervised.
 
 2026-11-15 owner-approved reset helper: robot/reset_start.sh (show state, typed YES that the tube is out of the grippers or hand-held, hold_tube release --gripper-off on both arms (each asks its own YES), open any non-open gripper via gripper_ends --action open --no-tube, then loop: owner folds by hand + read-only scripts/start_check.py until READY). start_check.py is read-only (torque, gripper band, each joint within 10 deg of clamped frame 0); tests/test_start_check.py. reset_start.sh itself not yet run live. A start_check run at ~21:10Z read READY (all 12 torque 0, both grippers open, left/right within 10 deg).
+
+2026-11-15 21:37Z FIRST live record_handoff session (owner): cycle to frame 42 OK (21:36:59Z), connect + adopt OK with camera, episode 0 started 21:38:26, catch-up done in 7 s (122 mesh checks, 5.5 ms mean), followed ~47 s with 0 collision holds / 0 clamps. Owner: pressing q could not stop the recording (by design q was idle-only; s/d were the episode keys). Ended with Ctrl-C: hold, then released joints 1-5 of both arms; dataset insert_left_20261115T213741Z has 0 episodes (unfinished episode discarded). No automatic return ran. FIX: q while recording now = save the episode and quit (no return; arms hold, then the release prompt); help + on-screen prompt updated; test added. Also: start_check.py gets --live (read-only; dry-run without it, as the script smoke tests require); reset_start.sh uses --live. Main 1860 passed, plugin 45 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 band() { uv run python scripts/hold_tube.py status --arm "$1" --live 2>/dev/null | tail -1 \
          | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['gripper_band'])"; }
 echo "== state now (read-only)"
-uv run python scripts/start_check.py || true
+uv run python scripts/start_check.py --live || true
 echo
 read -r -p "Is the tube OUT of both grippers, or held by your hand? Type YES: " ok
 [ "$ok" = "YES" ] || { echo "stopped; nothing changed"; exit 1; }
@@ -30,5 +30,5 @@ while true; do
   echo
   read -r -p "Fold both arms by hand into the start pose, then press Enter (q = stop): " k
   [ "$k" = "q" ] && exit 1
-  if uv run python scripts/start_check.py; then exit 0; fi
+  if uv run python scripts/start_check.py --live; then exit 0; fi
 done

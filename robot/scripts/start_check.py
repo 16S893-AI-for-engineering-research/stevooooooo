@@ -6,7 +6,7 @@ Ready = all 12 servos torque OFF, both grippers in their open band, and every jo
 10 deg of the (EEPROM/fold-clamped) timeline frame 0 (the replay adjusts the rest itself).
 Exit 0 = ready, 1 = not ready (each problem printed), 2+ = could not read.
 
-    uv run python scripts/start_check.py
+    uv run python scripts/start_check.py --live      # without --live: dry-run, nothing opened
 """
 from __future__ import annotations
 
@@ -40,7 +40,14 @@ def problems(states: Dict[str, dict], start: Dict[str, List[int]], max_deg: floa
     return out
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--live", action="store_true", help="open both arm ports and read (read-only)")
+    a = ap.parse_args(argv)
+    if not a.live:
+        print("DRY-RUN: nothing opened. Add --live to read both arms (read-only).")
+        return 0
     from inchworm import cycle_replay as cr
     from inchworm.backends import live_backend
     from inchworm.config import load_config

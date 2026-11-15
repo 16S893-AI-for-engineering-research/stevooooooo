@@ -630,9 +630,9 @@ def test_session_r_s_d_q_records_saves_discards_and_returns(tmp_path, monkeypatc
     r.connect()
     t, lead = _leader(tmp_path, _leader_ticks_for(F_TICKS)); t.connect()
     ds = rh.make_dataset(r, tmp_path / "ds", "local/handoff_test", 30)
-    s = rh.Session(r, t, ds, "insert", 30, Keys(["r", 40, "s", 3, "r", 25, "d", 3, "r", 10]),
+    s = rh.Session(r, t, ds, "insert", 30, Keys(["r", 40, "s", 3, "r", 25, "d", 3, "r", 70, 3, "q"]),
                    clock=clock, sleep=clock.sleep, say=lambda *_: None, max_s=2.0)
-    s.run()                                       # 3rd episode hits the 2 s cap (auto save), then q
+    s.run()                                       # 3rd episode hits the 2 s cap (auto save), then idle q
     assert (s.saved, s.discarded) == (2, 1) and r.returns_done == 3
     ds.finalize()
     r.disconnect(); t.disconnect()
@@ -646,3 +646,19 @@ def test_session_r_s_d_q_records_saves_discards_and_returns(tmp_path, monkeypatc
     assert [e["result"] for e in ends] == ["save", "discard", "save"]
     prompts = [e for e in ev if e["event"] == "return_planned"]
     assert len(prompts) == 3                                            # YES asked only the first time
+
+
+def test_session_q_while_recording_saves_and_quits_without_a_return(tmp_path, monkeypatch):
+    clock = sim.SimClock()
+    r, hw = _return_robot(tmp_path, monkeypatch, clock, answers=("YES", ""))
+    r.connect()
+    t, lead = _leader(tmp_path, _leader_ticks_for(F_TICKS)); t.connect()
+    ds = rh.make_dataset(r, tmp_path / "ds", "local/handoff_q", 30)
+    keys = Keys(["r", 30, "q"])
+    s = rh.Session(r, t, ds, "insert", 30, keys, clock=clock, sleep=clock.sleep, say=lambda *_: None)
+    s.run()
+    assert s.quit and (s.saved, s.discarded) == (1, 0) and r.returns_done == 0
+    assert keys.q == []                                   # stopped right at q, no extra polls
+    ds.finalize(); r.disconnect(); t.disconnect()
+    names = [e["event"] for e in _log(tmp_path)]
+    assert "return_planned" not in names and names[-1] == "released"

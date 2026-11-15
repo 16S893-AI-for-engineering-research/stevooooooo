@@ -9,7 +9,8 @@ Keys (terminal focused):
     r  start recording (the left arm catches up slowly to the leader, then follows)
     s  stop + SAVE the episode, then the automatic return
     d  stop + DISCARD the episode, then the automatic return
-    q  quit (only when idle). Ctrl-C = hold, then the normal release prompt.
+    q  quit. While recording: SAVE the episode and quit (no return; the arms hold, then the
+       normal release prompt). Ctrl-C = hold (an unfinished episode is discarded), then release.
 
 Return after s/d (not recorded): left arm straight out of the key 50 mm (-z of its base
 frame, 10 mm/s), joint line to its stop pose (10 deg/s), then the right arm (tube carried)
@@ -41,7 +42,7 @@ class Session:
         self.fps, self.keys, self.clock, self.sleep, self.say = fps, keys or queue.Queue(), clock, sleep, say
         self.max_s = max_s
         self.saved = self.discarded = 0
-        self.state = "idle"
+        self.quit = False
 
     def _key(self):
         try:
@@ -68,15 +69,16 @@ class Session:
         n = self.dataset.num_episodes
         self.robot.episode = n
         self.robot._log({"event": "episode_start", "episode": n})
-        self.say(f"RECORDING episode {n}  (s = save, d = discard; auto-save after {self.max_s:g} s)")
+        self.say(f"RECORDING episode {n}  (s = save, d = discard, q = save + quit; auto-save after {self.max_s:g} s)")
         t0 = self.clock()
         period = 1.0 / self.fps
         why = "save"
         while True:
             ts = self.clock()
             k = self._key()
-            if k in ("s", "d"):
-                why = "save" if k == "s" else "discard"
+            if k in ("s", "d", "q"):
+                why = "discard" if k == "d" else "save"
+                self.quit = k == "q"
                 break
             if ts - t0 >= self.max_s:
                 self.say(f"{self.max_s:g} s cap reached: saving")
@@ -108,6 +110,9 @@ class Session:
                 return
             if k == "r":
                 self.record_episode()
+                if self.quit:
+                    self.say(f"QUIT ({self.saved} saved, {self.discarded} discarded): the arms hold")
+                    return
                 self.say("RETURN: both arms go back to the stop pose")
                 self.robot.handoff_return(confirm=self.robot.returns_done == 0, clock=self.clock, sleep=self.sleep)
                 self.say(f"IDLE ({self.saved} saved, {self.discarded} discarded): move the leader, "
