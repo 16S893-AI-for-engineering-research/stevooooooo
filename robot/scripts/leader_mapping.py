@@ -62,18 +62,22 @@ def fit_joint(leader: Sequence[int], follower: Sequence[int], min_span_ticks: fl
     if len(leader) != len(follower) or len(leader) < 2:
         raise MappingError("need at least 2 paired poses")
     span = max(abs(wrap(a - leader[0])) for a in leader)
-    best = None
+    best, worsts = None, {}
     for sign in (1, -1):
         offs = [wrap(f - sign * l) for l, f in zip(leader, follower)]
         ref = offs[0]
         mean = (ref + sum(wrap(o - ref) for o in offs) / len(offs)) % TICKS
         res = [wrap(o - mean) for o in offs]
         worst = max(abs(r) for r in res)
+        worsts[sign] = worst
         if best is None or worst < best["worst_ticks"]:
             best = {"sign": sign, "offset_ticks": round(mean, 1), "residual_ticks": [round(r, 1) for r in res],
                     "worst_ticks": round(worst, 1)}
     best["leader_span_ticks"] = round(span, 1)
-    best["sign_determined"] = span >= min_span_ticks
+    other = worsts[-best["sign"]]
+    #: mod-4096 cannot tell +1 from -1 when the joint moved about half a turn between poses
+    best["sign_ambiguous"] = other - best["worst_ticks"] < min_span_ticks / 2
+    best["sign_determined"] = span >= min_span_ticks and not best["sign_ambiguous"]
     return best
 
 
@@ -87,7 +91,10 @@ def fit_mapping(captures: List[dict], min_span_deg: float = 15.0, tol_deg: float
                       min_span_deg / DEG_PER_TICK)
         r["worst_deg"] = round(r["worst_ticks"] * DEG_PER_TICK, 2)
         joints[j] = r
-        if not r["sign_determined"]:
+        if r["sign_ambiguous"] and r["leader_span_ticks"] >= min_span_deg / DEG_PER_TICK:
+            problems.append(f"{j}: both directions fit about equally (the joint moved about half a turn between "
+                            "poses); add a pose with this joint about a quarter turn from the others")
+        elif not r["sign_determined"]:
             problems.append(f"{j}: leader moved only {r['leader_span_ticks'] * DEG_PER_TICK:.1f} deg across the poses "
                             f"(need {min_span_deg}); sign NOT DETERMINED, move this joint more between poses")
         if r["worst_deg"] > tol_deg:
@@ -132,8 +139,10 @@ def load_captures(path: Path, labels: Optional[Sequence[str]] = None) -> List[di
         raise MappingError(f"no captures yet: {path}")
     caps = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
     caps = [c for c in caps if c.get("event") == "capture"]
+    last = {c["label"]: c for c in caps}          # a re-captured label replaces the earlier one
+    if not labels:
+        return list(last.values())
     if labels:
-        last = {c["label"]: c for c in caps}      # a re-captured label replaces the earlier one
         missing = [l for l in labels if l not in last]
         if missing:
             raise MappingError(f"labels not in {path.name}: {missing}")

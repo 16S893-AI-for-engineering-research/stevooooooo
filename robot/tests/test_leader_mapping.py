@@ -109,3 +109,19 @@ def test_follower_read_refuses_torque_on_and_never_writes():
     assert lm.read_follower(r0) == [2047] * 6
     assert lm.read_leader(r0) == [2047] * 6
     assert r.writes == 0 and r0.writes == 0
+
+
+def test_half_turn_motion_is_flagged_ambiguous():
+    # elbow-like: leader +2048, follower -2048 between two poses -> +1 and -1 fit equally
+    caps = [{"event": "capture", "label": "A", "leader_ticks": [0, 0, 31, 0, 0, 0], "follower_ticks": [0, 0, 3124, 0, 0, 0]},
+            {"event": "capture", "label": "B", "leader_ticks": [0, 0, 2079, 0, 0, 0], "follower_ticks": [0, 0, 1076, 0, 0, 0]}]
+    r = lm.fit_mapping(caps)["joints"]["elbow_flex"]
+    assert r["sign_ambiguous"] and not r["sign_determined"]
+
+
+def test_default_uses_latest_capture_per_label(tmp_path):
+    log = tmp_path / "x.jsonl"
+    log.write_text("\n".join(json.dumps(c) for c in [_cap("P1", [100] * 5)] + POSES) + "\n")
+    caps = lm.load_captures(log)
+    assert [c["label"] for c in caps] == ["P1", "P2", "P3"]
+    assert caps[0]["leader_ticks"] == POSES[0]["leader_ticks"]
