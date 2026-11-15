@@ -503,3 +503,146 @@ def test_handoff_holds_on_a_collision_and_catches_up_again(tmp_path, monkeypatch
     r.disconnect(); t.disconnect()
     names = [e["event"] for e in _log(tmp_path)]
     assert names.count("collision_hold") == 1 and "collision_clear" in names
+
+
+# ---------------------------------------------------------------------------
+# AA-23 rapid-fire recording (owner spec 2026-11-15): automatic return + r/s/d/q session
+# ---------------------------------------------------------------------------
+import queue  # noqa: E402
+
+_rs = importlib.util.spec_from_file_location("record_handoff", ROBOT / "lerobot_env" / "record_handoff.py")
+rh = importlib.util.module_from_spec(_rs); _rs.loader.exec_module(rh)
+
+
+class ReturnHW(HandoffHW):
+    """The other arm as a full ArmServoBus surface (sane drive registers) for the return."""
+
+    def __init__(self, clock, **kw):
+        super().__init__(clock, **kw)
+        ob = Bus("arm_right", OTHER_TICKS + [2038], clock)
+        ob._bus.read_bytes = ob._read_bytes
+        for s in range(1, 7):
+            ob.set_torque_enable(s, True)
+        self.other_bus = ob
+        self.other = ob._read_bytes
+
+    def other_arm_servo_bus(self, other):
+        assert other == "right"
+        return self.other_bus, self.other_bus._read_bytes, lambda: None
+
+
+class LinChain:
+    """Stand-in chain: TCP xyz = 0.1 m per radian of joints 1-3; linear, always reachable."""
+
+    def fk(self, q):
+        T = np.eye(4); T[:3, 3] = np.asarray(q[:3], float) * 0.1
+        return T
+
+    def ik(self, T, q_seed=None, **_):
+        from types import SimpleNamespace
+        q = np.array(q_seed, float); q[:3] = T[:3, 3] / 0.1
+        return SimpleNamespace(q=q, reachable=True, pos_err_m=0.0, ori_err_rad=0.0)
+
+
+class FreeModel:
+    def __init__(self, home, hit=None):
+        self.follower, self.other, self.home, self.checks, self.hit = "left", "right", home, 0, hit
+
+    def problem(self, f, o):
+        self.checks += 1
+        return self.hit
+
+
+def _return_robot(tmp_path, monkeypatch, clock, answers=("YES", "YES", ""), hit=None):
+    hw = ReturnHW(clock)
+    r, g = _handoff_robot(tmp_path, monkeypatch, hw, answers=answers)
+    home = {"left": F_TICKS, "right": OTHER_TICKS}
+    r._make_return_model = lambda cfg: FreeModel(home, hit)
+    r._make_chain = lambda cfg: LinChain()
+    return r, hw
+
+
+def _drive_left(r, t, lead, clock, ticks, n=150):
+    lead.ticks = _leader_ticks_for(ticks)
+    for _ in range(n):
+        r.send_action(t.get_action()); clock.sleep(1 / 30)
+
+
+def test_return_brings_both_arms_back_without_touching_grippers(tmp_path, monkeypatch):
+    clock = sim.SimClock()
+    r, hw = _return_robot(tmp_path, monkeypatch, clock)
+    r.connect()
+    t, lead = _leader(tmp_path, _leader_ticks_for(F_TICKS)); t.connect()
+    sign = CFG.motion_guard.servo_calibration.left_arm.elbow_flex_sign   # LinChain: TCP z grows with q[2]
+    demo = list(F_TICKS); demo[1] += 120; demo[2] += int(80 * sign)       # end of demo ABOVE the stop pose
+    _drive_left(r, t, lead, clock, demo)
+    for s, d in ((1, 20), (3, -25)):                                     # tube nudged: right arm moved a little
+        hw.other_bus.pos[s] += d; hw.other_bus.goal[s] += d
+    grips = (hw.bus.goal[6], hw.bus.torque[6], hw.other_bus.goal[6], hw.other_bus.torque[6])
+    rep = r.handoff_return(confirm=True, clock=clock, sleep=clock.sleep)
+    assert [l["leg"].split()[0] for l in rep["legs"]] == ["left", "left", "right"]
+    assert max(abs(hw.bus.pos[i + 1] - v) for i, v in enumerate(F_TICKS)) <= 10
+    assert max(abs(hw.other_bus.pos[i + 1] - v) for i, v in enumerate(OTHER_TICKS)) <= 10
+    assert (hw.bus.goal[6], hw.bus.torque[6], hw.other_bus.goal[6], hw.other_bus.torque[6]) == grips
+    assert r._handoff["catching_up"] and r.returns_done == 1             # next demo: slow catch-up again
+    r.disconnect(); t.disconnect()
+    names = [e["event"] for e in _log(tmp_path)]
+    assert names.index("return_planned") < names.index("return_leg") < names.index("return_done")
+
+
+@pytest.mark.parametrize("answers, hit, needle", [
+    (("YES", "no", ""), None, "not confirmed"),
+    (("YES", "YES", ""), "mesh collision: left_gripper intersects tube_1", "mesh collision"),
+])
+def test_return_refusal_moves_nothing(tmp_path, monkeypatch, answers, hit, needle):
+    from inchworm.handoff_return import ReturnRefused
+    clock = sim.SimClock()
+    r, hw = _return_robot(tmp_path, monkeypatch, clock, answers=answers, hit=hit)
+    r.connect()
+    before = (dict(hw.bus.goal), dict(hw.other_bus.goal))
+    with pytest.raises(ReturnRefused, match=needle):
+        r.handoff_return(confirm=True, clock=clock, sleep=clock.sleep)
+    assert (dict(hw.bus.goal), dict(hw.other_bus.goal)) == before
+    r.disconnect()
+
+
+class Keys:
+    """Scripted keyboard: each item is a key, or an int = that many empty polls."""
+
+    def __init__(self, script):
+        self.q = []
+        for k in script:
+            self.q += [None] * k if isinstance(k, int) else [k]
+
+    def get_nowait(self):
+        if not self.q:
+            return "q"
+        k = self.q.pop(0)
+        if k is None:
+            raise queue.Empty
+        return k
+
+
+def test_session_r_s_d_q_records_saves_discards_and_returns(tmp_path, monkeypatch):
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+    clock = sim.SimClock()
+    r, hw = _return_robot(tmp_path, monkeypatch, clock, answers=("YES", "YES", ""))
+    r.connect()
+    t, lead = _leader(tmp_path, _leader_ticks_for(F_TICKS)); t.connect()
+    ds = rh.make_dataset(r, tmp_path / "ds", "local/handoff_test", 30)
+    s = rh.Session(r, t, ds, "insert", 30, Keys(["r", 40, "s", 3, "r", 25, "d", 3, "r", 10]),
+                   clock=clock, sleep=clock.sleep, say=lambda *_: None, max_s=2.0)
+    s.run()                                       # 3rd episode hits the 2 s cap (auto save), then q
+    assert (s.saved, s.discarded) == (2, 1) and r.returns_done == 3
+    ds.finalize()
+    r.disconnect(); t.disconnect()
+    ds = LeRobotDataset("local/handoff_test", root=tmp_path / "ds")
+    assert ds.meta.total_episodes == 2
+    lens = [ds.meta.episodes[i]["length"] for i in range(2)]
+    assert 38 <= lens[0] <= 41 and 58 <= lens[1] <= 61                  # 40 polls; 2 s cap at 30 fps
+    assert tuple(ds[0]["observation.images.wrist"].shape) == (3, H, W)
+    ev = _log(tmp_path)
+    ends = [e for e in ev if e["event"] == "episode_end"]
+    assert [e["result"] for e in ends] == ["save", "discard", "save"]
+    prompts = [e for e in ev if e["event"] == "return_planned"]
+    assert len(prompts) == 3                                            # YES asked only the first time

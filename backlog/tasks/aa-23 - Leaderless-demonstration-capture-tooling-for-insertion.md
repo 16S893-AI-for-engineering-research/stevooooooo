@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 20:12'
+updated_date: '2026-11-15 21:13'
 labels: []
 milestone: m-3
 dependencies:
@@ -145,6 +145,16 @@ Open points to confirm with the owner before building:
 Physical state at this note: after the with-tube cycle, the right arm holds the tube alone (both arms torque on) unless the owner has since run teleop_handoff.sh and released.
 
 2026-11-15 19:34Z WITH-tube handoff teleop OK (owner-run teleop_handoff.sh): connect checks passed (right gripper 2036 ticks = locked band, both arms on stop pose: left read [1973,2198,2196,1172,2060]), adopted without torque cut, catch-up done in 3 s (104 mesh checks, mean 10.9 ms), followed the leader ~2 min with 0 collision holds and 0 clamps, released joints 1-5 of both arms, right gripper left locked. Demo-start handoff with the tube is now working end to end.
+
+2026-11-15 OWNER CONFIRMED record_handoff open points: (a) retract = straight -z of the left arm base frame (reverse of insertion), 50 mm, orientation held, at 10 mm/s, then a joint-space line to the left stop pose; (b) right arm resets to its stop pose after the left is back, tube modelled rigidly carried by the right gripper, refuse and ask if right drift >5 deg on any joint; (c) mesh check on every demo goal kept, holds logged per episode, no loosening; (d) return 10 deg/s, dry-run first, first live return owner-supervised with typed YES; episode safety cap 3 min (auto stop + save). Building now.
+
+2026-11-15 BUILT rapid-fire handoff recording (not yet run live):
+- robot/lerobot_env/record_handoff.py (+ record_handoff.sh): own loop on the LeRobot dataset API. Keys r record / s save / d discard / q quit (idle only); 3 min auto stop+save; left wrist camera; arms hold while idle and while saving; typed prompts pause the key listener.
+- src/inchworm/handoff_return.py + InchwormFollower.handoff_return(): plan first, fully mesh-checked (CarriedTubeModel: tube rigid with the right gripper, = handoff tube at the stop pose; arm=None so the moving tube is checked against the left arm too), then (1) left straight -z of its base frame, orientation held, 10 mm/s, (2) joint line to the left stop pose 10 deg/s, (3) right arm to its stop pose 10 deg/s. Refuses (nothing moved) on right drift >5 deg, IK unreachable or jump, limits, any contact. During a leg, present >45 ticks behind the goal = stop and hold (TRACK_TOL_TICKS, agent choice, UNVERIFIED). First return of a session needs typed YES. Grippers never commanded (tests assert goal/torque of servo 6 unchanged on both arms).
+- AGENT REFINEMENT TO CONFIRM WITH OWNER: the straight retract is 50 mm but never below the stop-pose height (which is 50 mm under the key); a shallow demo end pulls out only to that height. Without this, a return from the stop pose itself was refused (IK at -47 mm) and shallow ends would dip below the stop pose.
+- Dry run (record_handoff.sh --dry-run; real cell mesh + out/handoff_state.json, no hardware): returns from timeline frames 42-49 all plan clean (frame 48/49: 50 mm out, 51 mesh checks).
+- Tests: robot/tests/test_handoff_return.py (8: carried tube, straight/monotonic/orientation-held retract on the real chain, stop-height cap, drift refusal, contact refusal, pace + gripper untouched, resist = hold) and lerobot_env plugin +4 (return both arms, refusals move nothing, session r/s/d + 3 min-cap episodes in a real LeRobotDataset). Main 1855 passed, plugin 44 passed.
+- Next (owner present): replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ..., then record_handoff.sh; first return supervised.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

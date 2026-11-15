@@ -98,6 +98,15 @@ class FollowerHardware:
         b = _ServoBus(t)
         return b.read_bytes, b.write_bytes, t.close
 
+    def other_arm_servo_bus(self, other: str) -> tuple:
+        """(ArmServoBus, read_bytes, close) for the other arm: AA-23 return to its stop pose
+        (joints 1-5 sync writes only; the bus itself rejects gripper writes)."""
+        from inchworm.servo_bus import ArmServoBus
+        from inchworm import teleop_live as tl
+        t = self._be.open_serial(f"arm_{other}")
+        b = ArmServoBus(t, role=f"arm_{other}", joint_id_map={n: i + 1 for i, n in enumerate((*tl.J5, "gripper"))})
+        return b, b._bus.read_bytes, t.close
+
     def other_arm_read_bytes(self, other: str) -> tuple:
         """(read_bytes, close) for the other arm, read-only use only."""
         from inchworm.servo_bus import _ServoBus
@@ -147,6 +156,9 @@ class InchwormFollower(Robot):
         self._last_frame: Optional[np.ndarray] = None
         self._log_fh = None
         self._handoff: Optional[dict] = None      # handoff mode: state, gate, catch-up flags
+        self._cfg = None
+        self.episode: Optional[int] = None         # record_handoff.py: tags log lines
+        self.returns_done = 0
 
     def prompt(self, msg: str) -> str:                 # tests replace it
         return input(msg)
@@ -189,6 +201,8 @@ class InchwormFollower(Robot):
     # -- logging -------------------------------------------------------------
     def _log(self, rec: dict) -> None:
         rec = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "source": "lerobot_plugin", **rec}
+        if self.episode is not None:
+            rec.setdefault("episode", self.episode)
         if self._log_fh is not None:
             self._log_fh.write(json.dumps(rec, default=str) + "\n")
             self._log_fh.flush()
@@ -265,7 +279,7 @@ class InchwormFollower(Robot):
         if self._connected:
             raise RuntimeError(f"{self} already connected")
         tl, c = self._tl, self.config
-        cfg = self._load_cfg()
+        cfg = self._cfg = self._load_cfg()
         probs = self._static_refusals(cfg)
         if probs:
             raise InchwormRefused("REFUSED: " + "; ".join(probs))
@@ -391,6 +405,62 @@ class InchwormFollower(Robot):
             self._log({"event": "collision_clear", "held_steps": h["held"]})
             h["held"] = 0
         return goal
+
+    # -- AA-23 rapid-fire recording: automatic return between demos -------------
+    def _make_return_model(self, cfg):                       # tests replace it
+        from inchworm.handoff_return import CarriedTubeModel
+        st = self._handoff["state"]
+        return CarriedTubeModel(cfg, self._handoff["gate"].checker, st["goal_ticks"], np.asarray(st["tube_pose"]),
+                                follower=self.config.follower)
+
+    def _make_chain(self, cfg):                              # tests replace it
+        from inchworm.kinematics import build_chain, with_soft_limits
+        return with_soft_limits(build_chain(cfg.so101_kinematics),
+                                getattr(cfg.motion_guard, f"{self.config.follower}_arm_limits"))
+
+    def handoff_return(self, confirm: bool = True, interrupted=lambda: False, clock=time.monotonic,
+                       sleep=time.sleep) -> dict:
+        """Owner spec 2026-11-15: straight out of the key (50 mm, -z of the base frame), joint line
+        to the stop pose, then the other arm (tube carried) to its stop pose. The whole path is
+        mesh-checked before anything moves; ``confirm`` asks for a typed YES first. Grippers are
+        never commanded. Raises ReturnRefused (nothing moved) / ReturnAborted (holding)."""
+        from inchworm import handoff_return as hr
+        if not self._connected or self._handoff is None:
+            raise RuntimeError("handoff_return needs a connected tube_support=handoff robot")
+        tl, cfg, h, f = self._tl, self._cfg, self._handoff, self.config.follower
+        o = h["other"]
+        bus, read, close = self.hw.other_arm_servo_bus(o)
+        try:
+            off = [s for s in range(1, 6) if not read(s, tl.REG_TORQUE_ENABLE, 1)[0]]
+            if off:
+                raise hr.ReturnRefused(f"the {o} arm joints {off} are torque OFF. Nothing moved")
+            o_limits = tl.follower_preflight(cfg, o, read, require_torque_off=False)
+            now = {f: self.core.follower_ticks(),
+                   o: [int.from_bytes(read(s, tl.REG_PRESENT_POSITION, 2), "little") for s in range(1, 6)]}
+            plan = hr.plan_return(cfg, self._make_return_model(cfg), self._make_chain(cfg),
+                                  {f: self.core.limits, o: o_limits}, now)
+            self._log({"event": "return_planned", "from": now, "legs": plan.summary, "mesh_checks": plan.checks})
+            if confirm:
+                print("\nRETURN (first of this session, owner supervises):\n  " + "\n  ".join(plan.summary)
+                      + f"\n  grippers are not touched; the {o} gripper stays LOCKED. Ctrl-C = hold.")
+                if self.prompt("Type YES to move: ").strip() != "YES":
+                    raise hr.ReturnRefused("return not confirmed. Nothing moved")
+            ocore = hr.holding_core(cfg, o, bus, read, log=self._log)
+            legs = [hr.run_leg(self.core if leg.arm == f else ocore, leg, hz=self.config.control_hz,
+                               log=self._log, interrupted=interrupted, clock=clock, sleep=sleep)
+                    for leg in plan.legs]
+        except hr.ReturnRefused as exc:
+            self._log({"event": "return_refused", "reason": str(exc)})
+            raise
+        except BaseException as exc:
+            self._log({"event": "return_aborted", "reason": f"{type(exc).__name__}: {exc}"})
+            raise
+        finally:
+            close()
+        h["catching_up"], h["held"] = True, 0     # next demo starts with the slow catch-up again
+        self.returns_done += 1
+        self._log({"event": "return_done", "legs": legs})
+        return {"legs": legs, "plan": plan.summary}
 
     def _frame(self) -> np.ndarray:
         c = self.config
