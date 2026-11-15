@@ -3,3 +3,4 @@
 {"event": "capture", "utc": "2026-11-15T02:26:10Z", "label": "P3", "follower": "left", "leader_ticks": [2860, 1380, 1933, 1253, 2472, 535], "follower_ticks": [2967, 3430, 1079, 1047, 3516, 2034]}
 {"event": "capture", "utc": "2026-11-15T02:27:13Z", "label": "P1", "follower": "left", "leader_ticks": [1946, 3272, 31, 1391, 598, 3631], "follower_ticks": [1965, 1344, 3122, 1048, 2066, 2034]}
 {"event": "capture", "utc": "2026-11-15T02:28:08Z", "label": "P2", "follower": "left", "leader_ticks": [1914, 239, 2089, 2437, 599, 3452], "follower_ticks": [1966, 2433, 1047, 2060, 2063, 2034]}
+{"event": "capture", "utc": "2026-11-15T02:43:12Z", "label": "P3", "follower": "left", "leader_ticks": [1163, 219, 3135, 1380, 3811, 536], "follower_ticks": [1185, 2508, 2072, 1032, 990, 2034]}
