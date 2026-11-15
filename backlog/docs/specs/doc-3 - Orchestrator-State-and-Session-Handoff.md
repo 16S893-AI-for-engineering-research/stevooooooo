@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-13 03:49'
+updated_date: '2026-11-15 00:47'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-13 (late). AA-52 DONE: touching fold live (both lower arms rest on their shoulders at the start and end of the cycle, 15% elbow torque; owner: 'worked great'). **Next: owner picks from 'Next actions' below.** Suite passes.
+**Last verified:** 2026-11-13 (late). AA-51 handoff verified. Leader/teleop decisions recorded (see below). **Next: AA-44 leader mapping script + LeRobot plugins.** Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -23,6 +23,13 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 6. Owner prefers the official Feetech route for servo firmware.
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
+
+### Owner decisions 2026-11-13: teleop and leader (AA-44 / AA-23), recorded in both tasks' notes
+- Leader calibration: software sign/offset fit from 2-3 matched hand poses (leader and follower both read-only, no EEPROM writes). Joint 6 excluded.
+- First live teleop WITHOUT the mesh collision check (per-run flag, logged); joint, soft and EEPROM limits stay enforced. Measured cost if re-enabled: 2.2 ms median, 18 ms p95 per pose.
+- lerobot-calibrate may rewrite servo memory (owner OK). Plan: generate the LeRobot calibration file from the current follower EEPROM, so the values it writes are identical (zeros, fold and the AA-45 timeline depend on them).
+- During demos the other arm holds the tube, LOCKED and torque on (`locked_arm`).
+- Handoff proposal (awaiting owner OK): the cycle pauses at the end of each regrip's "move under target" (pre-insertion pose, 50 mm standoff). Teleop or the policy takes the moving arm, then code locks and re-plans from the actual pose. Torque stays on throughout.
 
 ### Done: AA-52 touching fold (2026-11-13)
 - The method was delegated by the owner ("use your best judgement") and accepted after the run ("worked great"). The replay stream keeps the elbow cap (`FOLD_ELBOW_CAP_TICKS` L 3081 / R 3036). At the start (after the final adjustment) and at the end, `ReplayRunner.fold_press` drives ONLY the elbows at 100 ticks/s with torque limit 150/1000 toward contact + 15 (L 3135 / R 3090) and holds; then the owner answers a y/n prompt (logged). `fold_unpress` returns to the cap and restores torque 500 before the stream starts. Warnings (> 20 ticks short of contact) are logged only. `--no-fold-press` disables it.

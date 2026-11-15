@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-10 17:26'
+updated_date: '2026-11-15 00:46'
 labels:
   - hardware
 dependencies:
@@ -47,4 +47,10 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-09 owner: the leader is encoder-only (no motor), so no gearing applies to a position reading; gearing is not needed for AC #1. Servo model/IDs/firmware are recorded in doc-1.
 
 2026-11-10: software for leader homing done (commit 25a2458). home_servos.py and record_joint_ranges.py accept --arm leader; new _ServoBus.read_bytes_tolerating/write_bytes_tolerating tolerate ONLY error bit 0x08 (any other bit raises; checksum/length still enforced; writes still verified by read-back). Tests in tests/test_home_servos.py. Not yet run live: needs the owner holding the leader at the follower zero pose (expected ticks from view_zero_pose.py, pass as --reading ID=TICKS).
+
+2026-11-13 owner decisions (teleop/leader):
+- Leader calibration: software mapping, no EEPROM writes. Both arms are placed by hand in the same pose, at 2-3 poses; the script reads leader + follower (both read-only) and fits per-joint sign and offset for joints 1-5. Joint 6 is excluded.
+- First live teleop tries WITHOUT the mesh collision check (owner: "I do not believe it will be an issue"). Scoped to the teleop path only, via an explicit per-run flag, logged. Joint/soft/EEPROM limits stay enforced. Measured cost if re-enabled: 2.2 ms median, 18 ms p95 per pose check (first_only).
+- lerobot-calibrate may rewrite servo memory (owner OK). Agent note: on the leader that is harmless. On the followers it would CHANGE homing offsets and limits that hardware.yaml zeros, the fold and the AA-45 timeline depend on. Plan instead: generate the LeRobot calibration file from the current follower EEPROM, so LeRobot writes back identical values.
+- Tube holding during demos: the other arm holds the tube, gripper LOCKED and torque on (tube_support_source = locked_arm).
 <!-- SECTION:NOTES:END -->

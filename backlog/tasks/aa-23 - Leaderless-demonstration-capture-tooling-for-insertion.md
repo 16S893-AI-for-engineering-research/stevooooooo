@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-27 20:06'
+updated_date: '2026-11-15 00:46'
 labels: []
 milestone: m-3
 dependencies:
@@ -88,6 +88,12 @@ AC#9 checked: mock arbiter verified called with follower camera role only; leade
 AC#10 checked: inspector reports episode count, duration distribution, success rate, per-joint offset coverage histogram with under-covered bins flagged. Output pasted in test_teleop_capture.py::test_inspect_dataset_runs.
 
 Owner 2026-10-27: no designed fixture; the owner will prop the tube up simply for demonstrations. AC#4 (fixture specified and validated against the real crawl configuration) is NOT changed: the 'documented build' will be a short description of the prop setup, and the frame/joint-pose comparison still has to be done once it exists.
+
+2026-11-13 owner decisions (teleop/leader):
+- Leader calibration: software mapping, no EEPROM writes. Both arms are placed by hand in the same pose, at 2-3 poses; the script reads leader + follower (both read-only) and fits per-joint sign and offset for joints 1-5. Joint 6 is excluded.
+- First live teleop tries WITHOUT the mesh collision check (owner: "I do not believe it will be an issue"). Scoped to the teleop path only, via an explicit per-run flag, logged. Joint/soft/EEPROM limits stay enforced. Measured cost if re-enabled: 2.2 ms median, 18 ms p95 per pose check (first_only).
+- lerobot-calibrate may rewrite servo memory (owner OK). Agent note: on the leader that is harmless. On the followers it would CHANGE homing offsets and limits that hardware.yaml zeros, the fold and the AA-45 timeline depend on. Plan instead: generate the LeRobot calibration file from the current follower EEPROM, so LeRobot writes back identical values.
+- Tube holding during demos: the other arm holds the tube, gripper LOCKED and torque on (tube_support_source = locked_arm).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
