@@ -346,8 +346,8 @@ def live(cfg, frames, a) -> int:
             print(f"  {arm:5}: " + "  ".join(f"{j} {-d:+.1f}" for j, d in zip(cr.JOINTS, res.diff_deg[arm])))
 
         tube_line = ("  - the tube's attachment keys are IN both open grippers (they lock on it next)\n"
-                     "  - the DexArm head is CLEAR of the tube and of its 170 mm lift path (the model does "
-                     "not know the DexArm pose; in its model pose the head touches the tube)\n"
+                     "  - the DexArm head is out of the way of the tube and its 170 mm lift path (owner "
+                     "2026-11-15; the DexArm is not collision-checked on this path)\n"
                      if a.tube_in_grippers else "  - NO tube in the grippers or the cell\n")
         stop_line = ("" if a.stop_after_frame is None else
                      f"  - the run STOPS at frame {frames[-1].index} and both arms KEEP HOLDING after this "

@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 18:06'
+updated_date: '2026-11-15 18:16'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -30,8 +30,8 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 - CONFIRMED by the owner 2026-11-15: stop frame 42; end of session = support tube + right arm, joints of both arms off, right gripper stays LOCKED (re-lock / finish the cycle = separate task).
 - **BUILT 2026-11-15 (sim-tested, dry-run OK, NOT live):**
   - `cd robot && uv run python scripts/replay_cycle.py --stop-after-frame 42 [--tube-in-grippers]` (add `--live --allow-unverified-soft-limits "..."`) plays frames 0..42 fluidly and stops. Both arms stay holding after exit. It writes `robot/out/handoff_state.json`. `--tube-in-grippers` models the tube in every preflight, skips the fold press, and never switches a gripper off.
-  - The LeRobot follower `--robot.tube_support=handoff` (WITHOUT `--robot.no_collision_check`) uses `inchworm.handoff`. It has no torque cut. It refuses unless both arms hold at the stop pose (+-34 ticks, UNVERIFIED placeholder), the right gripper is in its locked band and the left is not. Catch-up runs at `--robot.catchup_deg_s` (5), with a mesh check per goal (tube where the cycle left it; ~3 ms). A hit = hold. At the end, joints 1-5 of BOTH arms go off and the grippers are untouched. There is no launcher script yet (`teleop_left.sh` hard-codes no_collision_check; pass args or add `teleop_handoff.sh`).
-  - **Ask the owner:** with the tube modelled, the DexArm head in its MODEL pose intersects the tube at the fold. The tube preflight checks SO-101 pairs only, and the YES prompt asks the owner to confirm the DexArm head is clear.
+  - The LeRobot follower `--robot.tube_support=handoff` (WITHOUT `--robot.no_collision_check`) uses `inchworm.handoff`. It has no torque cut. It refuses unless both arms hold at the stop pose (+-34 ticks, UNVERIFIED placeholder), the right gripper is in its locked band and the left is not. Catch-up runs at `--robot.catchup_deg_s` (5), with a mesh check per goal (tube where the cycle left it; ~3 ms). A hit = hold. At the end, joints 1-5 of BOTH arms go off and the grippers are untouched. Launcher `robot/lerobot_env/teleop_handoff.sh`.
+  - **Owner decision 2026-11-15:** no DexArm collision check on the demo-start path; the owner keeps the DexArm out of the way (the tube preflight checks SO-101 pairs only; the YES prompt reminds). Launcher: `bash robot/lerobot_env/teleop_handoff.sh`. No-tube dry-run of `--stop-after-frame 42` re-run 2026-11-15: preflight 0, fluid 0, sim OK, both arms holding.
   - **Next (owner present):** (1) the dry-run above; (2) live WITHOUT the tube, then `hold_tube.py status --arm left|right --live` to confirm both arms still hold after exit; then one handoff teleop run (no tube); (3) then with the tube.
 
 ### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware

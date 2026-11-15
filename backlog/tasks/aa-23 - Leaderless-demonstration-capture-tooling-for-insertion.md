@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 18:06'
+updated_date: '2026-11-15 18:16'
 labels: []
 milestone: m-3
 dependencies:
@@ -117,6 +117,8 @@ Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms
 - Tests: tests/test_handoff.py (12), lerobot_env plugin tests +9 (40 total). Main suite passes.
 - Measured mesh check at the stop pose (real model, tube): median 2.9 ms, p95 6 ms per pose.
 - Next (owner present): 1) dry-run printout review; 2) first live step WITHOUT the tube: replay_cycle.py --stop-after-frame 42 --live ..., check both arms keep holding after exit (read-only hold_tube.py status --arm left/right), then a handoff teleop run with TUBE=... (needs a launcher flag set: --robot.tube_support=handoff, no no_collision_check); 3) then with the tube (--tube-in-grippers).
+
+2026-11-15 owner decision: do not collision-check the DexArm on the demo-start path; it will be out of the way (prompt text updated). Added robot/lerobot_env/teleop_handoff.sh. No-tube dry-run of --stop-after-frame 42 re-run: preflight 0, fluid 0, sim OK, both arms holding.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
