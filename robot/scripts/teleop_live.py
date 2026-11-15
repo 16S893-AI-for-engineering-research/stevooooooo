@@ -13,8 +13,8 @@ tube for this check).
 
 Live sequence: refuse unless the follower is torque-off with sane drive registers, the leader
 map is fitted, and every joint's mapped target is within 10 deg of the follower's pose (match
-the LEADER to the follower). Then CONFIRM, then torque on at --speed (default 150 ticks/s,
-~13 deg/s) and the follower tracks the leader at --hz (default 30). Limits are clamped (soft
+the LEADER to the follower). Then CONFIRM, then torque on at --speed (default 250 ticks/s,
+~22 deg/s) and the follower tracks the leader at --hz (default 30). Limits are clamped (soft
 limits within the EEPROM limits, 10 ticks inside). Ctrl-C or the stop file = HOLD in place;
 support the arm and press Enter to release torque. Log: calibration_data/teleop_live_<date>.jsonl.
 """
@@ -37,10 +37,10 @@ def main(argv=None) -> int:
     ap.add_argument("--follower", choices=("left", "right"), default="left")
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--check", action="store_true", help="read-only start-gate check, no torque")
-    ap.add_argument("--speed", type=int, default=150, help="Goal_Speed ticks/s (max 600)")
+    ap.add_argument("--speed", type=int, default=250, help="Goal_Speed cap ticks/s (max 600; owner default 250)")
     ap.add_argument("--hz", type=float, default=30.0)
     ap.add_argument("--smooth", type=float, default=None,
-                    help="leader filter 0..1 (1 = off; default 0.35, lower = smoother but more lag)")
+                    help="leader filter 0..1 (default 1 = off, owner 2026-11-15; lower = smoother but more lag)")
     ap.add_argument("--allow-unverified-soft-limits", default=None, metavar="OWNER_APPROVAL")
     ap.add_argument("--no-collision-check", default=None, metavar="OWNER_REASON")
     ap.add_argument("--map", type=Path, default=None)

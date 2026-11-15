@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 04:34'
+updated_date: '2026-11-15 04:52'
 labels:
   - hardware
 dependencies:
@@ -67,4 +67,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15 04:13-04:14Z: FIRST LIVE TELEOP of the left follower from the leader, 51 s, owner supervised. Owner: 'it works well', 'a little jittery'. Log teleop_live_2026-11-14.jsonl: 28.2-29.8 Hz (median 29.7), 3 overruns total. Median per-second worst lag 2-6 ticks; peaks: wrist_flex 252, elbow 94. Clamps: shoulder_lift 407 and wrist_flex 572 steps at the limit (held at the soft/tick limit, as designed). Ctrl-C hold, released 04:14:18Z. Jitter fix (not yet run live): leader deadband 1 tick + exponential filter alpha 0.35 (--smooth, 1 = off); Goal_Speed per joint from the remaining distance (1.5 x step per period, capped at --speed) instead of a fixed 150; acceleration 100 while following (same as the AA-50 fluid replay). Simulated tracking of a 0.3 Hz +/-100 tick sweep: worst error 2.0 deg unfiltered vs 2.7 deg filtered. AC #4 not checked yet: the owner has not stated the per-joint direction check.
 
 2026-11-15 owner: 'Yes everything moved the correct direction!' for the supervised live teleop 04:13-04:14Z at 150 ticks/s (log calibration_data/teleop_live_2026-11-14.jsonl; offsets from the fit, residuals <= 4.0 deg; joint 6 never mapped or written). AC #4 checked on that evidence. leader_map_left.json set unverified: false with that reference.
+
+2026-11-15 04:31-04:40Z owner tuning runs (6 sessions, all Ctrl-C hold then release; log teleop_live_2026-11-14.jsonl): speed 150 x smooth 0.35 (x3), 250 x 0.35, 250 x 1.0, 250 x 0.2. Owner: best with no smoother and speed 250. Defaults changed: DEFAULT_SPEED_TICKS_S 250 (cap; distance-based Goal_Speed below it), DEFAULT_SMOOTH_ALPHA 1.0 (off; deadband inactive at 1.0 since the filter passes through). Accel 100 while following kept.
 <!-- SECTION:NOTES:END -->

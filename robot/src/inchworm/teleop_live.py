@@ -36,7 +36,7 @@ REG_PRESENT_POSITION = 56
 REG_TORQUE_ENABLE = 0x28
 REG_MIN_LIMIT, REG_MAX_LIMIT = 9, 11
 EEPROM_INSIDE_TICKS = 10
-DEFAULT_SPEED_TICKS_S = 150       # ~13 deg/s: first supervised run
+DEFAULT_SPEED_TICKS_S = 250       # ~22 deg/s: owner choice 2026-11-15 (best of 150/250 x smooth 0.2/0.35/1)
 MAX_SPEED_TICKS_S = 600
 DEFAULT_ACCEL = 20                # energise only
 STREAM_ACCEL = 100                # while following: same ramp as the AA-50 fluid replay
@@ -44,7 +44,7 @@ STREAM_ACCEL = 100                # while following: same ramp as the AA-50 flui
 #: deadband and an exponential filter; Goal_Speed is set per joint from the remaining distance
 #: (cover each step in about SPEED_FACTOR x the step period) and capped at the configured speed, so the servo
 #: no longer starts and stops at full speed every 33 ms step.
-DEFAULT_SMOOTH_ALPHA = 0.35       # at 30 Hz: about 80 ms time constant
+DEFAULT_SMOOTH_ALPHA = 1.0        # filter OFF: owner 2026-11-15 preferred no smoothing at 250 ticks/s (0.2/0.35 tried)
 DEADBAND_TICKS = 1.0
 SPEED_FACTOR = 1.5                # Goal_Speed = 1.5 x the step distance per period
 MIN_SPEED_TICKS_S = 5             # never 0 (0 = full speed)

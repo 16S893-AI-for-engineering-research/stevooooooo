@@ -194,7 +194,7 @@ def test_live_script_end_to_end_with_simulated_servos(monkeypatch, tmp_path):
 
 
 def test_smoothing_filters_noise_and_speed_scales_with_step():
-    clock, bus, lead, core = _setup()
+    clock, bus, lead, core = _setup(speed_ticks_s=150, smooth_alpha=0.35)
     core.energise()
     base = lead.ticks[0]
     goals = []
@@ -216,3 +216,12 @@ def test_smooth_alpha_bounds():
         _setup(smooth_alpha=0)
     with pytest.raises(tl.TeleopRefused):
         _setup(smooth_alpha=1.5)
+
+
+def test_owner_defaults_2026_11_15():
+    assert tl.DEFAULT_SPEED_TICKS_S == 250 and tl.DEFAULT_SMOOTH_ALPHA == 1.0
+    clock, bus, lead, core = _setup()
+    core.energise()
+    lead.ticks[0] = (lead.ticks[0] + 400) % 4096
+    core.step()
+    assert abs(core.last_goal[0] - 2400) < 1 and bus.speed[1] == 250   # unfiltered goal, cap 250
