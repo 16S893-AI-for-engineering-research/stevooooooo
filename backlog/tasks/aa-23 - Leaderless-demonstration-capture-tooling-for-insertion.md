@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 19:29'
+updated_date: '2026-11-15 19:32'
 labels: []
 milestone: m-3
 dependencies:
@@ -128,6 +128,8 @@ Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms
 - Next: the same with the tube (--tube-in-grippers), owner present.
 
 2026-11-15 19:28Z first WITH-tube attempt ABORTED ~4 s after YES, before the arms moved (present ticks after = start ticks) and before any gripper lock: ServoChecksumError servo 2 (expected 0x7B, got 0xFB; arm not named in the message). The hold then failed on arm_right servo 5 (expected 0xDA got 0xEA). Owner released: all 12 servos torque 0, both grippers open (L 1567, R 1557). Earlier: one servo-2 checksum abort on 2026-11-12 (0xF9 vs 0xFB). Read-only status of both arms after that was clean. Hardware anomaly: asking the owner before more probes (AGENTS.md rule 8). No retry was added to the motion path.
+
+2026-11-15 19:31Z WITH-tube cycle to the handoff OK on rerun (no checksum error this time): both grippers LOCKED on the tube keys (L 2027, R 2029), carry frames 0-24 worst path error 36/34 ticks, left unlock 1606, frames 24-42 worst 16/6, read_errors 0, handoff_stop at frame 42 with present within 13 ticks of goal; out/handoff_state.json tube_in_grippers=true. Right arm now holds the tube alone. Next: teleop_handoff.sh with the tube.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
