@@ -18,6 +18,9 @@ dependencies = [
     "lerobot-robot-inchworm",
     # Newest available 0.6.x release on PyPI (0.6.2 does not exist).
     "lerobot[dataset,feetech]==0.6.1",
+    # AA-23 demo-start handoff: the follower's mesh collision gate (inchworm.handoff) needs
+    # the inchworm model extra (trimesh, python-fcl, scipy) in THIS environment too.
+    "inchworm-robot[model]",
 ]
 
 [build-system]
