@@ -39,6 +39,8 @@ def main(argv=None) -> int:
     ap.add_argument("--check", action="store_true", help="read-only start-gate check, no torque")
     ap.add_argument("--speed", type=int, default=150, help="Goal_Speed ticks/s (max 600)")
     ap.add_argument("--hz", type=float, default=30.0)
+    ap.add_argument("--smooth", type=float, default=None,
+                    help="leader filter 0..1 (1 = off; default 0.35, lower = smoother but more lag)")
     ap.add_argument("--allow-unverified-soft-limits", default=None, metavar="OWNER_APPROVAL")
     ap.add_argument("--no-collision-check", default=None, metavar="OWNER_REASON")
     ap.add_argument("--map", type=Path, default=None)
@@ -104,10 +106,11 @@ def main(argv=None) -> int:
         except tl.TeleopRefused as e:
             print(f"REFUSED: {e}"); return 4
         core = tl.TeleopCore(leader_read=lraw.read_bytes_tolerating, follower_bus=fbus, mapping=mapping,
-                             limits=limits, speed_ticks_s=a.speed, log=log)
+                             limits=limits, speed_ticks_s=a.speed, log=log,
+                             smooth_alpha=a.smooth if a.smooth is not None else tl.DEFAULT_SMOOTH_ALPHA)
         probs = core.start_problems()
         log({"event": "start", "mode": "live" if a.live else "check", "follower": a.follower,
-             "speed": a.speed, "hz": a.hz, "leader_ticks": core.leader_ticks(),
+             "speed": a.speed, "hz": a.hz, "smooth_alpha": core.smooth_alpha, "leader_ticks": core.leader_ticks(),
              "follower_ticks": core.follower_ticks(), "limits": {j: [round(x) for x in v] for j, v in limits.items()},
              "map_utc": mapping.get("utc"), "start_problems": probs,
              "soft_limits_override": a.allow_unverified_soft_limits, "no_collision_check": a.no_collision_check})

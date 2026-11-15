@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 03:46'
+updated_date: '2026-11-15 04:29'
 labels:
   - hardware
 dependencies:
@@ -63,4 +63,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15: src/inchworm/teleop_live.py (core: leader read 0x08-tolerant, software map, no-seam representative, clamp to soft limits ∩ EEPROM-10, ONE sync-write joints 1-5 with capped Goal_Speed, gripper never written, 10 deg start gate) + scripts/teleop_live.py (dry-run default; --check read-only; --live needs --no-collision-check reason and --allow-unverified-soft-limits approval; CONFIRM YES; Ctrl-C/stop file = HOLD then owner release; joints 1-5 torque-off sweep on exit; log calibration_data/teleop_live_<date>.jsonl). Tests tests/test_teleop_live.py (10, simulated servos). Read-only --check on hardware 03:11Z: refused at the start gate, wrist_roll leader -12.2 deg from the follower (others within 10). Observed: hardware.yaml servo_tick_limits shoulder_pan/lift differ from the live EEPROM on both arms (left pan yaml 674..2527 vs EEPROM 672..3340; right pan 1191..3044 vs 788..3447); teleop uses the live EEPROM intersected with the soft limits. Not yet: LeRobot plugins (next), live run (owner supervised).
 
 2026-11-15 03:39Z first --live attempt: energised, then TypeError (run_loop() got unexpected keyword 'log') before any teleop step; the error path HELD (present positions, no motion) and the owner released torque at 03:40:05Z. Fixed; new end-to-end test drives the real --live path of scripts/teleop_live.py against simulated servos (follows leader, stop file, released, gripper untouched).
+
+2026-11-15 04:13-04:14Z: FIRST LIVE TELEOP of the left follower from the leader, 51 s, owner supervised. Owner: 'it works well', 'a little jittery'. Log teleop_live_2026-11-14.jsonl: 28.2-29.8 Hz (median 29.7), 3 overruns total. Median per-second worst lag 2-6 ticks; peaks: wrist_flex 252, elbow 94. Clamps: shoulder_lift 407 and wrist_flex 572 steps at the limit (held at the soft/tick limit, as designed). Ctrl-C hold, released 04:14:18Z. Jitter fix (not yet run live): leader deadband 1 tick + exponential filter alpha 0.35 (--smooth, 1 = off); Goal_Speed per joint from the remaining distance (1.5 x step per period, capped at --speed) instead of a fixed 150; acceleration 100 while following (same as the AA-50 fluid replay). Simulated tracking of a 0.3 Hz +/-100 tick sweep: worst error 2.0 deg unfiltered vs 2.7 deg filtered. AC #4 not checked yet: the owner has not stated the per-joint direction check.
 <!-- SECTION:NOTES:END -->

@@ -44,8 +44,8 @@ def test_follows_leader_and_never_writes_gripper():
     core.energise()
     lead.ticks[0] = (lead.ticks[0] + 200) % 4096
     for _ in range(200):
-        core.step(); clock.sleep(0.02)
-    assert abs(bus.pos[1] - 2200) <= 2
+        core.step(); clock.sleep(1 / 30)
+    assert abs(bus.pos[1] - 2200) <= 3
     assert bus.goal[6] == 2034 and not bus.torque[6]          # gripper untouched
 
 
@@ -54,8 +54,8 @@ def test_limit_is_clamped_not_exceeded():
     core.energise()
     lead.ticks[2] = (lead.ticks[2] + 1800) % 4096   # elbow target 3800 > limit 3400
     for _ in range(400):
-        out = core.step(); clock.sleep(0.02)
-    assert out["goal"][2] == 3400 and "elbow_flex" in out["clamped"]
+        out = core.step(); clock.sleep(1 / 30)
+    assert 3395 <= out["goal"][2] <= 3400 and "elbow_flex" in out["clamped"]
     assert bus.pos[3] <= 3400 and core.clamps["elbow_flex"] > 0
 
 
@@ -191,3 +191,28 @@ def test_live_script_end_to_end_with_simulated_servos(monkeypatch, tmp_path):
     assert abs(bus.pos[1] - (f_ticks[0] + 50)) <= 15        # pan followed the leader
     assert not any(bus.torque[s] for s in range(1, 6))       # torque off on exit
     assert bus.goal[6] == 2034 and not bus.torque[6]          # gripper never touched
+
+
+def test_smoothing_filters_noise_and_speed_scales_with_step():
+    clock, bus, lead, core = _setup()
+    core.energise()
+    base = lead.ticks[0]
+    goals = []
+    for i in range(60):                       # +/-1 tick leader noise: deadband holds the goal
+        lead.ticks[0] = base + (1 if i % 2 else 0)
+        goals.append(core.step()["goal"][0]); clock.sleep(1 / 30)
+    assert max(goals) - min(goals) <= 1
+    lead.ticks[0] = base + 4                  # small correction: Goal_Speed well below the cap
+    core.step()
+    assert 5 <= bus.speed[1] < 150
+    lead.ticks[0] = base + 30
+    for _ in range(60):
+        core.step(); clock.sleep(1 / 30)
+    assert abs(core.last_goal[0] - (2000 + 30)) <= 2   # converges to the leader
+
+
+def test_smooth_alpha_bounds():
+    with pytest.raises(tl.TeleopRefused):
+        _setup(smooth_alpha=0)
+    with pytest.raises(tl.TeleopRefused):
+        _setup(smooth_alpha=1.5)

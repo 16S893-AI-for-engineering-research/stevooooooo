@@ -38,7 +38,16 @@ REG_MIN_LIMIT, REG_MAX_LIMIT = 9, 11
 EEPROM_INSIDE_TICKS = 10
 DEFAULT_SPEED_TICKS_S = 150       # ~13 deg/s: first supervised run
 MAX_SPEED_TICKS_S = 600
-DEFAULT_ACCEL = 20
+DEFAULT_ACCEL = 20                # energise only
+STREAM_ACCEL = 100                # while following: same ramp as the AA-50 fluid replay
+#: Smoothing (2026-11-15, owner: "a little jittery"). Leader readings go through a 1-tick
+#: deadband and an exponential filter; Goal_Speed is set per joint from the remaining distance
+#: (cover each step in about SPEED_FACTOR x the step period) and capped at the configured speed, so the servo
+#: no longer starts and stops at full speed every 33 ms step.
+DEFAULT_SMOOTH_ALPHA = 0.35       # at 30 Hz: about 80 ms time constant
+DEADBAND_TICKS = 1.0
+SPEED_FACTOR = 1.5                # Goal_Speed = 1.5 x the step distance per period
+MIN_SPEED_TICKS_S = 5             # never 0 (0 = full speed)
 DEFAULT_TORQUE_LIMIT = 500        # of 1000, same as the AA-50 replay
 START_MAX_DEG = 10.0
 
@@ -103,10 +112,16 @@ class TeleopCore:
     last_goal: Optional[List[float]] = None
     energised: bool = False
     clamps: Dict[str, int] = field(default_factory=lambda: {j: 0 for j in J5})
+    smooth_alpha: float = DEFAULT_SMOOTH_ALPHA
+    period_s: float = 1.0 / 30
+    filtered: Optional[List[float]] = None
+    est: Optional[List[float]] = None
 
     def __post_init__(self):
         if not 1 <= int(self.speed_ticks_s) <= MAX_SPEED_TICKS_S:
             raise TeleopRefused(f"speed must be 1..{MAX_SPEED_TICKS_S} ticks/s")
+        if not 0.0 < float(self.smooth_alpha) <= 1.0:
+            raise TeleopRefused("smooth_alpha must be in (0, 1]")
 
     # -- reads ---------------------------------------------------------------
     def leader_ticks(self) -> List[int]:
@@ -147,8 +162,26 @@ class TeleopCore:
             b.set_acceleration(s, accel)
             b.set_torque_limit(s, torque_limit)
             b.set_torque_enable(s, True)        # goal := present first (servo_bus)
+        for s in range(1, 6):
+            b.set_acceleration(s, STREAM_ACCEL)
         self.last_goal = [float(t) for t in self.follower_ticks()]
+        self.filtered = list(self.last_goal)      # filter starts at the follower's pose
+        self.est = list(self.last_goal)           # estimated servo position (for Goal_Speed)
         self.energised = True
+
+    def _smooth(self, goal: List[float]) -> List[float]:
+        """Deadband + exponential filter on the (clamped, unwrapped) goal."""
+        if self.filtered is None:
+            self.filtered = list(goal)
+            return list(goal)
+        out = []
+        for k, g in enumerate(goal):
+            f = self.filtered[k]
+            if abs(g - f) > DEADBAND_TICKS:
+                f = f + self.smooth_alpha * (g - f)
+            out.append(f)
+        self.filtered = out
+        return out
 
     def step(self) -> dict:
         """One teleop step: read leader, map, clamp, sync-write joints 1-5."""
@@ -158,8 +191,18 @@ class TeleopCore:
         goal, clamped = self.target(lt, self.last_goal)
         for j in clamped:
             self.clamps[j] += 1
+        goal = self._smooth(goal)            # filtered values stay inside the clamped interval
         ticks = {j: int(round(g)) for j, g in zip(J5, goal)}
-        self.follower_bus.sync_write_goal_ticks(ticks, {j: int(self.speed_ticks_s) for j in J5})
+        cap = int(self.speed_ticks_s)
+        speeds = {}
+        for k, j in enumerate(J5):
+            # Goal_Speed from the distance the servo still has to go (estimated, no bus read):
+            # small corrections move slowly, a lagging joint gets up to the cap.
+            d = goal[k] - self.est[k]
+            v = int(min(cap, max(MIN_SPEED_TICKS_S, SPEED_FACTOR * abs(d) / self.period_s)))
+            speeds[j] = v
+            self.est[k] += max(-v * self.period_s, min(v * self.period_s, d))
+        self.follower_bus.sync_write_goal_ticks(ticks, speeds)
         self.last_goal = goal
         return {"leader": lt, "goal": [ticks[j] for j in J5], "clamped": clamped}
 
@@ -190,6 +233,7 @@ def run_loop(core: TeleopCore, *, hz: float, should_stop: Callable[[], bool],
              report_every_s: float = 1.0, max_s: Optional[float] = None) -> dict:
     """Run steps at ``hz`` until should_stop() (or max_s). Logs a stats line every report_every_s."""
     period = 1.0 / hz
+    core.period_s = period
     t0 = last = clock()
     n = n_win = 0
     worst_lag = [0] * 5
