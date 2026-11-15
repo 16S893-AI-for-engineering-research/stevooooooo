@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 04:29'
+updated_date: '2026-11-15 04:34'
 labels:
   - hardware
 dependencies:
@@ -24,7 +24,7 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 - [ ] #1 doc-1 records the leader arm's USB serial, joint map, servo model and gearing, from the owner or a read-only scan
 - [ ] #2 hardware.yaml identifies the leader arm by USB serial and attach_usb.py/discover attach and find it, verified on hardware
 - [ ] #3 A read-only scan reads all leader joints at >= 20 Hz with error byte 0, logged
-- [ ] #4 Leader-to-follower joint mapping (sign, offset, joint 6 excluded) is verified at low speed under owner supervision, logged
+- [x] #4 Leader-to-follower joint mapping (sign, offset, joint 6 excluded) is verified at low speed under owner supervision, logged
 <!-- AC:END -->
 
 ## Definition of Done
@@ -65,4 +65,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15 03:39Z first --live attempt: energised, then TypeError (run_loop() got unexpected keyword 'log') before any teleop step; the error path HELD (present positions, no motion) and the owner released torque at 03:40:05Z. Fixed; new end-to-end test drives the real --live path of scripts/teleop_live.py against simulated servos (follows leader, stop file, released, gripper untouched).
 
 2026-11-15 04:13-04:14Z: FIRST LIVE TELEOP of the left follower from the leader, 51 s, owner supervised. Owner: 'it works well', 'a little jittery'. Log teleop_live_2026-11-14.jsonl: 28.2-29.8 Hz (median 29.7), 3 overruns total. Median per-second worst lag 2-6 ticks; peaks: wrist_flex 252, elbow 94. Clamps: shoulder_lift 407 and wrist_flex 572 steps at the limit (held at the soft/tick limit, as designed). Ctrl-C hold, released 04:14:18Z. Jitter fix (not yet run live): leader deadband 1 tick + exponential filter alpha 0.35 (--smooth, 1 = off); Goal_Speed per joint from the remaining distance (1.5 x step per period, capped at --speed) instead of a fixed 150; acceleration 100 while following (same as the AA-50 fluid replay). Simulated tracking of a 0.3 Hz +/-100 tick sweep: worst error 2.0 deg unfiltered vs 2.7 deg filtered. AC #4 not checked yet: the owner has not stated the per-joint direction check.
+
+2026-11-15 owner: 'Yes everything moved the correct direction!' for the supervised live teleop 04:13-04:14Z at 150 ticks/s (log calibration_data/teleop_live_2026-11-14.jsonl; offsets from the fit, residuals <= 4.0 deg; joint 6 never mapped or written). AC #4 checked on that evidence. leader_map_left.json set unverified: false with that reference.
 <!-- SECTION:NOTES:END -->

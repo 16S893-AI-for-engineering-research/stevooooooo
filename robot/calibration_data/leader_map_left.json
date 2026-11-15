@@ -81,6 +81,7 @@
  "tol_deg": 5.0,
  "follower": "left",
  "utc": "2026-11-15T02:47:31Z",
- "unverified": true,
- "note": "cleared only by the supervised low-speed teleop check (AA-44 AC #4)"
+ "unverified": false,
+ "note": "cleared only by the supervised low-speed teleop check (AA-44 AC #4)",
+ "verified": "owner 2026-11-15: supervised live teleop 04:13-04:14Z at 150 ticks/s (calibration_data/teleop_live_2026-11-14.jsonl); every joint moved the correct direction"
 }
