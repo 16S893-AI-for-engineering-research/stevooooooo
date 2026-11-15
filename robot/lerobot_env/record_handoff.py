@@ -137,6 +137,59 @@ class Session:
             self.sleep(0.02)
 
 
+class Preview:
+    """Live view of the wrist camera in a browser: http://localhost:PORT (this machine only).
+
+    Serves the frames the recorder already grabs (robot._last_frame) as MJPEG; it never opens
+    the camera itself (one camera stream at a time, AGENTS.md invariant 4). JPEG encoding runs
+    in the server thread, so the 30 Hz control loop does no extra work."""
+
+    def __init__(self, get_frame, port: int, fps: float = 10.0):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        prev = self
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                if self.path != "/":
+                    self.send_error(404); return
+                self.send_response(200)
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                try:
+                    while not prev.stopped:
+                        jpg = prev.jpeg()
+                        if jpg is not None:
+                            self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\n"
+                                             + f"Content-Length: {len(jpg)}\r\n\r\n".encode() + jpg + b"\r\n")
+                        time.sleep(1.0 / prev.fps)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+        self.get_frame, self.fps, self.stopped = get_frame, fps, False
+        self.server = ThreadingHTTPServer(("127.0.0.1", port), H)
+        self.server.daemon_threads = True
+        self.url = f"http://localhost:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def jpeg(self):
+        import cv2
+        f = self.get_frame()
+        if f is None:
+            return None
+        ok, buf = cv2.imencode(".jpg", f[:, :, ::-1] if f.ndim == 3 else f, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return buf.tobytes() if ok else None
+
+    def stop(self):
+        self.stopped = True
+        self.server.shutdown()
+        self.server.server_close()
+
+
 def make_dataset(robot, root: Path, repo_id: str, fps: int):
     from lerobot.datasets import LeRobotDataset, aggregate_pipeline_dataset_features, create_initial_features
     from lerobot.processor import make_default_processors
@@ -192,6 +245,8 @@ def main(argv=None) -> int:
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--allow-unverified-soft-limits", default="owner 2026-11-15 - AA-23 handoff recording")
     ap.add_argument("--no-camera", action="store_true", help="joints only (rehearsal)")
+    ap.add_argument("--preview-port", type=int, default=8765,
+                    help="live wrist view at http://localhost:PORT (0 = off)")
     ap.add_argument("--dry-run", action="store_true",
                     help="no hardware: plan + mesh-check the return from the planned insertion (timeline frames 42-49)")
     a = ap.parse_args(argv)
@@ -213,6 +268,7 @@ def main(argv=None) -> int:
     dataset = None
     closing = False
     rc = 0
+    preview = None
 
     def start_listener():
         return create_key_listener(lambda k: keys.put(k), controls_help="r record, s save, d discard, q quit")
@@ -241,6 +297,12 @@ def main(argv=None) -> int:
             print("REFUSED: no keyboard listener (run in an interactive terminal)")
             return 2
         print(f"dataset: {root}")
+        if not a.no_camera and a.preview_port:
+            try:
+                preview = Preview(lambda: robot._last_frame, a.preview_port)
+                print(f"LIVE VIEW: open {preview.url} in a browser")
+            except OSError as exc:
+                print(f"live view not started ({exc}); recording is not affected")
         Session(robot, teleop, dataset, a.task, a.fps, keys).run()
     except KeyboardInterrupt:
         print("\nCtrl-C: holding.")
@@ -249,6 +311,8 @@ def main(argv=None) -> int:
         rc = 1
     finally:
         closing = True
+        if preview is not None:
+            preview.stop()
         if listener is not None:
             listener.stop()
             listener = None

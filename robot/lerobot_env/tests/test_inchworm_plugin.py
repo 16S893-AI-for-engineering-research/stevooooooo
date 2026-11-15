@@ -697,3 +697,18 @@ def test_unwrap_to_keeps_the_turn_of_the_observation():
     act = {"elbow_flex.pos": 520.5, "wrist_flex.pos": -259.0, "shoulder_pan.pos": 181.0}
     out = rh.unwrap_to(act, obs)
     assert out == pytest.approx({"elbow_flex.pos": 160.5, "wrist_flex.pos": 101.0, "shoulder_pan.pos": 181.0})
+
+
+def test_preview_serves_the_last_frame_as_mjpeg_on_localhost_only():
+    import urllib.request
+    frame = {"f": None}
+    p = rh.Preview(lambda: frame["f"], port=0, fps=50)
+    try:
+        assert p.server.server_address[0] == "127.0.0.1"
+        frame["f"] = np.full((H, W, 3), 128, np.uint8)
+        with urllib.request.urlopen(p.url, timeout=5) as resp:
+            assert resp.headers["Content-Type"].startswith("multipart/x-mixed-replace")
+            data = resp.read(4000)
+        assert b"--frame" in data and b"\xff\xd8" in data                  # a JPEG part
+    finally:
+        p.stop()

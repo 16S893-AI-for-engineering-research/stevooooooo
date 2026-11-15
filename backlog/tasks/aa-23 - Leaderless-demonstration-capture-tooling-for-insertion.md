@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 22:14'
+updated_date: '2026-11-15 22:24'
 labels: []
 milestone: m-3
 dependencies:
@@ -165,6 +165,8 @@ OBSERVATION (data quality, to raise with the owner): episode 1 catch-up lasted 2
 
 2026-11-15 owner decisions: (1) option 3: record only after the catch-up. record_handoff: after r the arm catches up (not recorded; log recording_start with catchup_s), then frames are added; the 3 min cap counts from recording_start; an episode stopped during catch-up has nothing to save = discarded. (2) First-return 3 s settle pause OK as is. (3) Retract never below the stop-pose height: CONFIRMED.
 FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the saved ACTION for elbow_flex / wrist_flex (and some shoulder_lift) is 360 deg off observation.state (leader map wraps to another 4096-tick turn; the follower used the nearest representative, so motion was correct but the saved numbers were not). Wrapped |action-state| p99 was 2/37/23/15/5 deg (the 37/23 = the old recorded catch-up). Now record_handoff saves the action unwrapped to the state's turn (unwrap_to). The two saved episodes need the same unwrap before training (or re-record). Tests: plugin 47 (catch-up not recorded + action within 2 deg of state; unwrap_to).
+
+2026-11-15 owner: RE-RECORD (the 2 episodes of insert_left_20261115T215810Z have the 360 deg action offset; do not train on them). Added live wrist view to record_handoff: MJPEG at http://localhost:8765 (127.0.0.1 only) serving the frames the recorder already grabs (never opens the camera: one-camera invariant); --preview-port 0 = off. The lerobot env's OpenCV is headless (no window support) and rerun is not installed, hence the browser. Plugin tests 48.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
