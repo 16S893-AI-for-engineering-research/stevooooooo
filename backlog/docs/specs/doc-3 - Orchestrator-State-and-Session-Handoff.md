@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 16:49'
+updated_date: '2026-11-15 17:13'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 16:30Z. AA-44: live `lerobot-teleoperate` works with and without the wrist camera (30 Hz). `record_left.sh` and `scripts/hold_tube.py` written and sim-tested, NOT run live. **Next: owner-supervised `record_left.sh` (no tube, 3 practice episodes), then hold_tube rehearsal (`lock --no-tube`) on the right arm.** Suites pass (1835 + 31).
+**Last verified:** 2026-11-15 17:20Z. AA-44: live `lerobot-teleoperate` works (with camera, 30 Hz). **Owner decided the demo start (see 'Owner decisions 2026-11-15: demo start' below); next: confirm stop frame 42 + end-of-session with the owner, then build the cycle stop + plugin handoff mode (fresh session).** `hold_tube.py` is NOT the route for demos (it holds an arm where it is; do not run `lock` on the folded right arm). Suites pass (1835 + 31).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -23,6 +23,12 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 6. Owner prefers the official Feetech route for servo firmware.
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
+
+### Owner decisions 2026-11-15: demo start with the tube (AA-23/AA-44; full text in both tasks' notes)
+- Route A: the real cycle (`replay_cycle.py`) carries the tube to the left-regrip handoff and STOPS; right arm extended and LOCKED on the tube (pan 0, lift ~-69, elbow ~-8, wrist_flex ~-11, roll 0 deg; tube ~170 mm up). Tube available; attachment point = simulation.
+- The left arm starts where the LEADER is: slow catch-up (~5 deg/s proposed) of the powered left arm to the leader, replacing the 10 deg start gate on this path, with the mesh collision check ON (tube where the cycle left it).
+- Still to confirm: stop frame 42; end of session = support tube + right arm, joints off, right gripper stays LOCKED.
+- Build (not started): `--stop-after-frame N` leaving both arms holding; plugin handoff mode (no torque cut; refuses unless right arm at regrip pose + LOCKED); sim tests + dry-run; first live step WITHOUT the tube to measure that servos hold after the script exits (assumed, unmeasured).
 
 ### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware
 - `robot/lerobot_plugins/lerobot_robot_inchworm/` (robot `inchworm_follower`, teleoperator `inchworm_leader`) is installed editable in `robot/lerobot_env`. It does NOT use LeRobot's Feetech bus, so it never writes servo memory and no LeRobot calibration file is needed.

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 01:20'
+updated_date: '2026-11-15 17:13'
 labels: []
 milestone: m-3
 dependencies:
@@ -96,6 +96,13 @@ Owner 2026-10-27: no designed fixture; the owner will prop the tube up simply fo
 - Tube holding during demos: the other arm holds the tube, gripper LOCKED and torque on (tube_support_source = locked_arm).
 
 2026-11-13 owner: (1) handoff point confirmed = end of each regrip "move under target" (left: timeline frame 42), torque on in both arms, other arm LOCKED; code locks + re-plans from actual pose after. (2) Train the LEFT arm first (follower=left, leader=dedicated leader arm).
+
+2026-11-15 OWNER DECISIONS (demo start with the tube, AA-23/AA-44):
+1. Route A: the real cycle carries the tube to the left-regrip handoff and stops there (both arms holding; right arm extended and LOCKED on the tube at its regrip pose, frames 30-43: pan 0, lift ~-69, elbow ~-8, wrist_flex ~-11, roll 0 deg; tube lifted ~170 mm). The tube is available; the attachment point matches the simulation.
+2. The left arm starts where the LEADER drives it (owner: no good way to get the leader in the exact pose).
+3. Catch-up = option A (owner, replacing the 10 deg start gate on this path): the powered left arm moves slowly (proposed ~5 deg/s) from its handoff pose to the leader's pose, then follows normally. The agent's proposal accepted with it: the mesh collision check is ON for this path, with the tube modelled where the cycle left it (~2 ms/step). Owner: 'In real life I'll try to start as close to the real pose as possible but this way it's easier for me.'
+STILL TO CONFIRM with the owner: (a) stop frame = 42 (end of left 'move under target', 50 mm standoff, left gripper unlocked and clear); (b) end of session = support tube + right arm, joints torque-off with the right gripper still LOCKED on the key (re-lock/finish the cycle is a separate task).
+Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms holding on exit; plugin 'handoff' mode taking over the powered left arm (no torque cut; refuses unless the right arm reads its regrip pose and LOCKED) with the slow catch-up under the mesh check; sim tests + dry-run; first live step WITHOUT the tube to measure that servos keep holding after the script exits (assumed, not measured).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

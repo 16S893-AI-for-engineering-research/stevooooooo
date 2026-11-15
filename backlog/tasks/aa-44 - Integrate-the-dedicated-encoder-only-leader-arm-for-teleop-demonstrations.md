@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 16:49'
+updated_date: '2026-11-15 17:13'
 labels:
   - hardware
 dependencies:
@@ -99,4 +99,11 @@ LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split ou
 2026-11-15 16:08-16:09Z live lerobot-teleoperate WITH the left wrist camera (owner supervised, after the V4L2 fix): connect (test frame grabbed) -> energised -> ~35 s following -> hold -> released, no errors. Owner: loop time about 33.5 ms (30 Hz) with the camera. Log teleop_lerobot_2026-11-15.jsonl.
 - New robot/lerobot_env/record_left.sh: lerobot-record, local only (push_to_hub=false, new folder robot/datasets/<DATASET>_<UTC>/ each run, gitignored), env DATASET/EPISODES/EPISODE_S/RESET_S/TASK/TUBE. Argument parsing checked with a stubbed uv: draccus yields the intended RecordConfig (found+fixed: env NAME collided with the shell's NAME=hostname, renamed DATASET).
 - New scripts/hold_tube.py (status|lock|release, dry-run default): holds the other arm where it is placed (joints 1-5 goal:=present, speed 5, torque 500) then AA-17 position lock via GripperLockSM; preflight refuses torque ON, bad drive regs, joints outside EEPROM, gripper not in the open band; lock failure -> gripper torque off, joints hold until Enter; on success the script exits and the servos keep holding (port free for the plugin's locked_arm check). release: joints off after YES, gripper stays on unless --gripper-off; no unlock offered. tests/test_hold_tube.py (9, simulated servos). Main suite 1835 passed, lerobot_env 31. NOT run live.
+
+2026-11-15 OWNER DECISIONS (demo start with the tube, AA-23/AA-44):
+1. Route A: the real cycle carries the tube to the left-regrip handoff and stops there (both arms holding; right arm extended and LOCKED on the tube at its regrip pose, frames 30-43: pan 0, lift ~-69, elbow ~-8, wrist_flex ~-11, roll 0 deg; tube lifted ~170 mm). The tube is available; the attachment point matches the simulation.
+2. The left arm starts where the LEADER drives it (owner: no good way to get the leader in the exact pose).
+3. Catch-up = option A (owner, replacing the 10 deg start gate on this path): the powered left arm moves slowly (proposed ~5 deg/s) from its handoff pose to the leader's pose, then follows normally. The agent's proposal accepted with it: the mesh collision check is ON for this path, with the tube modelled where the cycle left it (~2 ms/step). Owner: 'In real life I'll try to start as close to the real pose as possible but this way it's easier for me.'
+STILL TO CONFIRM with the owner: (a) stop frame = 42 (end of left 'move under target', 50 mm standoff, left gripper unlocked and clear); (b) end of session = support tube + right arm, joints torque-off with the right gripper still LOCKED on the key (re-lock/finish the cycle is a separate task).
+Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms holding on exit; plugin 'handoff' mode taking over the powered left arm (no torque cut; refuses unless the right arm reads its regrip pose and LOCKED) with the slow catch-up under the mesh check; sim tests + dry-run; first live step WITHOUT the tube to measure that servos keep holding after the script exits (assumed, not measured).
 <!-- SECTION:NOTES:END -->
