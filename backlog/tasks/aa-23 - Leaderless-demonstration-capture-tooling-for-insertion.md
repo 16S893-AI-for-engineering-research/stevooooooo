@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 19:32'
+updated_date: '2026-11-15 20:00'
 labels: []
 milestone: m-3
 dependencies:
@@ -130,6 +130,19 @@ Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms
 2026-11-15 19:28Z first WITH-tube attempt ABORTED ~4 s after YES, before the arms moved (present ticks after = start ticks) and before any gripper lock: ServoChecksumError servo 2 (expected 0x7B, got 0xFB; arm not named in the message). The hold then failed on arm_right servo 5 (expected 0xDA got 0xEA). Owner released: all 12 servos torque 0, both grippers open (L 1567, R 1557). Earlier: one servo-2 checksum abort on 2026-11-12 (0xF9 vs 0xFB). Read-only status of both arms after that was clean. Hardware anomaly: asking the owner before more probes (AGENTS.md rule 8). No retry was added to the motion path.
 
 2026-11-15 19:31Z WITH-tube cycle to the handoff OK on rerun (no checksum error this time): both grippers LOCKED on the tube keys (L 2027, R 2029), carry frames 0-24 worst path error 36/34 ticks, left unlock 1606, frames 24-42 worst 16/6, read_errors 0, handoff_stop at frame 42 with present within 13 ticks of goal; out/handoff_state.json tube_in_grippers=true. Right arm now holds the tube alone. Next: teleop_handoff.sh with the tube.
+
+2026-11-15 OWNER SPEC for rapid-fire handoff recording (record_handoff.py; NOT built yet):
+- Started after replay_cycle.py --stop-after-frame 42 --tube-in-grippers. Own loop on the LeRobot dataset API (add_frame/save_episode/finalize; stock lerobot-record has fixed-time episodes + timed reset, no press-to-start, no return).
+- Keys: r = start recording, s = stop + save, d = stop + discard, q = quit (then the normal release). Recording includes the slow catch-up (owner OK). The owner moves the leader to the new start pose before pressing r.
+- One demo = left arm INSERTION into the next attachment point, up to just before locking (lock is not in the demo; gripper never in action/observation; stays open).
+- After s: save (arms hold while encoding), then automatic return, not recorded: FIRST a straight move away from the tube (out of the key), then a straight move back to the left start pose (NOT retracing the demo: owner says demo paths have extraneous motion). The RIGHT arm also resets to its stop pose every time. All mesh-checked, slow.
+- Wrist camera of the left arm only.
+Open points to confirm with the owner before building:
+(a) retract direction/distance: in the timeline the insertion (frames 42->48) is a straight +50 mm along the left arm base z (FK; tool_frame_offset unverified). Proposal: retract along -z (reverse of the insertion axis) by the insertion depth (~50 mm) via IK, then a joint-space line to the start pose.
+(b) right-arm reset order and model: only after the left gripper is out of the key and back; the right arm carries the tube, so its check must move the tube with the right gripper (the gate today has a fixed tube pose).
+(c) frames 48/49 (inserted) pass the mesh gate in the model, but real near-key poses could be flagged and held during demos; watch the collision_hold events on the first runs.
+(d) return speed proposal 10 deg/s; first live return owner-supervised (dry-run rule).
+Physical state at this note: after the with-tube cycle, the right arm holds the tube alone (both arms torque on) unless the owner has since run teleop_handoff.sh and released.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
