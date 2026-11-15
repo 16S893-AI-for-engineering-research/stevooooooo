@@ -406,6 +406,11 @@ class InchwormFollower(Robot):
             h["held"] = 0
         return goal
 
+    @property
+    def catching_up(self) -> bool:
+        """Handoff mode: still in the slow catch-up to the leader (follower != leader target)."""
+        return self._handoff is not None and bool(self._handoff["catching_up"])
+
     # -- AA-23 rapid-fire recording: automatic return between demos -------------
     def _make_return_model(self, cfg):                       # tests replace it
         from inchworm.handoff_return import CarriedTubeModel

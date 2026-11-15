@@ -6,7 +6,8 @@ Start AFTER  scripts/replay_cycle.py --stop-after-frame 42 --tube-in-grippers --
     bash ~/893/robot/lerobot_env/record_handoff.sh            # or: uv run python record_handoff.py --help
 
 Keys (terminal focused):
-    r  start recording (the left arm catches up slowly to the leader, then follows)
+    r  start: the left arm catches up slowly to the leader (NOT recorded), then recording starts
+       by itself once it has caught up (owner 2026-11-15: every recorded action = what the arm did)
     s  stop + SAVE the episode, then the automatic return
     d  stop + DISCARD the episode, then the automatic return
     q  quit. While recording: SAVE the episode and quit (no return; the arms hold, then the
@@ -33,6 +34,15 @@ ROBOT = Path(__file__).resolve().parents[1]
 EPISODE_MAX_S = 180.0          # owner 2026-11-15
 
 
+def unwrap_to(act: dict, obs: dict) -> dict:
+    """Leader targets are one 4096-tick turn representative of the joint (the leader map wraps);
+    the follower moves to the representative nearest its pose. Save that one, so the recorded
+    action and observation.state are in the same turn (measured 2026-11-15: elbow/wrist_flex
+    actions were saved 360 deg off the state)."""
+    return {k: (float(v) - ((float(v) - float(obs[k]) + 180.0) // 360.0) * 360.0 if k in obs else v)
+            for k, v in act.items()}
+
+
 class Session:
     """Idle -> recording -> (save | discard) -> return -> idle. Hardware/dataset injected."""
 
@@ -57,34 +67,40 @@ class Session:
                 **build_dataset_frame(self.dataset.features, act, prefix=ACTION), "task": self.task}
 
     def _tick(self, record: bool) -> None:
-        """One control step. Idle = the arm holds (no action sent); recording = follow the leader."""
+        """One control step: follow the leader; add the frame only when ``record``."""
         obs = self.robot.get_observation()
+        act = self.teleop.get_action()
+        self.robot.send_action(act)
         if record:
-            act = self.teleop.get_action()
-            self.robot.send_action(act)
-            self.dataset.add_frame(self._frame(obs, act))
+            self.dataset.add_frame(self._frame(obs, unwrap_to(act, obs)))
 
     def record_episode(self) -> str:
         """Returns 'save' or 'discard'."""
         n = self.dataset.num_episodes
         self.robot.episode = n
         self.robot._log({"event": "episode_start", "episode": n})
-        self.say(f"RECORDING episode {n}  (s = save, d = discard, q = save + quit; auto-save after {self.max_s:g} s)")
+        self.say(f"CATCHING UP (not recorded) for episode {n}: hold the leader still near the follower")
         t0 = self.clock()
+        t_rec = None                 # recording starts when the catch-up is done (owner 2026-11-15)
         period = 1.0 / self.fps
         why = "save"
         while True:
             ts = self.clock()
+            if t_rec is None and not self.robot.catching_up:
+                t_rec = ts
+                self.robot._log({"event": "recording_start", "episode": n, "catchup_s": round(ts - t0, 2)})
+                self.say(f"RECORDING episode {n}  (s = save, d = discard, q = save + quit; "
+                         f"auto-save after {self.max_s:g} s)")
             k = self._key()
             if k in ("s", "d", "q"):
                 why = "discard" if k == "d" else "save"
                 self.quit = k == "q"
                 break
-            if ts - t0 >= self.max_s:
+            if t_rec is not None and ts - t_rec >= self.max_s:
                 self.say(f"{self.max_s:g} s cap reached: saving")
                 why = "save"
                 break
-            self._tick(record=True)
+            self._tick(record=t_rec is not None)
             rest = period - (self.clock() - ts)
             if rest > 0:
                 self.sleep(rest)
@@ -98,7 +114,8 @@ class Session:
             self.discarded += 1
             why = "discard"
         self.robot._log({"event": "episode_end", "episode": n, "result": why, "frames": frames,
-                         "s": round(self.clock() - t0, 2)})
+                         "s": round(self.clock() - t0, 2),
+                         "recorded_s": None if t_rec is None else round(self.clock() - t_rec, 2)})
         self.robot.episode = None
         return why
 

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 22:03'
+updated_date: '2026-11-15 22:14'
 labels: []
 milestone: m-3
 dependencies:
@@ -162,6 +162,9 @@ Physical state at this note: after the with-tube cycle, the right arm holds the 
 
 2026-11-15 21:56-22:02Z FIRST SUCCESSFUL live rapid-fire session (owner): reset_start (both grippers torque off; right still read locked 2036 but cycle started with it open 1557, i.e. it was opened in between), cycle to frame 42 OK (worst path 33/30 then 16/5 ticks), record_handoff with camera: 2 episodes SAVED (583 + 1060 frames, 37 s + 68 s), datasets/insert_left_20261115T215810Z (2 episodes, 1643 frames, wrist video 4 MB). Both automatic returns ran clean: ep0 left straight out 50 mm (worst track 19 ticks) + joint line (18); ep1 out 43 mm (stop-height cap) (16) + line (13). Right arm drift < 10 ticks both times, so no right leg was needed. 0 collision holds, 0 clamps all session; ended idle with q, released joints 1-5 of both arms.
 OBSERVATION (data quality, to raise with the owner): episode 1 catch-up lasted 25 s (1011 mesh checks): the leader kept moving faster than 5 deg/s, so the follower stayed rate-limited and the recorded ACTION (leader) differed from what the arm did for that time. Options: move the leader to the follower before r (owner's plan), a faster catch-up (max 10 deg/s), or start recording only after catch-up. Also the 3 s settle wait ran out on the first retract (final error 13 > 10 ticks): harmless, adds ~3 s per return.
+
+2026-11-15 owner decisions: (1) option 3: record only after the catch-up. record_handoff: after r the arm catches up (not recorded; log recording_start with catchup_s), then frames are added; the 3 min cap counts from recording_start; an episode stopped during catch-up has nothing to save = discarded. (2) First-return 3 s settle pause OK as is. (3) Retract never below the stop-pose height: CONFIRMED.
+FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the saved ACTION for elbow_flex / wrist_flex (and some shoulder_lift) is 360 deg off observation.state (leader map wraps to another 4096-tick turn; the follower used the nearest representative, so motion was correct but the saved numbers were not). Wrapped |action-state| p99 was 2/37/23/15/5 deg (the 37/23 = the old recorded catch-up). Now record_handoff saves the action unwrapped to the state's turn (unwrap_to). The two saved episodes need the same unwrap before training (or re-record). Tests: plugin 47 (catch-up not recorded + action within 2 deg of state; unwrap_to).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
