@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 01:36'
+updated_date: '2026-11-15 02:47'
 labels:
   - hardware
 dependencies:
@@ -57,4 +57,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-13 owner: (1) handoff point confirmed = end of each regrip "move under target" (left: timeline frame 42), torque on in both arms, other arm LOCKED; code locks + re-plans from actual pose after. (2) Train the LEFT arm first (follower=left, leader=dedicated leader arm).
 
 2026-11-13: scripts/leader_mapping.py (capture/fit/watch; read-only: leader READ tolerating only 0x08, follower refuses torque ON, no writes; fit sign+offset mod 4096 per joint 1-5, gripper excluded; needs >=15 deg leader span per joint and residual <=5 deg, saves calibration_data/leader_map_<arm>.json unverified:true). Tests tests/test_leader_mapping.py (9). Live probe not run yet: the arm ports were held by a running replay_cycle.py (AA-52 command, started 19:05 local).
+
+2026-11-15 02:47Z: leader->left fit saved (calibration_data/leader_map_left.json, unverified:true) from owner hand-matched poses P1,P2,P3 (latest per label). All signs +1. Offsets ticks: pan 22.3, lift 2177.0, elbow 3083.7, wrist_flex 3741.7, wrist_roll 1443.0. Worst residual deg: 2.61, 1.49, 2.61, 2.00, 4.04 (tol 5). Leader span deg: 68.6, 93.4, 179.1, 91.9, 88.3. AC #4 still open: needs the supervised low-speed teleop check.
 <!-- SECTION:NOTES:END -->
