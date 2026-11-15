@@ -2,3 +2,8 @@
 {"utc": "2026-11-15T16:03:29Z", "source": "lerobot_plugin", "event": "energised"}
 {"utc": "2026-11-15T16:04:20Z", "source": "lerobot_plugin", "event": "hold", "hold": {"arm_left": "None"}, "clamps": {"shoulder_pan": 0, "shoulder_lift": 601, "elbow_flex": 0, "wrist_flex": 486, "wrist_roll": 0}}
 {"utc": "2026-11-15T16:04:21Z", "source": "lerobot_plugin", "event": "released"}
+{"utc": "2026-11-15T16:06:14Z", "source": "lerobot_plugin", "event": "refused", "reason": "BackendError: hardware camera transport for 'camera_left_arm': use V4L2CameraTransport.open() directly after AA-5 discovery, or pass --live to camera_cli / camera_probe"}
+{"utc": "2026-11-15T16:08:43Z", "source": "lerobot_plugin", "event": "connect", "follower": "left", "speed": 250, "smooth_alpha": 1.0, "control_hz": 30.0, "camera": true, "follower_ticks": [1951, 1308, 3108, 950, 2107], "limits": {"shoulder_pan": [720, 2517], "shoulder_lift": [1307, 2990], "elbow_flex": [1005, 3141], "wrist_flex": [948, 3109], "wrist_roll": [617, 3506]}, "soft_limits_override": "owner 2026-11-15 - AA-44 first LeRobot teleop", "no_collision_check": "owner 2026-11-13 - first teleop without mesh check", "tube_support": "no_tube"}
+{"utc": "2026-11-15T16:08:46Z", "source": "lerobot_plugin", "event": "energised"}
+{"utc": "2026-11-15T16:09:21Z", "source": "lerobot_plugin", "event": "hold", "hold": {"arm_left": "None"}, "clamps": {"shoulder_pan": 0, "shoulder_lift": 382, "elbow_flex": 0, "wrist_flex": 171, "wrist_roll": 0}}
+{"utc": "2026-11-15T16:09:23Z", "source": "lerobot_plugin", "event": "released"}

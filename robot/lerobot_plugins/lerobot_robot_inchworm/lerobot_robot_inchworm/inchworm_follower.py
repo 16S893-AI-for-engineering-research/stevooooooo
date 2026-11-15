@@ -343,7 +343,7 @@ class InchwormFollower(Robot):
                            "clamps": dict(self.core.clamps)})
                 print(f"\nHolding the {self.config.follower} arm in place (torque on).")
                 try:
-                    self.prompt("Support the arm, then press Enter to release torque: ")
+                    self.prompt("Support the arm, then press Enter (or Ctrl-C) to release torque: ")
                 except (KeyboardInterrupt, EOFError):
                     pass
         finally:

@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 16:05'
+updated_date: '2026-11-15 16:49'
 labels:
   - hardware
 dependencies:
@@ -95,4 +95,8 @@ LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split ou
 - Next: supervised lerobot-teleoperate on hardware (no_tube, camera=false first), then lerobot-record local with right arm LOCKED (tube_support=locked_arm).
 
 2026-11-15 16:03-16:04Z FIRST LIVE lerobot-teleoperate (owner supervised, robot/lerobot_env/teleop_left.sh: left follower, camera off, no_tube). Owner: 'it worked'. Log calibration_data/teleop_lerobot_2026-11-15.jsonl: connect -> energised (start gate passed) -> 51 s following -> hold (no errors) -> released. Clamps: shoulder_lift 601 and wrist_flex 486 steps at the limit (as in the teleop_live runs). Next: same with the wrist camera, then lerobot-record (local) — first no_tube, then with the right arm LOCKED (needs a way to lock+hold the right arm during recording; not built yet).
+
+2026-11-15 16:08-16:09Z live lerobot-teleoperate WITH the left wrist camera (owner supervised, after the V4L2 fix): connect (test frame grabbed) -> energised -> ~35 s following -> hold -> released, no errors. Owner: loop time about 33.5 ms (30 Hz) with the camera. Log teleop_lerobot_2026-11-15.jsonl.
+- New robot/lerobot_env/record_left.sh: lerobot-record, local only (push_to_hub=false, new folder robot/datasets/<DATASET>_<UTC>/ each run, gitignored), env DATASET/EPISODES/EPISODE_S/RESET_S/TASK/TUBE. Argument parsing checked with a stubbed uv: draccus yields the intended RecordConfig (found+fixed: env NAME collided with the shell's NAME=hostname, renamed DATASET).
+- New scripts/hold_tube.py (status|lock|release, dry-run default): holds the other arm where it is placed (joints 1-5 goal:=present, speed 5, torque 500) then AA-17 position lock via GripperLockSM; preflight refuses torque ON, bad drive regs, joints outside EEPROM, gripper not in the open band; lock failure -> gripper torque off, joints hold until Enter; on success the script exits and the servos keep holding (port free for the plugin's locked_arm check). release: joints off after YES, gripper stays on unless --gripper-off; no unlock offered. tests/test_hold_tube.py (9, simulated servos). Main suite 1835 passed, lerobot_env 31. NOT run live.
 <!-- SECTION:NOTES:END -->
