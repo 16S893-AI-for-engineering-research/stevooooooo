@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 00:46'
+updated_date: '2026-11-15 01:36'
 labels:
   - hardware
 dependencies:
@@ -53,4 +53,8 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 - First live teleop tries WITHOUT the mesh collision check (owner: "I do not believe it will be an issue"). Scoped to the teleop path only, via an explicit per-run flag, logged. Joint/soft/EEPROM limits stay enforced. Measured cost if re-enabled: 2.2 ms median, 18 ms p95 per pose check (first_only).
 - lerobot-calibrate may rewrite servo memory (owner OK). Agent note: on the leader that is harmless. On the followers it would CHANGE homing offsets and limits that hardware.yaml zeros, the fold and the AA-45 timeline depend on. Plan instead: generate the LeRobot calibration file from the current follower EEPROM, so LeRobot writes back identical values.
 - Tube holding during demos: the other arm holds the tube, gripper LOCKED and torque on (tube_support_source = locked_arm).
+
+2026-11-13 owner: (1) handoff point confirmed = end of each regrip "move under target" (left: timeline frame 42), torque on in both arms, other arm LOCKED; code locks + re-plans from actual pose after. (2) Train the LEFT arm first (follower=left, leader=dedicated leader arm).
+
+2026-11-13: scripts/leader_mapping.py (capture/fit/watch; read-only: leader READ tolerating only 0x08, follower refuses torque ON, no writes; fit sign+offset mod 4096 per joint 1-5, gripper excluded; needs >=15 deg leader span per joint and residual <=5 deg, saves calibration_data/leader_map_<arm>.json unverified:true). Tests tests/test_leader_mapping.py (9). Live probe not run yet: the arm ports were held by a running replay_cycle.py (AA-52 command, started 19:05 local).
 <!-- SECTION:NOTES:END -->
