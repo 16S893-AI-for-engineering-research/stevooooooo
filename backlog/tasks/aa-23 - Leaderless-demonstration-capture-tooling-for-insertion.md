@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 18:39'
+updated_date: '2026-11-15 19:29'
 labels: []
 milestone: m-3
 dependencies:
@@ -126,6 +126,8 @@ Build plan (not started): replay_cycle.py --stop-after-frame N leaving both arms
 - Found: lerobot_env lacked python-fcl -> handoff refused safely (mesh model not loaded). Fixed: lerobot_env depends on inchworm-robot[model].
 - 18:37 teleop_handoff.sh: connect checks passed ~6.5 min after the stop: left [1973,2198,2196,1170,2060] vs stop present [1973,2192,2197,1170,2060] (max drift 6 ticks); right [2064,1727,1944,1862,2054] vs [2064,1728,1944,1862,2054] (1 tick); right gripper 2036 (locked band). The servos DO hold after the script exits (measured, no tube load). handoff_adopted, catch-up done in ~2 s (84 mesh checks, mean 8.9 ms), followed the leader ~36 s, no collision_hold, no clamps; hold -> released, joints 1-5 of both arms off, grippers untouched. Owner: 'it worked'. Logs: calibration_data/replay_cycle_2026-11-15.jsonl, teleop_lerobot_2026-11-15.jsonl.
 - Next: the same with the tube (--tube-in-grippers), owner present.
+
+2026-11-15 19:28Z first WITH-tube attempt ABORTED ~4 s after YES, before the arms moved (present ticks after = start ticks) and before any gripper lock: ServoChecksumError servo 2 (expected 0x7B, got 0xFB; arm not named in the message). The hold then failed on arm_right servo 5 (expected 0xDA got 0xEA). Owner released: all 12 servos torque 0, both grippers open (L 1567, R 1557). Earlier: one servo-2 checksum abort on 2026-11-12 (0xF9 vs 0xFB). Read-only status of both arms after that was clean. Hardware anomaly: asking the owner before more probes (AGENTS.md rule 8). No retry was added to the motion path.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
