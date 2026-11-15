@@ -225,3 +225,23 @@ def test_owner_defaults_2026_11_15():
     lead.ticks[0] = (lead.ticks[0] + 400) % 4096
     core.step()
     assert abs(core.last_goal[0] - 2400) < 1 and bus.speed[1] == 250   # unfiltered goal, cap 250
+
+
+def test_lagging_joints_arrive_together():
+    """Owner 2026-11-15: 'only one joint at a time'. A big two-joint leader move must be
+    followed with both joints moving together and arriving at about the same time."""
+    clock, bus, lead, core = _setup()
+    core.energise()
+    lead.ticks[2] = (lead.ticks[2] + 800) % 4096      # elbow: 800 ticks
+    lead.ticks[3] = (lead.ticks[3] + 200) % 4096      # wrist_flex: 200 ticks
+    done = {}
+    for i in range(400):
+        core.step(); clock.sleep(1 / 30)
+        for sid, tgt in ((3, 2800), (4, 2200)):
+            if sid not in done and abs(bus.pos[sid] - tgt) <= 3:
+                done[sid] = i
+        if i == 30:   # 1 s in: both joints are part-way (the short one has not already finished)
+            frac3 = (bus.pos[3] - 2000) / 800
+            frac4 = (bus.pos[4] - 2000) / 200
+            assert 0.1 < frac3 < 0.9 and 0.1 < frac4 < 0.9 and abs(frac3 - frac4) < 0.2
+    assert set(done) == {3, 4} and abs(done[3] - done[4]) <= 6

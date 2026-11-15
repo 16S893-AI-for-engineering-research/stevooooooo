@@ -195,13 +195,19 @@ class TeleopCore:
         ticks = {j: int(round(g)) for j, g in zip(J5, goal)}
         cap = int(self.speed_ticks_s)
         speeds = {}
+        # Goal_Speed from the distance each servo still has to go (estimated, no bus read).
+        # COORDINATED (2026-11-15, owner: "it seems to only move one joint at a time"): when the
+        # follower lags, every joint is scaled by its share of the largest remaining distance,
+        # so all joints arrive together (a straight line in joint space) instead of each
+        # running at the cap and the short ones finishing first.
+        d = [g - e for g, e in zip(goal, self.est)]
+        dmax = max(abs(x) for x in d)
+        t_need = max(dmax / cap, dmax / (SPEED_FACTOR * dmax / self.period_s) if dmax > 0 else 0.0)
         for k, j in enumerate(J5):
-            # Goal_Speed from the distance the servo still has to go (estimated, no bus read):
-            # small corrections move slowly, a lagging joint gets up to the cap.
-            d = goal[k] - self.est[k]
-            v = int(min(cap, max(MIN_SPEED_TICKS_S, SPEED_FACTOR * abs(d) / self.period_s)))
+            v = abs(d[k]) / t_need if t_need > 0 else 0.0
+            v = int(min(cap, max(MIN_SPEED_TICKS_S, round(v))))
             speeds[j] = v
-            self.est[k] += max(-v * self.period_s, min(v * self.period_s, d))
+            self.est[k] += max(-v * self.period_s, min(v * self.period_s, d[k]))
         self.follower_bus.sync_write_goal_ticks(ticks, speeds)
         self.last_goal = goal
         return {"leader": lt, "goal": [ticks[j] for j in J5], "clamped": clamped}
@@ -238,6 +244,7 @@ def run_loop(core: TeleopCore, *, hz: float, should_stop: Callable[[], bool],
     n = n_win = 0
     worst_lag = [0] * 5
     slow = 0
+    last_pres = None
     while not should_stop() and (max_s is None or clock() - t0 < max_s):
         ts = clock()
         out = core.step()
@@ -245,6 +252,7 @@ def run_loop(core: TeleopCore, *, hz: float, should_stop: Callable[[], bool],
         n_win += 1
         if n % 5 == 0:     # follower read-back for the log only (lag between goal and present)
             pres = core.follower_ticks()
+            last_pres = pres
             worst_lag = [max(w, abs(p - g)) for w, p, g in zip(worst_lag, pres, out["goal"])]
         now = clock()
         if now - ts > period:
@@ -252,7 +260,7 @@ def run_loop(core: TeleopCore, *, hz: float, should_stop: Callable[[], bool],
         if now - last >= report_every_s:
             core.log({"event": "teleop_stats", "t": round(now - t0, 2), "hz": round(n_win / (now - last), 1),
                       "worst_lag_ticks": worst_lag, "clamps": dict(core.clamps), "overruns": slow,
-                      "goal": out["goal"]})
+                      "goal": out["goal"], "present": last_pres})
             last, n_win, worst_lag, slow = now, 0, [0] * 5, 0
         rest = period - (clock() - ts)
         if rest > 0:
