@@ -326,3 +326,26 @@ def test_leader_is_read_only_and_maps(tmp_path):
                                               map_path=str(MAP_PATH)))
     with pytest.raises(tl.TeleopRefused):
         bad.connect()
+
+
+def test_real_camera_path_opens_v4l2_only_under_the_arbiter_lock(monkeypatch):
+    """Found live 2026-11-15: FollowerHardware used HardwareBackend, which refuses cameras."""
+    import inchworm.backends as be
+    from inchworm.camera_arbiter import CameraArbiter, global_lock_held_for
+
+    seen = []
+
+    class T:
+        is_open = True
+        def close(self): self.is_open = False
+
+    monkeypatch.setattr(be.V4L2CameraTransport, "open",
+                        classmethod(lambda cls, d, ident: seen.append((d, global_lock_held_for(d))) or T()))
+    backend = fmod.camera_backend(CFG)
+    assert isinstance(backend, be.HardwareBackend)
+    with CameraArbiter(backend).acquire("camera_left_arm"):
+        pass
+    assert seen == [("camera_left_arm", True)]
+    monkeypatch.setenv(be.BACKEND_ENV_VAR, "mock")
+    with pytest.raises(be.BackendError):
+        fmod.camera_backend(CFG)

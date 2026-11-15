@@ -46,6 +46,24 @@ class InchwormRefused(RuntimeError):
     """A safety precondition refused the run (nothing was energised)."""
 
 
+def camera_backend(cfg):
+    """Real hardware backend whose cameras open through V4L2 (AA-5 discovery identity).
+
+    HardwareBackend itself refuses cameras on purpose (AA-14: callers open V4L2 explicitly,
+    as camera_cli/camera_probe --live do). V4L2CameraTransport.open() still refuses unless
+    CameraArbiter.acquire() holds the global one-camera lock for that device.
+    Found live 2026-11-15: the plugin used the plain HardwareBackend and connect() refused.
+    """
+    from inchworm.backends import HardwareBackend, V4L2CameraTransport, live_backend
+    live_backend(cfg)                      # same refusal of INCHWORM_BACKEND=mock as live runs
+
+    class _CameraBackend(HardwareBackend):
+        def _open_camera(self, device, identity):
+            return V4L2CameraTransport.open(device, identity)
+
+    return _CameraBackend(cfg)
+
+
 class FollowerHardware:
     """Real hardware handles. Tests replace ``InchwormFollower._open_hardware`` with simulated ones."""
 
@@ -53,6 +71,7 @@ class FollowerHardware:
         from inchworm.backends import live_backend
         from inchworm.servo_bus import ArmServoBus
         from inchworm import teleop_live as tl
+        self._cfg = cfg
         self._be = live_backend(cfg)
         self.role = f"arm_{follower}"
         self._t = self._be.open_serial(self.role)
@@ -73,7 +92,7 @@ class FollowerHardware:
         from inchworm.camera_capture import CameraSettings, open_capture
         from inchworm.lerobot_adapter import _ARM_ROLE_TO_BACKEND_CAMERA
         device = _ARM_ROLE_TO_BACKEND_CAMERA[f"arm_{follower}"]
-        self._cam = CameraArbiter(self._be).acquire(device)
+        self._cam = CameraArbiter(camera_backend(self._cfg)).acquire(device)
         try:
             cap = open_capture(self._cam.__enter__(), role=device)
             cap.apply_settings(CameraSettings(width=width, height=height, fps=fps))

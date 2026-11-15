@@ -9,8 +9,8 @@ exec uv run lerobot-teleoperate \
   --robot.id=left \
   --robot.camera=false \
   --robot.tube_support=no_tube \
-  --robot.no_collision_check="owner 2026-11-13: first teleop without mesh check" \
-  --robot.allow_unverified_soft_limits="owner 2026-11-15: AA-44 first LeRobot teleop" \
+  --robot.no_collision_check="owner 2026-11-13 - first teleop without mesh check" \
+  --robot.allow_unverified_soft_limits="owner 2026-11-15 - AA-44 first LeRobot teleop" \
   --teleop.type=inchworm_leader \
   --teleop.id=leader \
   --fps=30 \
