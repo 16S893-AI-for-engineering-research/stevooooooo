@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 04:52'
+updated_date: '2026-11-15 05:03'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -30,6 +30,7 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
   - Defaults are the owner's choice from 6 tuning runs: speed cap 250 ticks/s, no smoothing (`--smooth 1`), acceleration 100.
   - `--check` is read-only. Ctrl-C = HOLD, then the owner releases.
   - The log date is the laptop's local date (`teleop_live_2026-11-14.jsonl` holds the 2026-11-15Z runs).
+- **Parked (owner: "good enough for now"):** fix for "it seems to only move one joint at a time" on branch `aa-44-coordinated-speed` (commit c653de7, pushed, NOT run live). Cause in the log: on fast leader moves each lagging joint ran at the 250 cap on its own, so short moves finished first. The fix scales each joint's Goal_Speed by its share of the largest remaining distance; the new test fails on main and passes on the branch. To resume: merge the branch, run the suite, then one supervised live run.
 - Not done: AA-44 AC #1 (doc-1 entry; gearing is not needed per the owner), finalization. The right-arm leader map is not fitted.
 - **Next (fresh session): LeRobot plugins.**
   - Follower robot = teleop_live core + left wrist cam via the arbiter, mono (H,W,1).

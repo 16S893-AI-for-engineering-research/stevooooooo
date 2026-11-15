@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 04:52'
+updated_date: '2026-11-15 05:03'
 labels:
   - hardware
 dependencies:
@@ -69,4 +69,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15 owner: 'Yes everything moved the correct direction!' for the supervised live teleop 04:13-04:14Z at 150 ticks/s (log calibration_data/teleop_live_2026-11-14.jsonl; offsets from the fit, residuals <= 4.0 deg; joint 6 never mapped or written). AC #4 checked on that evidence. leader_map_left.json set unverified: false with that reference.
 
 2026-11-15 04:31-04:40Z owner tuning runs (6 sessions, all Ctrl-C hold then release; log teleop_live_2026-11-14.jsonl): speed 150 x smooth 0.35 (x3), 250 x 0.35, 250 x 1.0, 250 x 0.2. Owner: best with no smoother and speed 250. Defaults changed: DEFAULT_SPEED_TICKS_S 250 (cap; distance-based Goal_Speed below it), DEFAULT_SMOOTH_ALPHA 1.0 (off; deadband inactive at 1.0 since the filter passes through). Accel 100 while following kept.
+
+2026-11-15 owner: teleop 'only seems to move one joint at a time'. Log shows it: with a fast leader move each lagging joint ran at the 250 cap independently, so short moves finished first (e.g. wrist_flex lag up to 1223 ticks while elbow finished). Fix written and tested but NOT run live, parked on branch aa-44-coordinated-speed (commit c653de7, pushed): Goal_Speed scaled per joint by its share of the largest remaining distance so all joints arrive together; new test fails on main and passes on the branch. Owner: good enough for now; may come back to it.
 <!-- SECTION:NOTES:END -->
