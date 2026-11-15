@@ -928,6 +928,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "lerobot", extra = ["dataset", "feetech"] },
+    { name = "lerobot-robot-inchworm" },
 ]
 
 [package.dev-dependencies]
@@ -937,13 +938,21 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "lerobot", extras = ["dataset", "feetech"], specifier = "==0.6.1" }]
+requires-dist = [
+    { name = "lerobot", extras = ["dataset", "feetech"], specifier = "==0.6.1" },
+    { name = "lerobot-robot-inchworm", editable = "../lerobot_plugins/lerobot_robot_inchworm" },
+]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "inchworm-robot", editable = "../" },
     { name = "pytest", specifier = ">=7.0" },
 ]
+
+[[package]]
+name = "lerobot-robot-inchworm"
+version = "0.1.0"
+source = { editable = "../lerobot_plugins/lerobot_robot_inchworm" }
 
 [[package]]
 name = "markupsafe"

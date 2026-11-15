@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 06:06'
+updated_date: '2026-11-15 15:57'
 labels:
   - hardware
 dependencies:
@@ -84,4 +84,13 @@ LeRobot plugins (2026-11-15): 1. TeleopCore.command(raw follower ticks) split ou
 - MEASURED: LeRobot 0.6.1 treats an (H,W,1) camera as a DEPTH map, and the image writer REJECTS uint8 single-channel frames ('Unsupported single-channel image dtype: uint8'), so recording with the AA-22 adapter's (H,W,1) mono shape fails. An (H,W,3) grey frame round-trips (mean abs err 1.8/255 through AV1 video). Plan: the plugin sends grey copied into 3 channels (camera_channels=3). Ask the owner if a different choice is wanted.
 - Started (not installed, not tested): robot/lerobot_plugins/lerobot_robot_inchworm/ (pyproject, config_inchworm.py with InchwormFollowerConfig 'inchworm_follower' and InchwormLeaderConfig 'inchworm_leader').
 - TODO next: inchworm_follower.py (connect = follower_preflight + start gate on the first leader action + YES confirm + energise; send_action deg->ticks via TeleopCore.command; get_observation = follower ticks->deg + wrist cam via CameraArbiter/open_capture/grab_valid as 3-channel grey; disconnect = HOLD, operator Enter, then torque-off joints 1-5; gripper never written; tube_support no_tube|locked_arm read-only check of the other gripper band); inchworm_leader.py (read-only leader, leader map -> follower deg); 'uv add --editable ../lerobot_plugins/lerobot_robot_inchworm' in lerobot_env; tests in lerobot_env/tests on simulated servos (scripts/replay_sim.SimArmBus); scripts/lerobot_calibration_from_eeprom.py (read-only; only needed if LeRobot's own so101 classes are ever used, since the plugin does not use LeRobot's Feetech bus).
+
+2026-11-15 LeRobot plugins WRITTEN + tested on simulated servos (not run on hardware):
+- robot/lerobot_plugins/lerobot_robot_inchworm: inchworm_follower.py (InchwormFollower) + inchworm_leader.py (InchwormLeader); installed editable into lerobot_env (uv add --editable). lerobot-teleoperate/record --help list both types.
+- Follower: connect() refuses without no_collision_check reason, allow_unverified_soft_limits approval (while unverified) and tube_support in {no_tube, locked_arm}, BEFORE opening any port; then follower_preflight; locked_arm = read-only check of the other arm (gripper torque ON in locked band, joints 1-5 torque ON); YES prompt. Nothing energised in connect. First send_action = start gate (10 deg) then energise; TeleopCore.command clamps (soft ∩ EEPROM ∩ yaml). Stop file robot/out/STOP_TELEOP -> KeyboardInterrupt. disconnect = HOLD, Enter, torque off joints 1-5 (idempotent; LeRobot calls it in finally). Gripper not in action/observation; extra action keys rejected. Wrist cam via CameraArbiter (lock held for the connection), grab_valid, corrupt -> last good frame, grey -> 3 channels. robot.cameras property added (lerobot-record needs len(robot.cameras)). Log calibration_data/teleop_lerobot_<date>.jsonl.
+- Leader: read-only Present_Position IDs 1-5 (0x08 tolerated), leader_map_<follower>.json -> follower deg.
+- Tests lerobot_env/tests/test_inchworm_plugin.py (18): refusals, locked_arm, start gate, gripper rejection, follow + clamp + hold/release, stop file, corrupt frames, LeRobot's own teleop_loop, and LeRobot's real record() writing a local 1-episode video dataset (3x48x64 wrist frames, 5-D action/state). lerobot_env 30 passed; main suite 1823 passed.
+- CLI check (no hardware): lerobot-teleoperate --robot.type=inchworm_follower --teleop.type=inchworm_leader without flags -> REFUSED listing the three missing statements.
+- Calibration file from EEPROM NOT written: not needed (the plugin never uses LeRobot's Feetech bus or calibration).
+- Next: supervised lerobot-teleoperate on hardware (no_tube, camera=false first), then lerobot-record local with right arm LOCKED (tube_support=locked_arm).
 <!-- SECTION:NOTES:END -->

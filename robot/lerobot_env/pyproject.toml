@@ -15,6 +15,7 @@ version = "0.1.0"
 description = "Pinned LeRobot 0.6.x environment for the inchworm SO-101 robot"
 requires-python = ">=3.12"
 dependencies = [
+    "lerobot-robot-inchworm",
     # Newest available 0.6.x release on PyPI (0.6.2 does not exist).
     "lerobot[dataset,feetech]==0.6.1",
 ]
@@ -28,6 +29,7 @@ package = false
 
 [tool.uv.sources]
 inchworm-robot = { path = "../", editable = true }
+lerobot-robot-inchworm = { path = "../lerobot_plugins/lerobot_robot_inchworm", editable = true }
 
 [dependency-groups]
 dev = [

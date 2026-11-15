@@ -38,6 +38,10 @@ class InchwormFollowerConfig(RobotConfig):
     camera_channels: int = 3
     #: Ask for YES on the terminal before torque goes on (keep True on hardware).
     confirm: bool = True
+    #: Expected control rate (LeRobot --fps); sets the Goal_Speed step period of the core.
+    control_hz: float = 30.0
+    #: Log directory; empty = robot/calibration_data (teleop_lerobot_<date>.jsonl).
+    log_dir: str = ""
 
 
 @TeleoperatorConfig.register_subclass("inchworm_leader")

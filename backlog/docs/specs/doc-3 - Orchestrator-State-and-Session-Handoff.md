@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 06:07'
+updated_date: '2026-11-15 15:57'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 (late). AA-44: LeRobot plugins PARTIAL (core refactor + preflight done and tested; plugin package started). **Next: finish the LeRobot plugin, see 'In flight: LeRobot plugins' below (fresh session).** Suite passes.
+**Last verified:** 2026-11-15 (later). AA-44: LeRobot plugins WRITTEN and tested on simulated servos, including LeRobot's real record(); NOT run on hardware. **Next: supervised `lerobot-teleoperate` on hardware, see 'In flight: LeRobot plugins' below (fresh session).** Suites pass (1823 + lerobot_env 30).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -24,11 +24,17 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
 
-### In flight: LeRobot plugins (AA-44 / AA-23), paused 2026-11-15 for context
-- **Done, tested:** `TeleopCore.command()` / `target_from_follower_ticks()` / `gate_problems()` (step() reuses them); `teleop_live.follower_preflight()` (used by scripts/teleop_live.py); `src/inchworm/servo_checks.py` (drive_config_faults). lerobot_env gained the `lerobot[dataset]` extra (it was missing).
-- **Measured blocker for mono:** LeRobot 0.6.1 treats (H,W,1) cameras as depth maps and rejects uint8 frames, so record fails with the AA-22 adapter shape. Grey copied to (H,W,3) round-trips fine. The plugin uses 3 channels (`camera_channels=3`). Tell the owner.
-- **Started:** `robot/lerobot_plugins/lerobot_robot_inchworm/` (pyproject + config classes `inchworm_follower`, `inchworm_leader`). It does NOT use LeRobot's Feetech bus (so no servo memory writes).
-- **Next:** write `inchworm_follower.py` + `inchworm_leader.py` (spec in the AA-44 notes, last entry); `cd robot/lerobot_env && uv add --editable ../lerobot_plugins/lerobot_robot_inchworm`; tests on `scripts/replay_sim.SimArmBus`; then a supervised `lerobot-teleoperate --robot.type=inchworm_follower --teleop.type=inchworm_leader ...` (dry-run/check first), then `lerobot-record` (local only, `--dataset.push_to_hub=false`) with the right arm LOCKED.
+### In flight: LeRobot plugins (AA-44 / AA-23): written + sim-tested 2026-11-15, NOT run on hardware
+- `robot/lerobot_plugins/lerobot_robot_inchworm/` (robot `inchworm_follower`, teleoperator `inchworm_leader`) is installed editable in `robot/lerobot_env`. It does NOT use LeRobot's Feetech bus, so it never writes servo memory and no LeRobot calibration file is needed.
+- Follower: refuses before opening any port without `--robot.no_collision_check`, `--robot.allow_unverified_soft_limits` and `--robot.tube_support` (`no_tube` | `locked_arm`; locked_arm = a read-only check that the other gripper is torque-on in its locked band and its joints are torque on).
+  - Then follower_preflight, then a YES prompt. Torque goes on only at the first action that passes the 10 deg start gate.
+  - Stop file `robot/out/STOP_TELEOP` = Ctrl-C. Disconnect = HOLD, Enter, torque off joints 1-5. The gripper is never in action or observation.
+  - Wrist cam via the arbiter: grey copied to 3 channels (LeRobot 0.6.1 rejects (H,W,1) uint8; tell the owner). Log `calibration_data/teleop_lerobot_<date>.jsonl`.
+- Tests: `cd robot/lerobot_env && uv run pytest tests/` (18 plugin tests incl. LeRobot's teleop_loop and real record() to a local video dataset).
+- **Next (owner supervising, dry/read-only first):** from `robot/lerobot_env`, run with the cell as for teleop_live (no tube, other arm torque-off):
+  `uv run lerobot-teleoperate --robot.type=inchworm_follower --robot.id=left --robot.camera=false --robot.tube_support=no_tube --robot.no_collision_check="owner 2026-11-13: first teleop without mesh check" --robot.allow_unverified_soft_limits="owner <date>: <reason>" --teleop.type=inchworm_leader --teleop.id=leader --fps=30`
+  Then with the camera, then `lerobot-record ... --dataset.push_to_hub=false --dataset.repo_id=local/<name> --dataset.single_task="..."` with the right arm LOCKED (`--robot.tube_support=locked_arm`; needs `--robot.follower=left`).
+- Not checked: the read-only `scripts/teleop_live.py --check` start gate is the quickest pre-check; LeRobot's own loop calls get_observation before the first action, so a refused start gate raises after connect (nothing energised).
 
 ### In flight: AA-44 leader teleop (2026-11-15) — ACs #2-#4 checked; #1 open
 - **Live teleop WORKS (owner-supervised).** The left follower tracks the leader on joints 1-5 at about 30 Hz. Owner: every joint moved the correct direction (AC #4 checked). `leader_map_left.json` is verified (all signs +1).
