@@ -132,3 +132,62 @@ def test_live_script_refuses_without_collision_reason(capsys):
     assert m.main([]) == 0
     assert m.main(["--live"]) == 4
     assert "no-collision-check" in capsys.readouterr().out
+
+
+def test_live_script_end_to_end_with_simulated_servos(monkeypatch, tmp_path):
+    """Runs the real --live path of scripts/teleop_live.py against simulated servos.
+    Found 2026-11-15 on hardware: a wrong run_loop() keyword crashed the live path right after
+    energising (it held, nothing moved). This test drives that exact path."""
+    import threading, time as _t
+    import inchworm.backends as be
+    import inchworm.servo_bus as sb
+    from inchworm.config import load_config
+
+    cfg = load_config()
+    lim = cfg.motion_guard.left_arm_limits.servo_tick_limits
+    f_ticks = [1948, 1390, 3122, 1032, 990]
+
+    class Bus(sim.SimArmBus):
+        def _read_bytes(self, sid, reg, n):
+            if reg in (16, 21, 28, 48):          # drive registers: sane, non-zero
+                return bytes([100, 0])[:n]
+            return super()._read_bytes(sid, reg, n)
+
+    bus = Bus("arm_left", f_ticks + [2034], _t.monotonic,
+              limits={i + 1: tuple(lim[j]) for i, j in enumerate((*tl.J5, "gripper"))})
+    bus._bus.read_bytes = bus._read_bytes
+    m = tl.load_leader_map(pathlib.Path(__file__).parents[1] / "calibration_data" / "leader_map_left.json", "left")
+    lead_ticks = [round((f - m["joints"][j]["offset_ticks"]) % 4096) for f, j in zip(f_ticks, tl.J5)]
+    lead = Leader(lead_ticks)
+
+    class T:
+        def close(self): pass
+
+    monkeypatch.setattr(be, "live_backend", lambda cfg: type("B", (), {"open_serial": lambda self, r: T()})())
+    monkeypatch.setattr(sb, "ArmServoBus", lambda t, role, joint_id_map: bus)
+    monkeypatch.setattr(sb, "_ServoBus", lambda t: type("L", (), {"read_bytes_tolerating": staticmethod(lead.read)})())
+    sp = importlib.util.spec_from_file_location("tlive2", pathlib.Path(__file__).parents[1] / "scripts" / "teleop_live.py")
+    mod = importlib.util.module_from_spec(sp); sp.loader.exec_module(mod)
+    stop = tmp_path / "STOP"
+    monkeypatch.setattr(mod, "STOP_FILE", stop)
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    (tmp_path / "calibration_data").mkdir()
+    import shutil
+    shutil.copy(pathlib.Path(__file__).parents[1] / "calibration_data" / "leader_map_left.json",
+                tmp_path / "calibration_data" / "leader_map_left.json")
+    answers = iter(["YES", ""])
+    monkeypatch.setattr("builtins.input", lambda *a: next(answers))
+
+    def later():
+        _t.sleep(0.5)
+        lead.ticks[0] = (lead.ticks[0] + 50) % 4096
+        _t.sleep(1.0)
+        stop.touch()
+    threading.Thread(target=later, daemon=True).start()
+    rc = mod.main(["--live", "--allow-unverified-soft-limits", "test", "--no-collision-check", "test"])
+    assert rc == 0
+    log = (next((tmp_path / "calibration_data").glob("teleop_live_*.jsonl"))).read_text()
+    assert '"event": "stopped"' in log and '"event": "released"' in log and '"hold"' not in log
+    assert abs(bus.pos[1] - (f_ticks[0] + 50)) <= 15        # pan followed the leader
+    assert not any(bus.torque[s] for s in range(1, 6))       # torque off on exit
+    assert bus.goal[6] == 2034 and not bus.torque[6]          # gripper never touched

@@ -125,7 +125,7 @@ def main(argv=None) -> int:
         try:
             core.energise()
             log({"event": "energised"})
-            res = tl.run_loop(core, hz=a.hz, should_stop=STOP_FILE.exists, log=log)
+            res = tl.run_loop(core, hz=a.hz, should_stop=STOP_FILE.exists)
             log({"event": "stopped", "why": "stop file", **res})
         except (KeyboardInterrupt, Exception) as exc:  # noqa: BLE001
             what = "Ctrl-C" if isinstance(exc, KeyboardInterrupt) else f"{type(exc).__name__}: {exc}"

@@ -4,7 +4,7 @@ title: Integrate the dedicated encoder-only leader arm for teleop demonstrations
 status: To Do
 assignee: []
 created_date: '2026-11-09 00:41'
-updated_date: '2026-11-15 03:21'
+updated_date: '2026-11-15 03:46'
 labels:
   - hardware
 dependencies:
@@ -61,4 +61,6 @@ Owner, 2026-11-09: a third arm exists that is a leader only, with encoder-only s
 2026-11-15 02:47Z: leader->left fit saved (calibration_data/leader_map_left.json, unverified:true) from owner hand-matched poses P1,P2,P3 (latest per label). All signs +1. Offsets ticks: pan 22.3, lift 2177.0, elbow 3083.7, wrist_flex 3741.7, wrist_roll 1443.0. Worst residual deg: 2.61, 1.49, 2.61, 2.00, 4.04 (tol 5). Leader span deg: 68.6, 93.4, 179.1, 91.9, 88.3. AC #4 still open: needs the supervised low-speed teleop check.
 
 2026-11-15: src/inchworm/teleop_live.py (core: leader read 0x08-tolerant, software map, no-seam representative, clamp to soft limits ∩ EEPROM-10, ONE sync-write joints 1-5 with capped Goal_Speed, gripper never written, 10 deg start gate) + scripts/teleop_live.py (dry-run default; --check read-only; --live needs --no-collision-check reason and --allow-unverified-soft-limits approval; CONFIRM YES; Ctrl-C/stop file = HOLD then owner release; joints 1-5 torque-off sweep on exit; log calibration_data/teleop_live_<date>.jsonl). Tests tests/test_teleop_live.py (10, simulated servos). Read-only --check on hardware 03:11Z: refused at the start gate, wrist_roll leader -12.2 deg from the follower (others within 10). Observed: hardware.yaml servo_tick_limits shoulder_pan/lift differ from the live EEPROM on both arms (left pan yaml 674..2527 vs EEPROM 672..3340; right pan 1191..3044 vs 788..3447); teleop uses the live EEPROM intersected with the soft limits. Not yet: LeRobot plugins (next), live run (owner supervised).
+
+2026-11-15 03:39Z first --live attempt: energised, then TypeError (run_loop() got unexpected keyword 'log') before any teleop step; the error path HELD (present positions, no motion) and the owner released torque at 03:40:05Z. Fixed; new end-to-end test drives the real --live path of scripts/teleop_live.py against simulated servos (follows leader, stop file, released, gripper untouched).
 <!-- SECTION:NOTES:END -->
