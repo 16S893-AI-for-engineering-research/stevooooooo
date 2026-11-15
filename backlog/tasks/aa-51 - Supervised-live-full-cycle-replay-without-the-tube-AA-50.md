@@ -1,11 +1,11 @@
 ---
 id: AA-51
 title: Supervised live full-cycle replay without the tube (AA-50)
-status: In Progress
+status: Done
 assignee:
   - '@human'
 created_date: '2026-11-12 21:48'
-updated_date: '2026-11-13 03:40'
+updated_date: '2026-11-14 23:38'
 labels:
   - human-action
   - human-key-56aeb9883b7721f9
@@ -129,7 +129,7 @@ Preparation: Robot powered as usual; both arms torque-off and placed by hand rou
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 calibration_data/replay_cycle_<date>.jsonl holds a run that ends in 'done' and 'released' (or an abort with its reason), plus the owner's observations: did both arms follow the cycle smoothly, did each gripper open and turn about 45 degrees at its regrip, and was there any contact, grinding or alarming sound.
+- [x] #1 calibration_data/replay_cycle_<date>.jsonl holds a run that ends in 'done' and 'released' (or an abort with its reason), plus the owner's observations: did both arms follow the cycle smoothly, did each gripper open and turn about 45 degrees at its regrip, and was there any contact, grinding or alarming sound.
 <!-- AC:END -->
 
 ## Definition of Done
@@ -156,7 +156,7 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
 {
   "version": 1,
   "key": "56aeb9883b7721f9ef1fb18840c1b55b0e96568fab5e904ac17fae201eef5845",
-  "phase": "active",
+  "phase": "verified",
   "createdAt": "2026-11-12T21:48:39.439Z",
   "origin": "01a1d101-b8e5-7496-a5a0-f4e66bdd6498",
   "step": 7,
@@ -239,8 +239,18 @@ Follow the user-accepted procedure one step at a time, record evidence and stop 
     }
   ],
   "acceptedHash": "ff0e74c277109b038724b178aefb87b3a123ed98a8dfd113af59e0c2e2680779",
-  "acceptedAt": "2026-11-12T22:35:08.754Z"
+  "acceptedAt": "2026-11-12T22:35:08.754Z",
+  "summary": "worked great!",
+  "completedAt": "2026-11-13T21:14:45.229Z",
+  "verifiedAt": "2026-11-14T23:38:12.844Z",
+  "verification": "Read robot/calibration_data/replay_cycle_2026-11-12.jsonl myself: the no-tube run started 2026-11-13T00:23:01Z has gripper_lock LOCKED events for left and right at both regrips, then done at 00:27:31Z and released at 00:27:39Z with errors {}. A second full run ended done at 00:59:48Z. There are 8 done events in the file, and every released event has errors {}. Owner report: arms smooth yes, grippers relocked about 45 deg yes, contact/grinding/hot servo no. Summary: \"worked great!\". AA-50 is already Done. Uncertainty: steps 3-6 were recorded from the log, not observed by the owner. The owner's answers do not say which run they cover. The 70-150 C single reads in the later fluid runs are treated as bogus readings (doc-3 decision)."
 }
 ```
 <!-- /human-handoff-state -->
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Read robot/calibration_data/replay_cycle_2026-11-12.jsonl myself: the no-tube run started 2026-11-13T00:23:01Z has gripper_lock LOCKED events for left and right at both regrips, then done at 00:27:31Z and released at 00:27:39Z with errors {}. A second full run ended done at 00:59:48Z. There are 8 done events in the file, and every released event has errors {}. Owner report: arms smooth yes, grippers relocked about 45 deg yes, contact/grinding/hot servo no. Summary: "worked great!". AA-50 is already Done. Uncertainty: steps 3-6 were recorded from the log, not observed by the owner. The owner's answers do not say which run they cover. The 70-150 C single reads in the later fluid runs are treated as bogus readings (doc-3 decision).
+<!-- SECTION:FINAL_SUMMARY:END -->
