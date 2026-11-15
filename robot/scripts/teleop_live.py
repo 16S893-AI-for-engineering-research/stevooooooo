@@ -96,7 +96,11 @@ def main(argv=None) -> int:
         if bad:
             print(f"REFUSED: {role} drive config: {bad}"); return 5
         try:
-            limits = tl.intersect(tl.soft_limit_ticks(cfg, a.follower), tl.eeprom_limits(fraw.read_bytes))
+            yaml_ticks = getattr(cfg.motion_guard, f"{a.follower}_arm_limits").servo_tick_limits or {}
+            yaml_lim = {j: (yaml_ticks[j][0] + tl.EEPROM_INSIDE_TICKS, yaml_ticks[j][1] - tl.EEPROM_INSIDE_TICKS)
+                        for j in tl.J5}   # hardware.yaml tick limits (tighter than EEPROM on pan/lift)
+            limits = tl.intersect(tl.intersect(tl.soft_limit_ticks(cfg, a.follower), tl.eeprom_limits(fraw.read_bytes)),
+                                  yaml_lim)
         except tl.TeleopRefused as e:
             print(f"REFUSED: {e}"); return 4
         core = tl.TeleopCore(leader_read=lraw.read_bytes_tolerating, follower_bus=fbus, mapping=mapping,

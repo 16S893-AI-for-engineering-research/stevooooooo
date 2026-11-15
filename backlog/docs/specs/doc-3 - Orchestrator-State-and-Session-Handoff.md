@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 00:47'
+updated_date: '2026-11-15 03:22'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-13 (late). AA-51 handoff verified. Leader/teleop decisions recorded (see below). **Next: AA-44 leader mapping script + LeRobot plugins.** Suite passes.
+**Last verified:** 2026-11-15. AA-44: leader map fitted, supervised teleop script ready (see In flight). **Next: owner-supervised live teleop of the left arm, then the LeRobot plugins in a fresh session.** Suite passes.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
@@ -23,6 +23,17 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 6. Owner prefers the official Feetech route for servo firmware.
 7. DexArm collision: keep the mesh cell check (owner asked about a simple box; rejected with numbers: the fold reaches Y 67 mm, the DexArm base extends to Y 99 mm, and the tube crosses any box).
 8. (2026-11-09) Both arms rebuilt with powered STS3215 1/345 on every joint (same model as the first set). A third, dedicated encoder-only **leader arm** exists for teleop (AA-44); it changes decision-1's cross-arm plan. Ask the owner before reworking AA-23 around it.
+
+### In flight: AA-44 leader teleop (2026-11-15)
+- Leader->left map FITTED (`calibration_data/leader_map_left.json`, unverified): all signs +1, worst 1.5-4.0 deg over owner poses P1-P3. Tool: `scripts/leader_mapping.py capture/fit/watch` (read-only).
+- `scripts/teleop_live.py` + `src/inchworm/teleop_live.py` cover the supervised slow teleop.
+  - Joints 1-5 only, sent in ONE sync-write capped at 150 ticks/s. The gripper is never written.
+  - Each goal is clamped to the tightest of the soft limits, the EEPROM limits and the hardware.yaml tick limits (10 ticks inside).
+  - 10 deg start gate. Ctrl-C = HOLD. No mesh check (owner).
+  - `--check` is read-only; on 03:11Z it refused only on wrist_roll (leader 12 deg off).
+- **Next (owner at robot):** match the leader to the left arm (torque off). Run `--check`, then `uv run python scripts/teleop_live.py --live --allow-unverified-soft-limits "owner 2026-11-15: AA-44 teleop check" --no-collision-check "owner 2026-11-13: first teleop without mesh check"`. Logs `calibration_data/teleop_live_<date>.jsonl`; that run is AA-44 AC #4 evidence once the owner confirms tracking.
+- **Then (fresh session):** LeRobot plugins (follower robot = teleop_live core + left wrist cam via the arbiter, mono (H,W,1); leader teleoperator = leader map), a LeRobot calibration file from the current follower EEPROM, `lerobot-teleoperate`, then `lerobot-record` with the right arm LOCKED holding the tube.
+- Found: hardware.yaml `servo_tick_limits` for shoulder_pan/lift differ from the live EEPROM on both arms (e.g. left pan yaml 674..2527, EEPROM 672..3340). Not changed; ask the owner which is intended.
 
 ### Owner decisions 2026-11-13: teleop and leader (AA-44 / AA-23), recorded in both tasks' notes
 - Leader calibration: software sign/offset fit from 2-3 matched hand poses (leader and follower both read-only, no EEPROM writes). Joint 6 excluded.
