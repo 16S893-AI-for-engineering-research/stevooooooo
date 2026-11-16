@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-16 02:01'
+updated_date: '2026-11-16 03:19'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-16 02:10Z. Rapid-fire handoff recording works live (`reset_start.sh` -> cycle -> `lerobot_env/record_handoff.sh`, live view http://localhost:8765; records only after the catch-up; actions saved in the state's turn). Datasets: insert_left_20261115T222125Z and insert_left_20261116T015012Z (owner re-records; 215810Z has the 360 deg action offset, do not use). **Open, in this order (details AA-23 notes 2026-11-16):** (1) TORN camera frames in the recorded videos (~8-17 % of frames, halves of two frames; existing corrupt filter misses them): confirm with a camera-only capture, then reject at grab. Decide with the owner whether the two datasets are usable. (2) Owner wants start-pose wrist_roll +2 deg CCW (viewed from opposite the cables) on both arms: measure the tick sign first, regenerate the timeline + preflights, re-record after. Suites: main 1860, plugin 48; 9 camera/scanner tests failed once in a full run but pass alone (flaky? check).
+**Last verified:** 2026-11-16 03:15Z. Rapid-fire handoff recording works live (`reset_start.sh` -> cycle -> `lerobot_env/record_handoff.sh`, live view http://localhost:8765). Datasets: insert_left_20261115T222125Z, insert_left_20261116T015012Z (215810Z has the 360 deg action offset, do not use). **Robot state:** the 02:44Z cycle aborted before any arm motion (right wrist_flex was 1 deg past its soft limit); both grippers LOCKED on the tube. Run `reset_start.sh` before the next cycle. **NEXT (AA-23 notes 2026-11-16, owner decisions):** (1) start-pose wrist_roll -2 deg (CCW from the side opposite the wires) on both arms: plan, regenerate the timeline, rerun the preflights. (2) Start adjusts from ANY hand placement: no 10 deg cap, slow and mesh-checked; a start joint outside its soft limit may only move inward. (3) Camera: only ~8 NEW images/s (the rest are repeats); no torn frames, an earlier claim was wrong. Waiting on the owner (Windows Camera app rate check). Re-record after (1). Suites: main 1860, plugin 48.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
