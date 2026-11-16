@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-15 22:24'
+updated_date: '2026-11-16 02:01'
 labels: []
 milestone: m-3
 dependencies:
@@ -167,6 +167,9 @@ OBSERVATION (data quality, to raise with the owner): episode 1 catch-up lasted 2
 FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the saved ACTION for elbow_flex / wrist_flex (and some shoulder_lift) is 360 deg off observation.state (leader map wraps to another 4096-tick turn; the follower used the nearest representative, so motion was correct but the saved numbers were not). Wrapped |action-state| p99 was 2/37/23/15/5 deg (the 37/23 = the old recorded catch-up). Now record_handoff saves the action unwrapped to the state's turn (unwrap_to). The two saved episodes need the same unwrap before training (or re-record). Tests: plugin 47 (catch-up not recorded + action within 2 deg of state; unwrap_to).
 
 2026-11-15 owner: RE-RECORD (the 2 episodes of insert_left_20261115T215810Z have the 360 deg action offset; do not train on them). Added live wrist view to record_handoff: MJPEG at http://localhost:8765 (127.0.0.1 only) serving the frames the recorder already grabs (never opens the camera: one-camera invariant); --preview-port 0 = off. The lerobot env's OpenCV is headless (no window support) and rerun is not installed, hence the browser. Plugin tests 48.
+
+2026-11-16 owner report: the live view shows split images (halves of two frames). MEASURED in the recorded videos too, so not a viewer bug: datasets/insert_left_20261116T015012Z (2 episodes, 2102 frames) has ~352 frames that look torn (one neighbour's content above a row, the other's below; seam rows vary 40-420), insert_left_20261115T222125Z ~162 of 1761. Also exact duplicate frames (e.g. frames 2 = 3). The existing corrupt-frame filter (libjpeg warning / SOI-EOI in V4L2CameraTransport) does not catch these. Likely cause (UNVERIFIED): OpenCV V4L2 MJPEG decode into a reused buffer on a partial frame from the shared USB 2.0 link. Detector used: /tmp/tear2.py heuristic (not committed). NEXT (fresh session): confirm with a camera-only capture (no arms moving) that saves raw frames, then reject torn frames at grab (keep last good, like corrupt frames) and report the rate; decide with the owner whether the 2 datasets are usable or re-record.
+2026-11-16 owner request: start pose wrist_roll of BOTH arms +2 deg counter-clockwise viewed from the side opposite the cables. Not done yet: needs (1) the tick sign of 'CCW from opposite the cables' measured (owner turns each wrist slightly CCW by hand, torque off, read-only status before/after), (2) regenerating the timeline (the plan holds roll at 0 for both arms; inchworm_plan measured_fold_pose sets q[4]=0) and re-running the preflights, (3) the handoff stop pose changes, so episodes recorded before the change are at the old roll (re-record after).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

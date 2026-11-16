@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-15 22:03'
+updated_date: '2026-11-16 02:01'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-15 22:05Z. **Rapid-fire handoff recording WORKS live:** first session 21:58-22:02Z saved 2 insertion episodes (`robot/datasets/insert_left_20261115T215810Z`, 1643 frames, wrist video); both automatic returns clean (worst track 19 ticks), 0 collision holds. Start procedure: `bash robot/reset_start.sh` -> tube keys in -> `replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ...` -> `bash robot/lerobot_env/record_handoff.sh` (r / s / d / q). **Open with the owner:** (1) long catch-up when the leader is far from the follower makes action != motion at the start of an episode (AA-23 notes 22:05Z); (2) confirm the retract never-below-stop-height refinement; (3) TRACK_TOL_TICKS 45 unverified. Suites: main 1860, plugin 45.
+**Last verified:** 2026-11-16 02:10Z. Rapid-fire handoff recording works live (`reset_start.sh` -> cycle -> `lerobot_env/record_handoff.sh`, live view http://localhost:8765; records only after the catch-up; actions saved in the state's turn). Datasets: insert_left_20261115T222125Z and insert_left_20261116T015012Z (owner re-records; 215810Z has the 360 deg action offset, do not use). **Open, in this order (details AA-23 notes 2026-11-16):** (1) TORN camera frames in the recorded videos (~8-17 % of frames, halves of two frames; existing corrupt filter misses them): confirm with a camera-only capture, then reject at grab. Decide with the owner whether the two datasets are usable. (2) Owner wants start-pose wrist_roll +2 deg CCW (viewed from opposite the cables) on both arms: measure the tick sign first, regenerate the timeline + preflights, re-record after. Suites: main 1860, plugin 48; 9 camera/scanner tests failed once in a full run but pass alone (flaky? check).
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 
