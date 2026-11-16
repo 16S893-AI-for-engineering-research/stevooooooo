@@ -14,11 +14,13 @@ Live (owner present, hand on the power switch):
     uv run python scripts/replay_cycle.py --live \\
         --allow-unverified-soft-limits "owner 2026-11-13: AA-50 no-tube replay"
   1. refuses unless all 12 servos are torque-off and drive registers are sane;
-  2. reads the pose; if every joint is within 10 deg of frame 0 and the straight move there
-     is clear in the cell model, the robot makes the final adjustment itself (step 5);
-  3. asks you to confirm: no tube, DexArm parked, hands clear;
-  4. slow profile on; both grippers lock (45-degree turn; look that they turn);
-  5. the final adjustment to frame 0, then the whole cycle with no further prompts. Default
+  2. reads the pose; from ANY hand placement (owner 2026-11-16) the robot moves to frame 0
+     itself, one arm at a time, slowly, if that move is clear in the cell model (a joint
+     slightly past its soft limit may only come back inward);
+  3. asks you to confirm: grippers empty, DexArm parked, hands clear;
+  4. slow profile on; the start adjustment; (--tube-in-grippers: you put the tube's keys in
+     the open grippers and type YES); both grippers lock (45-degree turn; look that they turn);
+  5. the whole cycle with no further prompts. Default
      (owner 2026-11-13): FLUID motion, both arms at the same time, never stopping between
      frames, at --tempo x the animation speed (default 1.0, slowed only where a joint would pass ~57 deg/s); the arms rest only while a
      gripper unlocks or locks. --step-by-step = the old frame-by-frame replay at --speed;
@@ -31,8 +33,8 @@ Demo start with the tube (AA-23 / AA-44, owner decisions 2026-11-15):
   plays frames 0..42 (to the end of the left arm's "move under target", 50 mm under its next
   attachment point, right gripper LOCKED) and STOPS there with both arms HOLDING (torque on)
   after the script exits. It writes out/handoff_state.json for the LeRobot follower's
-  tube_support=handoff mode. --tube-in-grippers: the tube's attachment keys sit in the open
-  grippers before the start; every preflight then models the tube where the timeline puts it,
+  tube_support=handoff mode. --tube-in-grippers: the tube's attachment keys go in the open
+  grippers after the start adjustment, before the locks; every preflight then models the tube where the timeline puts it,
   the fold press is skipped, and no path of this script ever switches a gripper's torque off.
   Without it (first live step, owner 2026-11-15) the run is the no-tube rehearsal that checks
   the servos keep holding after the script exits.
@@ -164,7 +166,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="AA-23 demo start: play frames 0..N, then stop with both arms HOLDING after exit "
                          "and write out/handoff_state.json (owner 2026-11-15: N = 42)")
     ap.add_argument("--tube-in-grippers", action="store_true",
-                    help="the tube's keys are in the open grippers at the start: preflights model the tube, "
+                    help="the tube's keys go in the open grippers after the start adjustment (asked): preflights model the tube, "
                          "no fold press, grippers are never switched off; needs --stop-after-frame")
     ap.add_argument("--handoff-state", type=Path, default=None, help="handoff state path (default out/handoff_state.json)")
     ap.add_argument("--skip-sim", action="store_true", help="dry-run: skip the simulated run")
@@ -328,24 +330,30 @@ def live(cfg, frames, a) -> int:
         res = compare_start_pose(measured, {arm: list(frames[0].q[arm]) for arm in cr.ARMS})
         from inchworm.motion_guard import build_mesh_collision_guard
         mesh = build_mesh_collision_guard(cfg, "left")
-        appr = cr.approach_problems(cfg, measured, frames[0], None if mesh is None else mesh.checker,
-                                    tube=a.tube_in_grippers)
+        order, appr = cr.approach_plan(cfg, measured, frames[0], None if mesh is None else mesh.checker)
+        outside = cr.outside_soft_limits(cfg, measured)
         log({"event": "start", "ticks": ticks, "gripper_ticks": grip, "speed": a.speed,
              "mode": "step-by-step" if a.segments is None else f"fluid tempo {a.tempo:g}",
              "soft_limits_override": a.allow_unverified_soft_limits,
              "stop_after_frame": a.stop_after_frame, "tube_in_grippers": a.tube_in_grippers,
-             "diff_to_start_deg": res.diff_deg, "approach_problems": appr})
+             "diff_to_start_deg": res.diff_deg, "approach_problems": appr,
+             "approach_order": order, "start_outside_soft_limits": outside})
         if appr:
             print("REFUSED: the robot will not adjust to the start pose from here:")
             for p in appr:
                 print("  " + p)
             return 6
-        print(f"Start pose: the robot will make the final adjustment itself (each joint within "
-              f"{cr.APPROACH_MAX_DEG:.0f} deg; move checked against the cell model). Degrees to move:")
+        span = max(abs(d) for arm in cr.ARMS for d in res.diff_deg[arm])
+        print(f"Start pose: the robot moves to it itself, one arm at a time ({order[0]} first), slowly "
+              f"(~{cr.APPROACH_TICKS_S * 360 / 4096:.0f} deg/s, about {span * 4096 / 360 / cr.APPROACH_TICKS_S:.0f} s "
+              f"per arm at most), checked against the cell model. Degrees to move:")
         for arm in cr.ARMS:
             print(f"  {arm:5}: " + "  ".join(f"{j} {-d:+.1f}" for j, d in zip(cr.JOINTS, res.diff_deg[arm])))
+        for o in outside:
+            print(f"  note: {o} (allowed: the move only brings it back inside)")
 
-        tube_line = ("  - the tube's attachment keys are IN both open grippers (they lock on it next)\n"
+        tube_line = ("  - the grippers are EMPTY: the tube goes in AFTER the arms reach the start pose "
+                     "(you will be asked)\n"
                      "  - the DexArm head is out of the way of the tube and its 170 mm lift path (owner "
                      "2026-11-15; the DexArm is not collision-checked on this path)\n"
                      if a.tube_in_grippers else "  - NO tube in the grippers or the cell\n")
@@ -364,10 +372,16 @@ def live(cfg, frames, a) -> int:
                             abort_on_faults=a.segments is None)
         try:
             r.energise()
+            print(f"moving to the start pose ({order[0]} arm first, slow) ...")
+            r.move_to_start(order)
+            log({"event": "at_start", "ticks": {x: r._ticks(x) for x in cr.ARMS}})
+            if a.tube_in_grippers:
+                print("\nBoth arms are at the start pose and HOLDING.")
+                if input("Put the tube's attachment keys in BOTH open grippers, then type YES "
+                         "(anything else = stop, no gripper moves): ").strip() != "YES":
+                    raise cr.ReplayAborted("tube not confirmed in the grippers")
             print("locking both grippers (45-degree turn) ...")
             r.lock_both()
-            print("final adjustment to the start pose ...")
-            r.move_to_start()
             if a.fold_press:
                 print("fold press: resting both lower arms on their shoulders (15 % elbow torque) ...")
                 r.fold_press(frames[0], "start")

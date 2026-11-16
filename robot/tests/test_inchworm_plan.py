@@ -11,6 +11,7 @@ The checker loads once per module (meshes take about 11 s).
 """
 from __future__ import annotations
 
+import math
 import json
 from pathlib import Path
 
@@ -308,20 +309,21 @@ def test_per_arm_start_reaches_each_point(cfg, checker):
 # ---------------------------------------------------------------------------
 
 
-def test_fold_start_holds_pan_and_roll_at_zero(cfg, checker):
+def test_fold_start_holds_pan_at_zero_and_roll_at_minus_2_deg(cfg, checker):
     """Default plan starts in the measured fold (both arms the same, pan 0,
-    roll 0), keeps pan and roll at 0 for both arms in every frame, and ends
+    roll -2 deg = owner 2026-11-16, 2 deg CCW from the side opposite the wires),
+    keeps pan and roll at those values for both arms in every frame, and ends
     back in the fold. Pan is NOT removed from the joint limits."""
     from inchworm.inchworm_plan import measured_fold_pose
     plan = plan_cycle(cfg, checker)
     assert plan.start_kind.startswith("measured fold") and plan.hold_pan_roll
     q0 = measured_fold_pose(cfg)
-    assert q0[0] == 0.0 and q0[4] == 0.0
+    assert q0[0] == 0.0 and q0[4] == pytest.approx(math.radians(-2.0))
     np.testing.assert_allclose(plan.printing_pose_left, q0)
     np.testing.assert_allclose(plan.printing_pose_right, q0)
     for fr in plan.frames:
         assert fr.left_q[0] == 0.0 and fr.right_q[0] == 0.0, fr.step
-        assert fr.left_q[4] == 0.0 and fr.right_q[4] == 0.0, fr.step
+        assert fr.left_q[4] == q0[4] and fr.right_q[4] == q0[4], fr.step
     np.testing.assert_allclose(plan.frames[-1].left_q, q0, atol=2e-3)
     np.testing.assert_allclose(plan.frames[-1].right_q, q0, atol=2e-3)
     kin = build_cell_kinematics(cfg, checker)

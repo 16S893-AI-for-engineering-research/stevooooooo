@@ -1,4 +1,4 @@
-"""AA-23 start_check.problems: torque, gripper band and the 10 deg start window."""
+"""AA-23 start_check.problems: torque, gripper band (and the optional degree window, no longer used live)."""
 import importlib.util
 import pathlib
 
@@ -27,3 +27,9 @@ def test_not_ready_reasons():
     assert not any("right shoulder" in x for x in p)
     near = list(START["left"]); near[0] += 113                          # 9.9 deg: inside
     assert sc.problems({"left": _st(near), "right": _st(START["right"])}, START, 10.0) == []
+
+
+def test_no_degree_window_by_default():
+    """Owner 2026-11-16: the robot adjusts from any hand placement; distance alone is not a problem."""
+    far = list(START["left"]); far[2] -= 500                            # 44 deg off
+    assert sc.problems({"left": _st(far), "right": _st(START["right"])}, START) == []

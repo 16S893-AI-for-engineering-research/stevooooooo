@@ -558,9 +558,16 @@ IK_JOINT_WEIGHTS = np.array([1000.0, 1.0, 1.0, 1.0, 1000.0])
 UP = np.array([0.0, 0.0, 1.0])
 
 
+#: Owner 2026-11-16: servo 5 (wrist_roll) of BOTH arms starts 2 deg counter-clockwise viewed
+#: from the side opposite its wires. doc-1: the ID5 cable exits down and a higher reading is
+#: clockwise viewed with the cable exiting away from the viewer, so CCW = a LOWER reading;
+#: wrist_roll_sign is +1 on both arms (hardware.yaml), so the joint value is -2 deg.
+START_ROLL_RAD = math.radians(-2.0)
+
+
 def measured_fold_pose(cfg) -> np.ndarray:
     """Owner 2026-11-12: the printing pose IS the measured fold, the same for
-    both arms, with pan 0 and roll 0. Joints 2-4 = the mean of the two arms'
+    both arms, with pan 0 and roll START_ROLL_RAD (owner 2026-11-16). Joints 2-4 = the mean of the two arms'
     measured fold (the fold-allowance centres in hardware.yaml, which are the
     hand-placed fold of 2026-11-11 with the landmark zeros)."""
     mesh = cfg.motion_guard.collision.mesh
@@ -569,7 +576,7 @@ def measured_fold_pose(cfg) -> np.ndarray:
         raise PlanStopped("no measured fold configured (motion_guard.collision.mesh.fold_allowance_centre_*)")
     q = (np.asarray(L, dtype=float) + np.asarray(R, dtype=float)) / 2.0
     q[0] = 0.0
-    q[4] = 0.0
+    q[4] = START_ROLL_RAD
     return q
 
 
@@ -623,7 +630,7 @@ def plan_cycle(
     both arms.
     With ``start_from_fold`` (default, owner 2026-11-12: "the printing pose
     and the folded pose should be the same"), the start is the measured fold
-    for both arms with pan 0 and roll 0 (:func:`measured_fold_pose`), and the
+    for both arms with pan 0 and roll -2 deg (:func:`measured_fold_pose`), and the
     tube is re-placed rigidly onto the grippers (left grip = middle point, axis
     along left->right grip) instead of its CAD placement (owner 2026-11-11: the
     URDF placement is approximate). Planning stops if the left grip is more than
@@ -664,7 +671,7 @@ def plan_cycle(
     elif start_from_fold:
         qL = measured_fold_pose(cfg)
         qR = qL.copy()
-        start_kind = "measured fold (both arms, pan 0, roll 0; tube placed on the grippers)"
+        start_kind = "measured fold (both arms, pan 0, roll -2 deg; tube placed on the grippers)"
         TL, TR = kin.gripper_pose("left", qL), kin.gripper_pose("right", qR)
         pe0, ae0 = _pose_error(TL, T_mid)
         if pe0 > START_GRIP_TOL_M or ae0 > START_GRIP_TOL_RAD:
@@ -860,7 +867,7 @@ def plan_cycle(
     S_carry = (UP * lift_m + Y * first_carry_m, yaw)
     S_end = (ax * pitch, 0.0)
     emit("printing pose (start)", True, True, motion(*S0),
-         ("printing pose (measured fold, pan 0, roll 0)" if start_from_fold and printing_pose is None
+         ("printing pose (measured fold, pan 0, roll -2 deg)" if start_from_fold and printing_pose is None
           else "printing pose (IK, seeded from placeholder)"), {})
 
     repositions.append(RepositionLog(
@@ -942,7 +949,7 @@ def build_report(plan: CyclePlan, att: AttachmentModel) -> str:
     if plan.start_kind.startswith("measured fold"):
         lines.append(
             "The printing pose is the owner's MEASURED fold (hand-placed 2026-11-11,\n"
-            "landmark zeros), one pose for both arms with pan 0 and roll 0. The tube\n"
+            "landmark zeros), one pose for both arms, pan 0, roll -2 deg. The tube\n"
             "is re-placed onto the grippers (its CAD placement is approximate,\n"
             "owner 2026-11-11). It is never written to hardware.yaml.\n"
             "Lift, first carry and regrip standoff are model-chosen, not measured."
@@ -959,7 +966,7 @@ def build_report(plan: CyclePlan, att: AttachmentModel) -> str:
     lines.append("")
     lines.append(f"  start pose kind : {plan.start_kind}")
     if plan.hold_pan_roll:
-        lines.append("  pan / roll      : held at the start value (0) for BOTH arms in this")
+        lines.append("  pan / roll      : held at the start value (pan 0, roll -2 deg) for BOTH arms in this")
         lines.append("                    movement (owner 2026-11-12); pan stays a free joint")
         lines.append("                    elsewhere (the learned insertion may pan)")
     lines.append("")

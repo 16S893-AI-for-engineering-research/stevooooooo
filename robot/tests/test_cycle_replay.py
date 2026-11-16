@@ -161,17 +161,84 @@ class _Checker:
         return ["left_wrist vs chassis"] if self.hit else []
 
 
-def test_approach_adjusts_when_close_refuses_when_far_or_colliding():
+class _ArmChecker:
+    """Collides only while ``arm`` is between t=0.3 and 0.7 of its own move AND the other arm
+    is still at its measured pose (so moving the other arm first clears it)."""
+    def __init__(self, cfg, f0, near, arm):
+        self.f0, self.near, self.arm = f0, near, arm
+
+    def check(self, state, arm=None):
+        q = {"left": np.asarray(state.left_q), "right": np.asarray(state.right_q)}
+        o = "right" if self.arm == "left" else "left"
+        d = self.f0.q[self.arm] - self.near[self.arm]
+        t = float((q[self.arm] - self.near[self.arm]) @ d / (d @ d))
+        return ["sweep"] if 0.3 < t < 0.7 and np.allclose(q[o], self.near[o]) else []
+
+
+def test_approach_adjusts_from_any_distance_refuses_only_when_colliding():
+    """Owner 2026-11-16: no distance cap; the move is planned one arm at a time."""
     cfg = load_config()
     f0 = _short_plan(cfg)[0]
-    near = {a: f0.q[a] + np.radians([0.5, -0.3, 3.5, 0.0, -2.7]) for a in cr.ARMS}   # the measured fold offsets
-    assert cr.approach_problems(cfg, near, f0, _Checker()) == []
-    far = {a: f0.q[a] + np.radians([0, 0, 12.0, 0, 0]) for a in cr.ARMS}
-    p = cr.approach_problems(cfg, far, f0, _Checker())
-    assert p and "elbow_flex" in p[0] and "closer by hand" in p[0]
-    assert cr.approach_problems(cfg, near, f0, _Checker(hit=True))
+    near = {a: f0.q[a] + np.radians([0.5, -0.3, 3.5, 0.0, -2.7]) for a in cr.ARMS}
+    assert cr.approach_plan(cfg, near, f0, _Checker()) == (("left", "right"), [])
+    far = {a: f0.q[a] + np.radians([20.0, -30.0, -45.0, 25.0, 40.0]) for a in cr.ARMS}
+    assert cr.approach_problems(cfg, far, f0, _Checker()) == []
+    p = cr.approach_problems(cfg, near, f0, _Checker(hit=True))
+    assert p and "both orders" in p[0]
     assert cr.approach_problems(cfg, near, f0, None) == ["mesh collision model unavailable"]
     assert cr.approach_problems(cfg, {"left": near["left"]}, f0, _Checker())       # missing arm
+    # left first sweeps through something while the right is still away: right goes first
+    assert cr.approach_plan(cfg, far, f0, _ArmChecker(cfg, f0, far, "left"))[0] == ("right", "left")
+
+
+def test_approach_refuses_a_start_pose_outside_the_soft_limits():
+    cfg = load_config()
+    f0 = _short_plan(cfg)[0]
+    bad = cr.Frame(0, "x", {"left": f0.q["left"] + np.radians([0, 0, 0, 200.0, 0]), "right": f0.q["right"]},
+                   dict(f0.locked))
+    p = cr.approach_problems(cfg, {a: f0.q[a] for a in cr.ARMS}, bad, _Checker())
+    assert p and "left: start pose outside the soft limits" in p[0]
+
+
+def test_start_outside_soft_limit_moves_inward_one_arm_at_a_time():
+    """Live 2026-11-16: right wrist_flex read 902 ticks, 1 deg past its soft limit, and the run
+    aborted with q_start outside the soft limits. Now the adjustment brings it back inward, one
+    arm at a time, slowly; nothing else is relaxed."""
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _short_plan(cfg)
+        start = {a: cr.q_to_ticks(cfg, a, plan[0].q[a]) + [1560] for a in cr.ARMS}
+        start["right"][3] = 902                                           # wrist_flex past -1.6581 rad
+        start["left"][2] -= 450                                           # elbow ~40 deg open
+        from inchworm.so101_pose_reader import ticks_to_q
+        assert cr.outside_soft_limits(cfg, {"right": ticks_to_q(cfg, "right", start["right"][:5])})
+        clock = sim.SimClock()
+        buses = {a: sim.SimArmBus(f"arm_{a}", start[a], clock) for a in cr.ARMS}
+        recs = []
+        r = cr.build_runner(cfg, plan, buses, live=False, clock=clock, sleep=clock.sleep, log=recs.append)
+        r.energise()
+        t0 = clock()
+        r.move_to_start(("right", "left"))
+        took = clock() - t0
+        mv = [x for x in recs if x["event"] == "frame"]
+        assert [sorted(x["goal_ticks"]) for x in mv] == [["right"], ["left"]]   # one arm per move
+        for a in cr.ARMS:
+            assert max(abs(t - g) for t, g in zip(r._ticks(a), cr.q_to_ticks(cfg, a, plan[0].q[a]))) <= cr.REACH_TOL_TICKS
+        assert took >= 450 / cr.APPROACH_TICKS_S                          # slow: ~5 deg/s
+        # the same start without the inward allowance is still refused by the guard
+        from inchworm.motion_guard import MotionViolationError
+        buses2 = {a: sim.SimArmBus(f"arm_{a}", start[a], clock) for a in cr.ARMS}
+        r2 = cr.build_runner(cfg, plan, buses2, live=False, clock=clock, sleep=clock.sleep)
+        r2.energise()
+        with pytest.raises(MotionViolationError, match="q_start"):
+            r2.arms["right"].guarded.write_positions_rad(plan[0].q["right"])
+        # and a goal outside the limits is refused even with it
+        q = plan[0].q["left"].copy(); q[3] = 3.0
+        with pytest.raises(MotionViolationError, match="q_end|outside soft limits"):
+            r2.arms["left"].guarded.write_positions_rad(q, inward_start=True)
+    finally:
+        logging.disable(logging.NOTSET)
 
 
 def test_real_fold_is_close_enough_to_adjust():

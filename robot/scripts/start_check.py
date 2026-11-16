@@ -2,8 +2,9 @@
 """AA-23: read-only readiness check for the demo start (``replay_cycle.py --stop-after-frame 42
 --tube-in-grippers``). Opens both arms, reads only; nothing is written.
 
-Ready = all 12 servos torque OFF, both grippers in their open band, and every joint within
-10 deg of the (EEPROM/fold-clamped) timeline frame 0 (the replay adjusts the rest itself).
+Ready = all 12 servos torque OFF, both grippers in their open band, and the replay's automatic
+start adjustment (owner 2026-11-16: from ANY hand placement, one arm at a time, slow) is clear
+in the cell model. The degrees each joint will move are printed for information only.
 Exit 0 = ready, 1 = not ready (each problem printed), 2+ = could not read.
 
     uv run python scripts/start_check.py --live      # without --live: dry-run, nothing opened
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -22,7 +23,7 @@ J5 = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll")
 DEG = 360.0 / 4096
 
 
-def problems(states: Dict[str, dict], start: Dict[str, List[int]], max_deg: float) -> List[str]:
+def problems(states: Dict[str, dict], start: Dict[str, List[int]], max_deg: Optional[float] = None) -> List[str]:
     """``states`` = hold_tube.read_state() per arm; ``start`` = frame-0 ticks per arm."""
     out = []
     for arm, st in states.items():
@@ -34,7 +35,7 @@ def problems(states: Dict[str, dict], start: Dict[str, List[int]], max_deg: floa
                        f"{st['open_band_ticks'][0]}..{st['open_band_ticks'][1]})")
         for k, j in enumerate(J5):
             d = (st["ticks"][k + 1] - start[arm][k]) * DEG
-            if abs(d) > max_deg:
+            if max_deg is not None and abs(d) > max_deg:
                 out.append(f"{arm} {j}: {d:+.1f} deg from the start pose (max {max_deg:g}); move it by hand "
                            f"(reads {st['ticks'][k + 1]} ticks, start {start[arm][k]})")
     return out
@@ -69,14 +70,25 @@ def main(argv=None) -> int:
         st = states[arm]
         print(f"{arm:5s} torque {[st['torque'][s] for s in range(1, 7)]}  gripper {st['gripper_band']} "
               f"({st['ticks'][6]})  joints {[st['ticks'][s] for s in range(1, 6)]}  start {start[arm]}")
-    probs = problems(states, start, cr.APPROACH_MAX_DEG)
+    probs = problems(states, start)
+    from inchworm.motion_guard import build_mesh_collision_guard
+    from inchworm.so101_pose_reader import ticks_to_q
+    measured = {arm: ticks_to_q(cfg, arm, [states[arm]["ticks"][s] for s in range(1, 6)]) for arm in cr.ARMS}
+    mesh = build_mesh_collision_guard(cfg, "left")
+    order, appr = cr.approach_plan(cfg, measured, frames[0], None if mesh is None else mesh.checker)
+    probs += [f"start adjustment: {p} (move the arms by hand clear of it)" for p in appr]
+    for arm in cr.ARMS:
+        print(f"{arm:5s} degrees the robot will move: "
+              + "  ".join(f"{j} {(start[arm][k] - states[arm]['ticks'][k + 1]) * DEG:+.1f}" for k, j in enumerate(J5)))
+    for o in cr.outside_soft_limits(cfg, measured):
+        print(f"  note: {o} (allowed: the adjustment only brings it back inside)")
     if probs:
         print("NOT READY:")
         for p in probs:
             print("  " + p)
         return 1
-    print("READY: put the tube keys in both open grippers, then run replay_cycle.py --stop-after-frame 42 "
-          "--tube-in-grippers --live ...")
+    print(f"READY: grippers EMPTY, run replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ... "
+          f"(it moves to the start pose, {order[0]} arm first, then asks you to put the tube keys in)")
     return 0
 
 

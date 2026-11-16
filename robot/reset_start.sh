@@ -3,7 +3,9 @@
 # A handoff session ends with joints 1-5 off but BOTH grippers still torque ON (right LOCKED on the
 # tube). This: (1) shows the state, (2) asks you to take the tube out / hold it, (3) gripper torque
 # off on both arms, (4) opens any gripper that is not open (AA-17 state machine, empty gripper),
-# (5) you fold both arms by hand, (6) read-only start check until READY.
+# (5) you fold both arms by hand ROUGHLY (the replay moves them to the exact start pose itself,
+# owner 2026-11-16), (6) read-only start check until READY. Leave the grippers EMPTY: the replay
+# asks for the tube after its start adjustment.
 # Never opens a gripper before you confirm the tube is out of the grippers or held by your hand.
 #   bash ~/893/robot/reset_start.sh
 set -euo pipefail
@@ -28,7 +30,7 @@ for arm in left right; do
 done
 while true; do
   echo
-  read -r -p "Fold both arms by hand into the start pose, then press Enter (q = stop): " k
+  read -r -p "Fold both arms by hand roughly into the start pose (grippers empty), then press Enter (q = stop): " k
   [ "$k" = "q" ] && exit 1
   if uv run python scripts/start_check.py --live; then exit 0; fi
 done

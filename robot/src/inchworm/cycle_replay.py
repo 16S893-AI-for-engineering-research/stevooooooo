@@ -288,22 +288,31 @@ def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SA
     return problems
 
 
-#: Owner request 2026-11-13: when the hand-placed arms are CLOSE to the start pose, the
-#: robot makes the final adjustment itself (guard- and collision-checked) instead of the
-#: owner placing them exactly. Further than this on any joint = refuse (not "close").
-#: UNVERIFIED placeholder; the measured fold is 3.5 deg off on the elbows.
-APPROACH_MAX_DEG = 10.0
+#: Owner 2026-11-16 ("I don't want to have to nail the starting pose; if I'm off, it should
+#: just go to the right starting position"): no distance cap on the start adjustment any more
+#: (was APPROACH_MAX_DEG = 10). Instead it is SLOW (this many ticks/s on the joint that moves
+#: most, ~5 deg/s, like the handoff catch-up), moves ONE ARM AT A TIME, runs with EMPTY
+#: grippers (the tube goes in only after it, so the arms never drag the tube), and each line is
+#: checked against the soft limits (goal), the cell mesh model and the other arm before anything moves.
+APPROACH_TICKS_S = 57
+APPROACH_DEG_PER_SAMPLE = 1.0   # mesh samples along the adjustment: at least one per degree
 
 
-def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, checker,
-                      max_deg: float = APPROACH_MAX_DEG, samples: int = PREFLIGHT_SAMPLES,
-                      tube: bool = False) -> List[str]:
-    """Check the automatic final adjustment from the measured pose to frame 0.
+def approach_plan(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, checker,
+                  samples: int = PREFLIGHT_SAMPLES) -> Tuple[Optional[Tuple[str, str]], List[str]]:
+    """Plan the automatic adjustment from the measured (hand-placed) pose to frame 0.
 
-    Refuses when any joint is more than ``max_deg`` away, or when the straight-line move
-    (both arms together, no tube) touches anything in the cell model. Fails closed.
+    ONE ARM AT A TIME, each on a straight joint line while the other stands still, so the
+    check is exact whatever the servo timing. Tries left-then-right, then right-then-left.
+    Returns (order, []) or (None, problems).
+
+    Any distance is allowed. A measured joint OUTSIDE its soft limit is allowed too, because
+    frame 0 is inside every limit, so the move only brings it back inward (live 2026-11-16:
+    right wrist_flex 1 deg past its limit). Refuses when frame 0 is outside a soft limit or
+    every order touches something in the cell model (NO tube: the grippers are empty during
+    the adjustment). Fails closed.
     """
-    from inchworm.system_model.collision import CellState
+    from inchworm.motion_guard import build_joint_limit_guard
 
     problems: List[str] = []
     q0 = {}
@@ -313,28 +322,52 @@ def approach_problems(cfg, measured: Dict[str, Sequence[float]], frame0: Frame, 
             problems.append(f"{a}: no valid measured pose")
             continue
         q0[a] = np.asarray(m, dtype=np.float64)
-        for j, d in zip(JOINTS, np.degrees(frame0.q[a] - q0[a])):
-            if abs(d) > max_deg:
-                problems.append(f"{a} {j}: {d:+.1f} deg to the start pose (more than {max_deg:.0f}; "
-                                f"place the arm closer by hand)")
+        v = build_joint_limit_guard(cfg, a).check(frame0.q[a], live=False)
+        if v is not None:
+            problems.append(f"{a}: start pose outside the soft limits: {v}")
     if problems:
-        return problems
+        return None, problems
     if checker is None:
-        return ["mesh collision model unavailable"]
-    if tube and frame0.tube is None:
-        return ["frame 0: the timeline has no tube pose"]
-    for k in range(samples + 1):
-        t = k / samples
-        ql = (1 - t) * q0["left"] + t * frame0.q["left"]
-        qr = (1 - t) * q0["right"] + t * frame0.q["right"]
-        try:
-            hits = [c for a in ARMS for c in checker.check(
-                cell_state(ql, qr, frame0.tube if tube else None), arm=a)]
-        except Exception as exc:  # noqa: BLE001 - fail closed
-            return [f"adjustment move: collision check failed: {exc}"]
-        if hits:
-            return [f"adjustment move (t={t:.2f}): {hits[0]}"]
-    return []
+        return None, ["mesh collision model unavailable"]
+    tried = []
+    for order in (("left", "right"), ("right", "left")):
+        q = {a: q0[a].copy() for a in ARMS}
+        bad = None
+        for a in order:
+            span = float(np.degrees(np.abs(frame0.q[a] - q0[a])).max())
+            n = max(samples, int(math.ceil(span / APPROACH_DEG_PER_SAMPLE)))
+            for k in range(n + 1):
+                t = k / n
+                q[a] = (1 - t) * q0[a] + t * frame0.q[a]
+                try:
+                    hits = [c for b in ARMS for c in checker.check(cell_state(q["left"], q["right"], None), arm=b)]
+                except Exception as exc:  # noqa: BLE001 - fail closed
+                    return None, [f"adjustment move: collision check failed: {exc}"]
+                if hits:
+                    bad = f"{order[0]} first: {a} arm at t={t:.2f}: {hits[0]}"
+                    break
+            if bad:
+                break
+        if bad is None:
+            return order, []
+        tried.append(bad)
+    return None, ["adjustment move collides in both orders: " + "; ".join(tried)]
+
+
+def approach_problems(cfg, measured, frame0: Frame, checker, samples: int = PREFLIGHT_SAMPLES) -> List[str]:
+    return approach_plan(cfg, measured, frame0, checker, samples)[1]
+
+
+def outside_soft_limits(cfg, measured: Dict[str, Sequence[float]]) -> List[str]:
+    """Measured joints outside their soft limits (information: the adjustment moves them in)."""
+    from inchworm.motion_guard import build_joint_limit_guard
+    out = []
+    for a in ARMS:
+        if a in measured:
+            v = build_joint_limit_guard(cfg, a).check(measured[a], live=False)
+            if v is not None:
+                out.append(v)
+    return out
 
 
 def fold_press_preflight(cfg, frame: Frame, checker, samples: int = PREFLIGHT_SAMPLES,
@@ -696,10 +729,20 @@ class ReplayRunner:
         from inchworm.so101_pose_reader import ticks_to_q
         return {a: np.asarray(ticks_to_q(self.cfg, a, self._ticks(a))) for a in ARMS}
 
-    def move_to_start(self):
-        """Final adjustment from the measured pose to frame 0 (after :func:`approach_problems`)."""
-        start = Frame(-1, "measured start", self.present_q(), dict(self.frames[0].locked))
-        self._move(start, self.frames[0])
+    def move_to_start(self, order: Sequence[str] = ARMS):
+        """Adjustment from the measured pose to frame 0, one arm at a time in ``order`` (from
+        :func:`approach_plan`), slow (APPROACH_TICKS_S). Grippers are EMPTY during it. A start
+        joint outside its soft limit may only come back inward (the goal is checked as usual)."""
+        f0 = self.frames[0]
+        cur = Frame(-1, "measured start", self.present_q(), dict(f0.locked))
+        done: List[str] = []
+        for a in order:
+            # arms already adjusted keep their frame-0 goal; the others hold where they stand
+            q = {b: (f0.q[b] if b in done or b == a else cur.q[b]).copy() for b in ARMS}
+            nxt = Frame(f0.index if a == order[-1] else -1, f"start adjustment {a}", q, dict(f0.locked))
+            self._move(Frame(-1, "measured", {**q, a: cur.q[a]}, dict(f0.locked)), nxt,
+                       vmax_ticks_s=min(self.vmax_ticks_s, APPROACH_TICKS_S), inward_start=True)
+            done.append(a)
 
     def run(self):
         """Step-by-step replay (each frame reached before the next is sent). No prompts."""
@@ -710,13 +753,14 @@ class ReplayRunner:
                 (self._lock if what == "lock" else self._unlock)(a)
             self._move(prev, cur)
 
-    def _move(self, prev: Frame, cur: Frame):
+    def _move(self, prev: Frame, cur: Frame, vmax_ticks_s: Optional[int] = None,
+              inward_start: bool = False):
         """One frame-to-frame move of both arms: guard-checked writes, then wait for arrival."""
         goals, exp = {}, 0.0
         for a in ARMS:
             if np.allclose(prev.q[a], cur.q[a]):
                 continue
-            sp, t = frame_speeds(prev.q[a], cur.q[a], self.vmax_ticks_s)
+            sp, t = frame_speeds(prev.q[a], cur.q[a], vmax_ticks_s or self.vmax_ticks_s)
             exp = max(exp, t)
             goals[a] = (sp, cur.q[a])
         if not goals:
@@ -731,7 +775,7 @@ class ReplayRunner:
                 h.bus.set_goal_speed(h.ids[j], s)
             tick_goals[a] = q_to_ticks(self.cfg, a, q)
         for a, (sp, q) in goals.items():
-            self.arms[a].guarded.write_positions_rad(q)
+            self.arms[a].guarded.write_positions_rad(q, inward_start=inward_start)
         final, peak, dt = self._wait_arrival(tick_goals, exp, cur.index)
         for a in ARMS:
             from inchworm.gripper_lock import GripperState

@@ -812,8 +812,14 @@ class MotionGuard:
         q_start: JointVec,
         q_end: JointVec,
         live: bool = False,
+        inward_start: bool = False,
     ) -> Optional[str]:
         """Validate a straight-line joint-space interpolation.
+
+        ``inward_start`` (owner 2026-11-16, start adjustment only): a START joint that lies
+        outside its soft limit (the owner placed the arm by hand) is accepted when the END
+        pose is inside every limit, so the move only brings that joint back inward. The end
+        pose and every collision check are unchanged.
 
         Checks both endpoints with the joint-limit guard (fail-closed on
         unverified), then samples the full interpolation for collisions.
@@ -841,12 +847,12 @@ class MotionGuard:
             When ``live=True`` and soft limits are unverified.
         """
         # Check both endpoints for joint-limit violations (fail-closed on live)
-        v = self.limit_guard.check(q_start, live=live)
-        if v is not None:
-            return f"q_start: {v}"
-        v = self.limit_guard.check(q_end, live=False)  # live=False: already checked above
+        v_start = self.limit_guard.check(q_start, live=live)
+        v = self.limit_guard.check(q_end, live=live)
         if v is not None:
             return f"q_end: {v}"
+        if v_start is not None and not inward_start:
+            return f"q_start: {v_start}"
 
         # Dense trajectory collision check (samples endpoints + interior)
         v = self.collision_model.check_trajectory(q_start, q_end)
@@ -1160,8 +1166,11 @@ class GuardedArm:
         self,
         q: JointVec,
         bypass_guard: bool = False,
+        inward_start: bool = False,
     ) -> None:
         """Write a complete 5-DoF joint configuration (radians) with guard enforcement.
+
+        ``inward_start``: see :meth:`MotionGuard.check_trajectory` (start adjustment only).
 
         This is the preferred entry point for motion commands that compute
         a full configuration (e.g. from IK).  It runs the full
@@ -1201,7 +1210,8 @@ class GuardedArm:
             # Trajectory check from present to target
             present_q = self._read_present_pose_rad()
             traj_violation = self._guard.check_trajectory(
-                present_q, np.asarray(q, dtype=np.float64), live=False
+                present_q, np.asarray(q, dtype=np.float64), live=False,
+                inward_start=inward_start,
             )
             if traj_violation is not None:
                 raise MotionViolationError(traj_violation)
