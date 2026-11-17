@@ -558,8 +558,8 @@ IK_JOINT_WEIGHTS = np.array([1000.0, 1.0, 1.0, 1.0, 1000.0])
 UP = np.array([0.0, 0.0, 1.0])
 
 
-#: Owner 2026-11-16: the start roll was first -2 deg here; the owner then asked for 3, then 5 deg, and to
-#: MOVE THE ZERO instead (hardware.yaml wrist_roll_zero_offset_deg; 2026-11-17: 5 deg in total), so the
+#: Owner 2026-11-16: the start roll was first -2 deg here; the owner then asked for 3, then 5, then 6 deg, and to
+#: MOVE THE ZERO instead (hardware.yaml wrist_roll_zero_offset_deg; 2026-11-17: 6 deg in total), so the
 #: start pose is roll 0 again in the new calibration.
 START_ROLL_RAD = 0.0
 

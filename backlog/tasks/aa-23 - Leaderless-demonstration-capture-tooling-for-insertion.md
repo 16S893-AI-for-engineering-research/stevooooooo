@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-17 19:45'
+updated_date: '2026-11-17 19:59'
 labels: []
 milestone: m-3
 dependencies:
@@ -179,6 +179,8 @@ FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the sa
 2026-11-17 owner: 3 deg CCW total, by MOVING THE ZERO. A -3 deg plan roll was refused by the planner (start grip 3.42 deg off the CAD middle point vs the 3.0 deg START_GRIP_TOL; -2.5 deg = 2.99 deg). So hardware.yaml wrist_roll_zero_offset_deg -3 deg on both arms (L 181.187->178.187, R 180.615->177.615; roll 0 = tick 2027 L / 2021 R), the fold_allowance roll centres re-expressed (+0.0524 rad), and inchworm_plan START_ROLL_RAD back to 0. Joints 1-4 of the timeline are identical to the original; the start/stop wrist_roll ticks are 34-35 lower than the original. Soft-limit ticks are now 582..3472 L, 576..3466 R (inside the EEPROM limits). The leader map works in ticks, so it is unchanged. Planner OK, demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863 passed, plugin 48 passed. Live 01:28Z run (before this change): the automatic start adjustment worked, left arm first, then the tube, locks and the handoff stop at frame 42.
 
 2026-11-17 owner: 5 deg in total (2 deg more). hardware.yaml wrist_roll_zero_offset_deg L 176.187, R 175.615 (-5 deg from the original 181.187 / 180.615); fold_allowance roll centres +0.0873 rad from the original (L 0.0405, R 0.0382). Start/stop wrist_roll ticks: L 2005, R 1998 (57 ticks below the original). Soft limits 560..3450 L / 553..3443 R ticks, inside the EEPROM limits (the left lower limit has 10 ticks to spare). Joints 1-4 of the timeline are unchanged. Planner OK; demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
+
+2026-11-17 owner: one more degree, 6 deg in total. wrist_roll_zero_offset_deg L 175.187, R 174.615; fold_allowance roll centres L 0.0579, R 0.0556. Start/stop wrist_roll ticks L 1993, R 1987 (68 ticks below the original). With -2.2165 rad the left lower soft limit would be tick 548, 2 ticks PAST the EEPROM Min 550, so it is TIGHTENED to -2.2130 rad (tick 550.6); right unchanged (tick 542 vs EEPROM 533). This is a stricter limit, not a looser one; the start pose is ~125 deg away from it. Planner OK; demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
