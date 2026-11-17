@@ -28,10 +28,12 @@ Checkpoint format (LeRobot ACT)
 ``pretrained_model/`` directory must contain:
 
 - ``config.json`` — LeRobot model configuration; fields consumed here:
-  - ``output_shapes`` or ``action_feature_size`` to verify 5-dim action
-  - ``input_shapes`` to verify 5 joint positions + 1 camera image key
-  - (exact field names depend on LeRobot ACT version; validated against
-    :func:`_validate_checkpoint_features`)
+  - LeRobot 0.6.1: ``output_features.action.shape == [5]``,
+    ``input_features`` with one STATE ``[5]`` and exactly one VISUAL image;
+    older forms (``output_shapes``, per-joint keys) are still accepted
+  - (validated by :func:`_validate_checkpoint_features`)
+- ``train_config.json`` (0.6.1, optional) — when its dataset root is on this host,
+  the dataset's action names must be the 5 contract joints in order, no gripper
 - ``model.safetensors`` — model weights; only SHA-256 is computed here;
   lerobot is not imported in the main env (AC#6).
 
@@ -56,7 +58,8 @@ Two :class:`PolicyBackend` implementations:
 ``StubBackend``
     Returns a fixed nudge; used in tests.  No lerobot import.
 ``LeRobotBackend``
-    Lazy-imports ``lerobot`` and wraps an ``ACTPolicy``; used in
+    LeRobot 0.6.1 ``ACTPolicy`` + checkpoint pre/post processors, observations
+    built with the ``inchworm_follower`` plugin's features; used in
     ``robot/lerobot_env``.  Raises :class:`LeRobotNotAvailable` in the main
     3.10 env where lerobot is absent.
 
@@ -262,12 +265,21 @@ def _validate_checkpoint_features(
     if action_dim is None and "action_feature_size" in config_dict:
         action_dim = int(config_dict["action_feature_size"])
 
-    # Form 3: output_features dict keyed by joint name
+    # Form 3: output_features dict keyed by joint name, or the LeRobot 0.6.1 form
+    # {"action": {"type": "ACTION", "shape": [5]}} (the joint names are then in the
+    # dataset meta, checked by _validate_dataset_action_names).
     if "output_features" in config_dict:
         feats = config_dict["output_features"]
         if isinstance(feats, dict):
-            action_keys_found = frozenset(feats.keys())
-            action_dim = len(action_keys_found)
+            lerobot_action = feats.get("action")
+            if isinstance(lerobot_action, dict) and "shape" in lerobot_action:
+                shape = lerobot_action["shape"]
+                if not isinstance(shape, (list, tuple)) or len(shape) != 1:
+                    _fail(f"output_features.action.shape {shape!r} is not a 1-D action vector")
+                action_dim = int(shape[0])
+            else:
+                action_keys_found = frozenset(feats.keys())
+                action_dim = len(action_keys_found)
 
     # Form 4: inside a nested "config" sub-dict
     if action_dim is None and "config" in config_dict:
@@ -387,9 +399,56 @@ def _validate_checkpoint_features(
                     "gripper is excluded from the contract observation space"
                 )
 
+        # LeRobot 0.6.1 form: {"observation.state": {"type": "STATE", "shape": [5]},
+        # "observation.images.wrist": {"type": "VISUAL", "shape": [3, H, W]}}
+        typed = {k: v for k, v in obs_keys.items() if isinstance(v, dict) and "type" in v}
+        if typed:
+            states = [k for k, v in typed.items() if v["type"] == "STATE"]
+            visuals = [k for k, v in typed.items() if v["type"] == "VISUAL"]
+            for k in states:
+                if list(typed[k].get("shape", [])) != [N_JOINTS]:
+                    _fail(f"observation feature {k!r} shape {typed[k].get('shape')!r} != [{N_JOINTS}]")
+            if len(visuals) != 1:
+                _fail(f"observation features have {len(visuals)} images {visuals!r}; "
+                      "contract requires exactly one wrist camera")
+
         validated_obs_keys = tuple(sorted(obs_keys.keys()))
 
     return action_dim, validated_obs_keys
+
+
+def _validate_dataset_action_names(names: Any, checkpoint_dir: Path) -> None:
+    """LeRobot 0.6.1 stores the action joint names in the dataset meta, not in config.json.
+    They must be exactly the contract joints, in the contract order, and never the gripper."""
+    names = list(names or [])
+    for n in names:
+        if n.removesuffix(".pos") == _GRIPPER_KEY:
+            raise CheckpointIncompatible(
+                checkpoint_dir,
+                f"dataset action names contain forbidden gripper key {n!r}; "
+                "policy must never command the gripper servo (AGENTS.md safety invariant)",
+            )
+    expected = [f"{j}.pos" for j in JOINT_ORDER]
+    if names != expected:
+        raise CheckpointIncompatible(
+            checkpoint_dir, f"dataset action names {names!r} != contract order {expected!r}"
+        )
+
+
+def _training_dataset_info(checkpoint_dir: Path) -> Optional[Dict[str, Any]]:
+    """meta/info.json of the dataset named in ``train_config.json`` (LeRobot 0.6.1), or None
+    when the checkpoint has no train_config.json or the dataset root is not on this host."""
+    tc = checkpoint_dir / "train_config.json"
+    if not tc.exists():
+        return None
+    try:
+        root = json.loads(tc.read_text(encoding="utf-8")).get("dataset", {}).get("root")
+    except json.JSONDecodeError as exc:
+        raise CheckpointIncompatible(checkpoint_dir, f"train_config.json is not valid JSON: {exc}") from exc
+    info = Path(root) / "meta" / "info.json" if root else None
+    if info is None or not info.exists():
+        return None
+    return json.loads(info.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +534,11 @@ class CheckpointLoader:
 
         # Feature validation (AC#6): raises CheckpointIncompatible on mismatch
         action_dim, obs_keys = _validate_checkpoint_features(config_dict, d)
+        ds_info = _training_dataset_info(d)
+        if ds_info is not None:
+            _validate_dataset_action_names(
+                ds_info.get("features", {}).get("action", {}).get("names"), d
+            )
 
         # Compute SHA-256 of model.safetensors (AC#5)
         sha256 = _sha256_file(weights_path)
@@ -607,55 +671,103 @@ class StubBackend(PolicyBackend):
 # --- AA-26: LeRobotBackend ---
 
 class LeRobotBackend(PolicyBackend):
-    """Inference backend that lazy-imports lerobot and wraps ACTPolicy.
+    """Inference backend on the LeRobot 0.6.1 API (only inside ``robot/lerobot_env``).
 
-    This backend is intended for use inside ``robot/lerobot_env`` where
-    lerobot is installed.  In the main 3.10 env it raises
-    :class:`LeRobotNotAvailable` when instantiated.
+    Same calls as LeRobot's own rollout (``rollout/inference/sync.py``):
+    ``ACTPolicy.from_pretrained`` + ``make_pre_post_processors`` (the checkpoint's
+    MEAN_STD normaliser / unnormaliser) + ``build_inference_frame`` + ``make_robot_action``.
+
+    The observation is converted exactly as the recorder stored it: the dataset features
+    come from the ``inchworm_follower`` plugin (``follower_features``), joints are
+    ``<joint>.pos`` raw servo degrees in :data:`JOINT_ORDER`, and the grey wrist frame is
+    copied into 3 channels by the plugin's ``format_frame``.
 
     Parameters
     ----------
     device:
-        PyTorch device string.  Default: ``"cpu"`` (use ``"cuda"`` in
-        lerobot_env when a GPU is available).
+        PyTorch device string (overrides the device saved in the checkpoint).
+    follower:
+        Follower arm (``"left"`` / ``"right"``) whose plugin config sizes the features.
+    task:
+        Task string passed to the policy (ACT ignores it).
     """
 
-    def __init__(self, *, device: str = "cpu") -> None:
-        # Lazy import check — fail early with a clear message
+    def __init__(self, *, device: str = "cpu", follower: str = "left", task: str = "") -> None:
         try:
             import torch  # noqa: F401 PLC0415
+            import lerobot  # noqa: F401 PLC0415
         except ImportError as exc:
             raise LeRobotNotAvailable(
-                "torch is not installed; activate robot/lerobot_env to use LeRobotBackend"
+                "lerobot is not installed; activate robot/lerobot_env to use LeRobotBackend"
             ) from exc
         self._device = device
+        self._follower = follower
+        self._task = task
         self._policy: Any = None
+        self._pre: Any = None
+        self._post: Any = None
+        self._camera: Tuple[int, int, int] = (0, 0, 0)
+        self.ds_features: Dict[str, Any] = {}
 
     def load_weights(self, meta: CheckpointMeta) -> None:
-        """Load ACTPolicy weights from ``meta.weights_path``.
-
-        Raises :class:`LeRobotNotAvailable` if lerobot is not installed.
-        """
-        try:
-            from lerobot.common.policies.act.modeling_act import ACTPolicy  # noqa: PLC0415
-        except ImportError as exc:
-            raise LeRobotNotAvailable(
-                "lerobot is not installed; activate robot/lerobot_env"
-            ) from exc
-
+        """Load the ACT policy and its pre/post processors from ``meta.checkpoint_dir``."""
         import torch  # noqa: PLC0415
-        from safetensors.torch import load_file  # noqa: PLC0415
+        from lerobot.configs.policies import PreTrainedConfig  # noqa: PLC0415
+        from lerobot.policies.act.modeling_act import ACTPolicy  # noqa: PLC0415
+        from lerobot.policies.factory import make_pre_post_processors  # noqa: PLC0415
+        from lerobot.utils.constants import ACTION, OBS_STR  # noqa: PLC0415
+        from lerobot.utils.feature_utils import hw_to_dataset_features  # noqa: PLC0415
+        from lerobot_robot_inchworm.config_inchworm import InchwormFollowerConfig  # noqa: PLC0415
+        from lerobot_robot_inchworm.inchworm_follower import follower_features  # noqa: PLC0415
 
-        # Build policy from config
-        config_path = meta.config_path
-        policy = ACTPolicy.from_pretrained(str(meta.checkpoint_dir))
+        rcfg = InchwormFollowerConfig(follower=self._follower)
+        obs_ft, act_ft = follower_features(rcfg)
+        self.ds_features = {**hw_to_dataset_features(act_ft, ACTION),
+                            **hw_to_dataset_features(obs_ft, OBS_STR)}
+        _validate_dataset_action_names(self.ds_features[ACTION]["names"], meta.checkpoint_dir)
+        self._camera = (rcfg.camera_height, rcfg.camera_width, rcfg.camera_channels)
+
+        path = str(meta.checkpoint_dir)
+        pcfg = PreTrainedConfig.from_pretrained(path)
+        pcfg.device = self._device
+        if pcfg.type != "act":
+            raise CheckpointIncompatible(meta.checkpoint_dir, f"policy type {pcfg.type!r} is not 'act'")
+        for key, feat in pcfg.input_features.items():
+            want = self.ds_features.get(key)
+            if want is None:
+                raise CheckpointIncompatible(meta.checkpoint_dir, f"policy input {key!r} is not a follower feature")
+            shape = tuple(want["shape"])
+            if len(shape) == 3:          # dataset (H, W, C) -> policy (C, H, W)
+                shape = (shape[2], shape[0], shape[1])
+            if tuple(feat.shape) != shape:
+                raise CheckpointIncompatible(
+                    meta.checkpoint_dir, f"policy input {key!r} shape {tuple(feat.shape)} != follower {shape}")
+        policy = ACTPolicy.from_pretrained(path, config=pcfg)
         policy.to(self._device)
         policy.eval()
-        self._policy = policy
-        _LOG.info(
-            "LeRobotBackend: loaded ACTPolicy from %s on device=%s",
-            meta.checkpoint_dir, self._device,
+        policy.reset()
+        self._pre, self._post = make_pre_post_processors(
+            pcfg, pretrained_path=path,
+            preprocessor_overrides={"device_processor": {"device": self._device}},
         )
+        self._policy = policy
+        self._torch = torch
+        _LOG.info("LeRobotBackend: loaded ACTPolicy from %s on device=%s (n_action_steps=%s)",
+                  meta.checkpoint_dir, self._device, pcfg.n_action_steps)
+
+    def reset(self) -> None:
+        """Clear the ACT action queue (call before each insertion attempt)."""
+        if self._policy is not None:
+            self._policy.reset()
+            self._pre.reset()
+            self._post.reset()
+
+    def raw_observation(self, obs: Observation) -> Dict[str, Any]:
+        """Contract observation -> the follower plugin's ``get_observation()`` dict."""
+        from lerobot_robot_inchworm.inchworm_follower import CAMERA_KEY, format_frame  # noqa: PLC0415
+        raw: Dict[str, Any] = {f"{j}.pos": float(v) for j, v in zip(JOINT_ORDER, obs.joint_positions_deg)}
+        raw[CAMERA_KEY] = format_frame(np.asarray(obs.frame, dtype=np.uint8), *self._camera)
+        return raw
 
     def step(self, obs: Observation) -> PolicyAction:
         if self._policy is None:
@@ -663,37 +775,59 @@ class LeRobotBackend(PolicyBackend):
                 "LeRobotBackend.step() called before load_weights(); "
                 "call CheckpointLoader.load() first"
             )
-        import torch  # noqa: PLC0415
+        from lerobot.policies.utils import build_inference_frame, make_robot_action  # noqa: PLC0415
+        torch = self._torch
+        frame = build_inference_frame(observation=self.raw_observation(obs), device=torch.device(self._device),
+                                      ds_features=self.ds_features, task=self._task,
+                                      robot_type="inchworm_follower")
+        with torch.inference_mode():
+            action = self._post(self._policy.select_action(self._pre(frame)))
+        robot_action = make_robot_action(action, self.ds_features)
+        return {k.removesuffix(".pos"): float(v) for k, v in robot_action.items()}
 
-        # Build lerobot-style observation dict
-        joint_tensor = torch.tensor(
-            obs.joint_positions_deg, dtype=torch.float32, device=self._device
-        ).unsqueeze(0)  # shape (1, 5)
 
-        # Frame: (H, W) uint8 → (1, 1, H, W) float32 in [0, 1]
-        frame_f = (
-            torch.tensor(obs.frame, dtype=torch.float32, device=self._device) / 255.0
-        )
-        frame_tensor = frame_f.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+def raw_servo_deg_to_q_rad(cfg: Any, arm: str) -> Callable[[Any], npt.NDArray[np.float64]]:
+    """Joint units of the recorded data (raw servo degrees, ticks x 360/4096) -> URDF
+    radians through the verified AA-9 servo calibration (``so101_pose_reader.ticks_to_q``).
+    Used as the supervisor's ``joint_deg_to_rad`` for a LeRobot checkpoint."""
+    from inchworm.so101_pose_reader import ticks_to_q  # noqa: PLC0415
 
-        from inchworm.lerobot_adapter import (  # noqa: PLC0415
-            OBSERVATION_JOINT_KEYS,
-            CAMERA_KEY,
-        )
-        obs_dict = {
-            k: joint_tensor[:, i : i + 1]
-            for i, k in enumerate(OBSERVATION_JOINT_KEYS)
-        }
-        obs_dict[CAMERA_KEY] = frame_tensor  # type: ignore[assignment]
+    def convert(deg: Any) -> npt.NDArray[np.float64]:
+        ticks = [float(d) * 4096.0 / 360.0 for d in np.asarray(deg, dtype=np.float64)]
+        return np.asarray(ticks_to_q(cfg, arm, ticks), dtype=np.float64)
 
-        with torch.no_grad():
-            action_tensor = self._policy.select_action(obs_dict)
+    return convert
 
-        # action_tensor shape: (1, N_JOINTS) or (N_JOINTS,)
-        action_arr = action_tensor.squeeze(0).cpu().numpy()
 
-        from inchworm.policy_contract import JOINT_ORDER as _JO  # noqa: PLC0415
-        return {name: float(action_arr[i]) for i, name in enumerate(_JO)}
+class DatasetReplaySource:
+    """Dry-run frame source: observations replayed from one episode of a recorded LeRobot
+    v3.0 dataset (no camera, no serial port). Returns ``(grey (H, W) uint8, joints raw servo
+    degrees)`` per call like a live frame source; after the last frame it repeats it.
+
+    The recorded wrist frame is grey copied into 3 channels; the channel mean is returned
+    so the policy sees it through the same grey -> 3-channel path as a live frame.
+    """
+
+    def __init__(self, root: "str | Path", episode: int = 0, *, start: int = 0) -> None:
+        from lerobot.datasets import LeRobotDataset  # noqa: PLC0415
+        root = Path(root)
+        self.dataset = LeRobotDataset(f"local/{root.name}", root=root, episodes=[episode],
+                                      video_backend="pyav")
+        self.length = len(self.dataset)
+        self.index = start
+        self.last_action_deg: Optional[npt.NDArray[np.float32]] = None
+
+    def item(self, index: int) -> Tuple[npt.NDArray[np.uint8], npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+        x = self.dataset[min(index, self.length - 1)]
+        img = x["observation.images.wrist"].numpy()    # (3, H, W) float in [0, 1]
+        grey = np.clip(np.round(img.mean(axis=0) * 255.0), 0, 255).astype(np.uint8)
+        return grey, x["observation.state"].numpy().astype(np.float32), x["action"].numpy()
+
+    def __call__(self) -> Tuple[npt.NDArray[np.uint8], npt.NDArray[np.float32]]:
+        frame, joints, action = self.item(self.index)
+        self.last_action_deg = action
+        self.index += 1
+        return frame, joints
 
 
 # ---------------------------------------------------------------------------
@@ -743,6 +877,12 @@ class CheckpointPolicy(PolicyProtocol):
         ensure every rollout in the log is traceable to the exact model weights.
         """
         self._meta.log_identity(logger, prefix="rollout_start: ")
+
+    def reset(self) -> None:
+        """Clear backend state (the ACT action queue) before a new rollout."""
+        reset = getattr(self._backend, "reset", None)
+        if reset is not None:
+            reset()
 
     def step(self, obs: Observation) -> PolicyAction:
         """Delegate to the backend.
@@ -1029,6 +1169,7 @@ class PolicyRunner:
         # Log checkpoint identity before every rollout (AC#5)
         if isinstance(self._policy, CheckpointPolicy):
             self._policy.log_rollout_start(self._logger)
+            self._policy.reset()
         else:
             self._logger.info("rollout_start: policy=%s", type(self._policy).__name__)
 

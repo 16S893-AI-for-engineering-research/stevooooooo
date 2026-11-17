@@ -644,6 +644,10 @@ def test_session_r_s_d_q_records_saves_discards_and_returns(tmp_path, monkeypatc
     ev = _log(tmp_path)
     ends = [e for e in ev if e["event"] == "episode_end"]
     assert [e["result"] for e in ends] == ["save", "discard", "save"]
+    # loop rate measured before save_episode (the save time is logged separately)
+    assert ends[2]["loop_hz"] == pytest.approx(30.0, abs=1.0) and ends[2]["overruns"] == 0
+    assert ends[2]["recorded_s"] == pytest.approx(2.0, abs=0.1) and ends[0]["save_s"] is not None
+    assert ends[1]["save_s"] is None
     prompts = [e for e in ev if e["event"] == "return_planned"]
     assert len(prompts) == 3                                            # YES asked only the first time
 

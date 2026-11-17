@@ -8,6 +8,18 @@ Usage
   python scripts/rollout.py --checkpoint PATH/pretrained_model/ --live
   python scripts/rollout.py --checkpoint PATH/pretrained_model/ --cycle-count 20
 
+Dataset-replay dry-run (robot/lerobot_env; real policy, no hardware opened)::
+
+  cd robot/lerobot_env
+  uv run python ../scripts/rollout.py --checkpoint OUT/checkpoints/last/pretrained_model \
+      --dataset ../datasets/insert_left_<UTC> --episode 0 --device cuda
+
+  The trained checkpoint runs through LeRobotBackend (LeRobot 0.6.1 API, the
+  checkpoint's normalisation) inside the unchanged supervisor; observations
+  (wrist frame + joints, raw servo degrees) are replayed from the episode. The
+  workspace target is the episode's last (seated) pose. Each step's policy target
+  is compared with the recorded action; nothing is commanded.
+
 Acceptance notes
 ----------------
 AC#4 (latency): runs ``select_action`` timing in dry-run mode on randomly-
@@ -74,6 +86,18 @@ def _parse_args() -> argparse.Namespace:
         metavar="DEVICE",
         help="PyTorch device for lerobot inference (default: cpu)",
     )
+    p.add_argument(
+        "--dataset",
+        default=None,
+        metavar="DIR",
+        help="Dry-run only: replay observations from this recorded LeRobot dataset and run "
+             "the real checkpoint (LeRobotBackend) instead of the stub",
+    )
+    p.add_argument("--episode", type=int, default=0, help="Dataset episode to replay (default: 0)")
+    p.add_argument("--follower", default="left", choices=("left", "right"),
+                   help="Arm the checkpoint drives (calibration for the workspace check)")
+    p.add_argument("--max-steps", type=int, default=200, metavar="N",
+                   help="Supervisor step limit per attempt (default: 200)")
     return p.parse_args()
 
 
@@ -106,8 +130,22 @@ def main() -> int:
 
     _LOG.info("checkpoint validated: sha256=%s", meta.sha256)
 
+    if args.dataset and not dry_run:
+        _LOG.error("--dataset is a dry-run replay; it cannot be combined with --live")
+        return 1
+
     # --- 2. Select backend -----------------------------------------------
-    if dry_run:
+    replay = None
+    if dry_run and args.dataset:
+        _LOG.info("dry-run dataset replay: LeRobotBackend on %s episode %d", args.dataset, args.episode)
+        try:
+            from inchworm.policy_runner import DatasetReplaySource, LeRobotBackend  # noqa: PLC0415
+            backend = LeRobotBackend(device=args.device, follower=args.follower)
+            replay = DatasetReplaySource(args.dataset, args.episode)
+        except LeRobotNotAvailable as exc:
+            _LOG.error("lerobot is not available: %s\nRun from robot/lerobot_env.", exc)
+            return 1
+    elif dry_run:
         _LOG.info("dry-run mode: using StubBackend (no lerobot import)")
         backend = StubBackend()
     else:
@@ -123,14 +161,18 @@ def main() -> int:
             )
             return 1
 
-    policy = CheckpointPolicy(meta, backend)
+    try:
+        policy = CheckpointPolicy(meta, backend)
+    except CheckpointIncompatible as exc:
+        _LOG.error("checkpoint incompatible: %s", exc)
+        return 1
 
     # --- 3. Build supervisor_kwargs (mock frame source and arm) ----------
     import numpy as np  # noqa: PLC0415
 
     from inchworm.config import load_config, PolicySupervisorConfig  # noqa: PLC0415
     from inchworm.kinematics import build_chain  # noqa: PLC0415
-    from inchworm.policy_contract import N_JOINTS  # noqa: PLC0415
+    from inchworm.policy_contract import JOINT_ORDER, N_JOINTS  # noqa: PLC0415
 
     cfg = load_config()
     chain = build_chain(cfg.so101_kinematics)
@@ -142,8 +184,27 @@ def main() -> int:
         joints = np.zeros(N_JOINTS, dtype=np.float32)
         return frame, joints
 
+    joint_deg_to_rad = lambda d: np.deg2rad(np.asarray(d, dtype=np.float64))  # noqa: E731
+    frame_source = _mock_frame_source
+    step_errors = []
+    if replay is not None:
+        from inchworm.policy_runner import raw_servo_deg_to_q_rad  # noqa: PLC0415
+        joint_deg_to_rad = raw_servo_deg_to_q_rad(cfg, args.follower)
+        _, last_state, _ = replay.item(replay.length - 1)
+        target_m = chain.fk(joint_deg_to_rad(last_state))[:3, 3]
+        frame_source = replay
+        inner = policy.step
+
+        def _compare(obs):
+            action = inner(obs)
+            rec = replay.last_action_deg
+            step_errors.append(max(abs(action[j] - float(rec[i])) for i, j in enumerate(JOINT_ORDER)))
+            return action
+
+        policy.step = _compare
+
     supervisor_config = PolicySupervisorConfig(
-        max_steps=200,
+        max_steps=args.max_steps,
         max_wall_time_s=30.0,
         workspace_radius_m=0.15,
         max_action_magnitude_deg=5.0,
@@ -172,10 +233,10 @@ def main() -> int:
         "config": supervisor_config,
         "chain": chain,
         "target_attachment_point_m": target_m,
-        "frame_source": _mock_frame_source,
+        "frame_source": frame_source,
         "motion_executor": lambda action: None,  # dry-run no-op
         "approach_callable": lambda: True,
-        "joint_deg_to_rad": lambda d: np.deg2rad(np.asarray(d, dtype=np.float64)),
+        "joint_deg_to_rad": joint_deg_to_rad,
         "dry_run": True,
     }
 
@@ -204,6 +265,19 @@ def main() -> int:
             "timestamp": time.time(),
             "dry_run": dry_run,
         }
+        if replay is not None:
+            record.update({
+                "dataset": str(args.dataset), "episode": args.episode,
+                "steps_compared": len(step_errors),
+                "max_abs_err_vs_recorded_deg": round(max(step_errors), 3) if step_errors else None,
+                "median_abs_err_vs_recorded_deg":
+                    round(float(np.median(step_errors)), 3) if step_errors else None,
+            })
+            _LOG.info("replay: %d steps, |policy - recorded action| max %s deg, median %s deg",
+                      len(step_errors), record["max_abs_err_vs_recorded_deg"],
+                      record["median_abs_err_vs_recorded_deg"])
+            step_errors.clear()
+            replay.index = 0
         outcomes.append(record)
 
         with log_path.open("a", encoding="utf-8") as fh:

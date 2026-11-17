@@ -51,6 +51,31 @@ TUBE_SUPPORT = ("no_tube", "locked_arm", "handoff")
 CAMERA_KEY = "wrist"
 
 
+def follower_features(config) -> tuple:
+    """(observation_features, action_features) of the follower for ``config``: joints 1-5 as
+    ``<joint>.pos`` floats (raw servo degrees) and, with the camera, ``wrist`` (H, W, C).
+    The AA-26 policy runner builds its LeRobot dataset features from this, so training data
+    and deployment observations use one definition."""
+    from inchworm import teleop_live as tl
+    motors = {f"{j}.pos": float for j in tl.J5}
+    obs: Dict[str, Any] = dict(motors)
+    if config.camera:
+        obs[CAMERA_KEY] = (config.camera_height, config.camera_width, config.camera_channels)
+    return obs, dict(motors)
+
+
+def format_frame(data: np.ndarray, height: int, width: int, channels: int) -> np.ndarray:
+    """Camera frame -> (H, W, channels) uint8 as recorded: grey (H, W) or (H, W, 1) is copied
+    into 3 channels when ``channels == 3``. Raises on a frame of the wrong size."""
+    if data.shape[:2] != (height, width):
+        raise RuntimeError(f"camera frame {data.shape} != configured {height}x{width}")
+    if data.ndim == 2:
+        data = data[:, :, None]
+    if channels == 3 and data.shape[2] == 1:
+        data = np.repeat(data, 3, axis=2)
+    return np.ascontiguousarray(data, dtype=np.uint8)
+
+
 class InchwormRefused(RuntimeError):
     """A safety precondition refused the run (nothing was energised)."""
 
@@ -169,20 +194,13 @@ class InchwormFollower(Robot):
         return {CAMERA_KEY: f"arm_{self.config.follower} wrist camera via the AA-6 arbiter"} if self.config.camera else {}
 
     # -- features -----------------------------------------------------------
-    @property
-    def _motors_ft(self) -> Dict[str, type]:
-        return {f"{j}.pos": float for j in self.joints}
-
     @cached_property
     def observation_features(self) -> dict:
-        ft: Dict[str, Any] = dict(self._motors_ft)
-        if self.config.camera:
-            ft[CAMERA_KEY] = (self.config.camera_height, self.config.camera_width, self.config.camera_channels)
-        return ft
+        return follower_features(self.config)[0]
 
     @cached_property
     def action_features(self) -> dict:
-        return dict(self._motors_ft)
+        return follower_features(self.config)[1]
 
     @property
     def is_connected(self) -> bool:
@@ -475,13 +493,7 @@ class InchwormFollower(Robot):
             if self._last_frame is None:                       # nothing valid yet: black frame
                 return np.zeros((c.camera_height, c.camera_width, c.camera_channels), dtype=np.uint8)
             return self._last_frame                            # damaged frames never stop a run
-        if data.shape[:2] != (c.camera_height, c.camera_width):
-            raise RuntimeError(f"camera frame {data.shape} != configured {c.camera_height}x{c.camera_width}")
-        if data.ndim == 2:
-            data = data[:, :, None]
-        if c.camera_channels == 3 and data.shape[2] == 1:
-            data = np.repeat(data, 3, axis=2)
-        self._last_frame = np.ascontiguousarray(data, dtype=np.uint8)
+        self._last_frame = format_frame(data, c.camera_height, c.camera_width, c.camera_channels)
         return self._last_frame
 
     def get_observation(self) -> dict:

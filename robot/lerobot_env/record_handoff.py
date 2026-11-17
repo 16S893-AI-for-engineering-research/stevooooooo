@@ -84,6 +84,7 @@ class Session:
         t_rec = None                 # recording starts when the catch-up is done (owner 2026-11-15)
         period = 1.0 / self.fps
         why = "save"
+        ticks = overruns = 0         # recorded control steps; steps that took longer than the period
         while True:
             ts = self.clock()
             if t_rec is None and not self.robot.catching_up:
@@ -102,12 +103,19 @@ class Session:
                 break
             self._tick(record=t_rec is not None)
             rest = period - (self.clock() - ts)
+            if t_rec is not None:
+                ticks += 1
+                overruns += rest < 0
             if rest > 0:
                 self.sleep(rest)
+        t_end = self.clock()         # recording loop rate is measured here, before the video save
+        recorded_s = None if t_rec is None else t_end - t_rec
         frames = self.dataset.writer.episode_buffer["size"] if getattr(self.dataset, "writer", None) else None
+        save_s = None
         if why == "save" and frames:
             self.say("saving (the arms hold) ...")
             self.dataset.save_episode()
+            save_s = round(self.clock() - t_end, 2)
             self.saved += 1
         else:
             self.dataset.clear_episode_buffer()
@@ -115,7 +123,9 @@ class Session:
             why = "discard"
         self.robot._log({"event": "episode_end", "episode": n, "result": why, "frames": frames,
                          "s": round(self.clock() - t0, 2),
-                         "recorded_s": None if t_rec is None else round(self.clock() - t_rec, 2)})
+                         "recorded_s": None if recorded_s is None else round(recorded_s, 2),
+                         "loop_hz": round(ticks / recorded_s, 2) if recorded_s else None,
+                         "overruns": overruns, "save_s": save_s})
         self.robot.episode = None
         return why
 
