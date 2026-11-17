@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-25 19:38'
+updated_date: '2026-11-17 22:06'
 labels: []
 milestone: m-3
 dependencies:
@@ -117,6 +117,13 @@ AC#4 measurement 2026-10-25 (this host: RTX 3050 Ti 4 GB, CUDA, lerobot 0.6.1, R
 - select_action(): mean 0.94 ms, median 0.61, p95 1.91, p99 19.02, max 22.78 ms (300 calls). Most calls pop a queued action.
 - Full network forward (predict_action_chunk, runs once per 100 steps): mean 16.93 ms, p95 21.11, max 25.52 ms.
 Compatibility with supervisor_loop_rate_hz 50 (20 ms budget): the mean fits easily. But the per-step budget also includes the camera (measured mean ~17-18 ms per frame at ~55-60 fps, AA-14) and the servo bus read (~5 ms). On chunk-boundary steps that is about 17 + 21 + 5 = ~43 ms, which OVERRUNS 20 ms (about once every 2 s). Also, the supervisor _attempt loop has no rate pacing or overrun detection: it runs as fast as camera + policy + bus allow, so 50 Hz is a config value, not an enforced rate. NOT CHECKED: (1) random weights, not the trained checkpoint (an earlier note required the trained checkpoint); (2) compatibility is not shown for worst-case steps. Owner decision needed: accept random-weight evidence, and decide whether to (a) run the loop at 20-25 Hz, (b) add pacing with overrun logging, or (c) shrink chunk_size or use temporal ensembling.
+
+2026-11-17 (commit 0103784): LeRobot 0.6.1 port.
+- LeRobotBackend now uses ACTPolicy.from_pretrained + make_pre_post_processors (normalisation) + build_inference_frame/make_robot_action, with features from the inchworm_follower plugin (`follower_features`, `format_frame`: observation.state 5 raw servo deg, observation.images.wrist 3x480x640).
+- CheckpointLoader accepts the 0.6.1 config (output_features.action.shape [5], typed input_features) and checks the dataset action names (no gripper).
+- New dry-run: `rollout.py --checkpoint CKPT --dataset DS --episode N` replays the recorded observations through the real policy + unchanged supervisor (nothing commanded). Verified on the 30-step audit checkpoint: 600 steps; |policy - recorded| median 8.8 deg (an untrained model, so expected).
+- Tests: main suite rc 0; lerobot_env suite rc 0.
+- NOT done (live wiring; `--live` still aborts on purpose): (1) motion_executor via GuardedArm/MotionGuard with the mesh check; (2) a live frame/joint source (arbiter wrist cam + pose reader; read_arm_ticks refuses with torque on, so it needs a torque-on read path); (3) SeatingEvaluator sample source (AA-24); (4) GripperLockSM (AA-17) wired to the seating result. First live run supervised by the owner.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
