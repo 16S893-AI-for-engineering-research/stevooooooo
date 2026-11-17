@@ -3,13 +3,13 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-16 19:34'
+updated_date: '2026-11-17 03:24'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
 **Keep this current.** Update it via `backlog doc update doc-3` whenever a blocker clears, a task finishes, an estimate changes, or a decision is made. A stale doc-3 is worse than none, because it invites confident action on wrong information. If the Last verified date below is old, trust task statuses and `git log` over this prose and re-verify before acting.
 
-**Last verified:** 2026-11-16 19:30Z. Rapid-fire handoff recording works live (`reset_start.sh` -> `replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live` -> `lerobot_env/record_handoff.sh`, live view http://localhost:8765). **New, dry-run + tests only, first live run needs the owner:** (1) start wrist_roll -2 deg on both arms (timeline regenerated; ticks L 2039, R 2032); (2) the replay moves to the start pose itself from ANY hand placement (one arm at a time, ~5 deg/s, mesh-checked; a joint past its soft limit may only move inward) with EMPTY grippers, THEN asks for the tube keys (YES), THEN locks. Old datasets start from the old roll: re-record (215810Z also has the 360 deg action offset). **Camera:** only ~8 NEW images/s from the left wrist camera (rest are repeats; no torn frames). Owner check pending: Windows Camera app frame rate. Suites: main 1863, plugin 48.
+**Last verified:** 2026-11-17 02:30Z. Rapid-fire handoff recording works live (`reset_start.sh` -> `replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live` -> `lerobot_env/record_handoff.sh`, live view http://localhost:8765). Automatic start adjustment from any hand placement ran live OK 2026-11-17 01:28Z (one arm at a time, empty grippers, then the tube YES prompt, then the locks). **Wrist_roll zero moved -3 deg on both arms (owner 2026-11-16, hardware.yaml; the plan keeps roll 0): start/stop wrist_roll ticks are now L 2027, R 2021.** That change is dry-run and tests only so far; the first live run needs the owner. A -3 deg start roll in the plan was refused by the planner's 3 deg start-grip tolerance, so the zero moved instead. Old datasets start from the old roll: re-record (215810Z also has the 360 deg action offset). **Camera:** only ~8 NEW images/s from the left wrist camera (the rest are repeats; no torn frames). Owner check pending: the frame rate in the Windows Camera app. Suites: main 1863, plugin 48.
 
 **START HERE (fresh orchestrator session).** Read this section, then `backlog task view <ID> --plain` only for the task you pick up. Do not read old session transcripts. Session rules: see AGENTS.md "Session and cost discipline".
 

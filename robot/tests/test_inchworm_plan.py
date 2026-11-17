@@ -309,16 +309,16 @@ def test_per_arm_start_reaches_each_point(cfg, checker):
 # ---------------------------------------------------------------------------
 
 
-def test_fold_start_holds_pan_at_zero_and_roll_at_minus_2_deg(cfg, checker):
+def test_fold_start_holds_pan_at_zero_and_roll_at_zero(cfg, checker):
     """Default plan starts in the measured fold (both arms the same, pan 0,
-    roll -2 deg = owner 2026-11-16, 2 deg CCW from the side opposite the wires),
+    roll 0; owner 2026-11-16: the 3 deg CCW start roll lives in the calibration zero),
     keeps pan and roll at those values for both arms in every frame, and ends
     back in the fold. Pan is NOT removed from the joint limits."""
     from inchworm.inchworm_plan import measured_fold_pose
     plan = plan_cycle(cfg, checker)
     assert plan.start_kind.startswith("measured fold") and plan.hold_pan_roll
     q0 = measured_fold_pose(cfg)
-    assert q0[0] == 0.0 and q0[4] == pytest.approx(math.radians(-2.0))
+    assert q0[0] == 0.0 and q0[4] == 0.0
     np.testing.assert_allclose(plan.printing_pose_left, q0)
     np.testing.assert_allclose(plan.printing_pose_right, q0)
     for fr in plan.frames:
