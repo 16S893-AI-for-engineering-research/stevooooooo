@@ -3,7 +3,7 @@ id: doc-3
 title: Orchestrator State and Session Handoff
 type: guide
 created_date: '2026-10-20 21:37'
-updated_date: '2026-11-17 20:22'
+updated_date: '2026-11-17 21:15'
 ---
 Live orchestrator state: what is in flight, what is blocked, what is uncertain, and how to resume cold. Read this **first** when picking up this project in a fresh session, then doc-1 (hardware truth) and doc-2 (change-control rules).
 
@@ -127,7 +127,32 @@ Live orchestrator state: what is in flight, what is blocked, what is uncertain, 
 ### nono sandbox profile (owner request 2026-11-10): draft ready, NOT promoted
 - Draft `~/.config/nono/profile-drafts/inchworm-893.json` (validated) extends mit-parley. It adds: python_runtime, linux_sysfs_read, git_config; rw on ~/893, ~/worktrees/893, the uv/hf/torch/matplotlib/fontconfig caches, /dev/serial, /dev/v4l, /dev/ttyACM0-4, ttyUSB0-1, video0-5; network for pypi, huggingface, github (HTTPS).
 - Tested inside the sandbox: robot imports, uv, backlog, worktrees, pypi/hf 200, example.com blocked, ~/.ssh denied.
-- **Owner decisions open:** (a) git push: SSH (port 22 + ~/.ssh) is blocked; options are push from outside the sandbox, an HTTPS remote with a nono credential route, or bypass_protection for ~/.ssh (weakest). (b) `attach_usb.py` (powershell.exe/usbipd.exe via /mnt/c + WSL interop) is not allowed; run it outside the sandbox. (c) Devices are untested in the sandbox (none attached). Promote with `nono profile promote inchworm-893`.
+- **2026-11-17 audit (nono 0.77.0; the sub-agent timed out, findings from its transcript):** in the sandbox, ~/.pi/agent/sessions and npm are writable, `backlog` works, and HTTPS `git ls-remote` works.
+- **Gaps found:**
+  - /tmp is not writable. The camera arbiter needs `/tmp/inchworm_cam_locks`, and stop files are `/tmp/inchworm_stop_move` (the e-stop path!). The global camera lock was denied.
+  - Multiprocessing needs `/dev/shm`.
+  - The git credential store lock (~/.git-credentials) was denied.
+  - The remote is SSH (`git@github.com`), and the sandbox has no DNS/port 22.
+  - gh config is denied.
+  - Interop is denied: powershell.exe gave Permission denied.
+  - With `--allow /tmp/inchworm_cam_locks --allow /dev/shm` and TMPDIR under ~/.pi/agent/tmp, only `test_camera_arbiter.py::test_ac6_cross_process_stale_lock_recovery_after_sigkill` still failed (cause not found). An `--allow /tmp` run was not completed. Devices are still untested in the sandbox.
+- **Proposed profile additions (not applied):**
+  - `/tmp` rw (simplest; covers the locks, stop files and pytest tmp), or `/tmp/inchworm_cam_locks` + the stop files + TMPDIR.
+  - `/dev/shm` rw.
+  - For push: switch origin to HTTPS and use a nono credential route or an allow_file for ~/.git-credentials, or push from outside the sandbox.
+- **Next:** one full `uv run pytest` under `nono run -p <draft> --allow /tmp --allow /dev/shm`. If green, the owner decides on push, then `nono profile promote inchworm-893`. Run `attach_usb.py` outside the sandbox before launching pi under nono, because the devices must exist at sandbox start (video0-5 / ttyACM0-4 are allow-listed by name).
+
+### LeRobot recording readiness audit (2026-11-17; report /tmp/lerobot-audit/report.md)
+- **Recording: GO after the owner checks the wrist-camera rate. Policy use: NO-GO until agent fixes.**
+- **Dataset:** v3.0, 30 fps, `observation.state` 5 joints, `action` 5 joints, `observation.images.wrist` 480x640x3 (grey copied to 3 channels), AV1. The gripper is excluded by design.
+- **ACT smoke train:** 30 steps on GPU OK (with `accelerate` added temporarily). The checkpoint loads and `select_action` returns 5 joints.
+- **Blockers:**
+  1. Owner: wrist camera ~8-12 new frames/s (the rest repeat).
+  2. Agent: add `lerobot[...,training]` (accelerate) to robot/lerobot_env and re-lock.
+  3. Agent: AA-26 runner. It imports `lerobot.common` (gone in 0.6.1), uses the wrong feature names / 1-channel image, has no normalisation, the checkpoint check rejects a real checkpoint, and `rollout.py --live` always aborts.
+  4. Agent: `inspect_dataset.py` reads the old format (reports 0 episodes); add success labels.
+  5. Agent: log the loop rate before the video save.
+- **Episode plan:** 10 clean episodes, then a smoke train (20-30k steps), then one supervised rollout, then 50 and later 80-100 in about 5 variation groups (pan/lift/elbow ±10 deg, wrist flex high/low, roll ±5 deg, a few recoveries). Use ACT chunk 10-20 or temporal ensembling.
 
 ### Blocker
 - None for software. Hardware progress waits on the owner for the AA-43 steps above.
