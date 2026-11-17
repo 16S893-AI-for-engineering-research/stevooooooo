@@ -64,6 +64,8 @@ python3 -m http.server 8000
 
 Then open http://localhost:8000/.
 
+Refresh the site's numbers (tasks, criteria, tests, agent cost, harness lists) with `python3 tools/update-site-stats.py`; it rewrites only the `<!-- stats:... -->` regions and the session-activity chart.
+
 ## Status
 
 Built with the `pi` coding agent, reviewed by hand before publishing.

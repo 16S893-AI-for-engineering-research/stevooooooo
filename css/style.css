@@ -613,3 +613,8 @@ pre.sim-pre { background: rgba(8, 6, 20, 0.8); border: 1px solid var(--border); 
   .spec-list li { grid-template-columns: 1fr; gap: 0.1rem; }
   .role-table td:first-child { white-space: normal; }
 }
+
+/* ---------- Project: agent harness breakdown ---------- */
+.harness h4 { margin: 1.1rem 0 0.4rem; font-family: var(--font-mono); font-weight: 400; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.harness .grid-2 > div > h4:first-child { margin-top: 0.4rem; }
+.harness .lesson-list li::before { content: "\2022"; color: var(--teal); }

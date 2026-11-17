@@ -34,9 +34,9 @@
       </p>
       <div class="stat-row">
         <div class="stat"><b>3 arms</b><span>two SO-101 grippers and a DexArm print head</span></div>
-        <div class="stat"><b>69%</b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
-        <div class="stat"><b>1,792</b><span>automated software tests</span></div>
-        <div class="stat"><b>~$545</b><span>total AI agent cost so far</span></div>
+        <div class="stat"><b><!-- stats:ms-pct -->69%<!-- /stats --></b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
+        <div class="stat"><b><!-- stats:tests -->1,863<!-- /stats --></b><span>automated software tests</span></div>
+        <div class="stat"><b>~<!-- stats:cost -->$603<!-- /stats --></b><span>total AI agent cost so far</span></div>
       </div>
     </div>
 
@@ -119,7 +119,7 @@
         <div class="section-head"><span class="num">03</span><h2>How AI agents were used</h2></div>
         <p class="section-lead">
           I did the systems design, hardware and robot model. The software, more
-          than 1,700 tests' worth, was written by AI coding agents running in
+          than <!-- stats:tests-floor -->1,800<!-- /stats --> tests' worth, was written by AI coding agents running in
           <code>pi</code>. My job was to manage them like a small team.
         </p>
 
@@ -132,35 +132,76 @@
         </ol>
         <p class="loop-note">&#8634; When a step needs hands on the robot, the agent writes a step-by-step procedure that I accept, and a separate guide tab walks me through it.</p>
 
-        <div class="panel" style="margin-top:1.25rem">
-          <h3>The toolkit</h3>
-          <table class="role-table">
-            <thead><tr><th>Piece</th><th>What it does</th></tr></thead>
-            <tbody>
-              <tr><td>Backlog.md tasks</td><td>52 tasks and about 290 acceptance criteria. A criterion is only checked with evidence, and agents may not rewrite one to match what they built.</td></tr>
-              <tr><td>Shared memory docs</td><td>Three documents every agent reads first: the hardware facts, the change-control rules, and a live "where are we" state with the next action.</td></tr>
-              <tr><td>Safety rules</td><td>Hard limits agents can't relax: one camera streaming at a time, never both grippers open while holding the tube, laser off on every exit, dry-run before any first live move.</td></tr>
-              <tr><td>Clarify-before-build skill</td><td>For anything visual or physical, the agent must ask questions and restate the plan before writing code.</td></tr>
-              <tr><td>Human handoff + walkthrough tab</td><td>Keeps work that only I can do to a minimum, and makes each item a verifiable checklist.</td></tr>
-              <tr><td>My own Claude</td><td>Component selection, trade-offs and early planning, kept outside pi to keep its context clean.</td></tr>
-            </tbody>
-          </table>
+        <div class="panel harness" style="margin-top:1.25rem">
+          <h3>How the agent harness is set up</h3>
+          <p class="muted small">Everything the agents work inside: the rules they load, the skills, prompts and extensions they can call, and the shared documents they read. Lists marked &#8635; are regenerated from the repository by <code>tools/update-site-stats.py</code>.</p>
+          <div class="grid-2">
+            <div>
+              <h4>Ground rules: <code>AGENTS.md</code></h4>
+              <ul class="lesson-list">
+                <li><strong>Read first</strong>: doc-3 (live state), then doc-1 (hardware facts), then doc-2 (change control), before any robot task.</li>
+                <li><strong>Backlog.md workflow</strong>: run <code>backlog instructions overview</code> at the start, read the matching guide before creating, executing or finalising a task, and change tasks only through the <code>backlog</code> CLI.</li>
+                <li><strong>1. No moving the goalposts</strong>: never edit acceptance criteria or descriptions to match what was built; ask instead.</li>
+                <li><strong>2. Evidence only</strong>: a criterion is checked only with test output, a measurement or a logged run, never code reading.</li>
+                <li><strong>3. No weakening</strong>: no relaxed tolerances, limits or safety checks, and no deleted or skipped tests.</li>
+                <li><strong>4. Safety invariants</strong>: one camera at a time, never both grippers open with the tube attached, the gripper only commanded by the lock state machine (never the learned policy), laser off on every exit, limits and collisions checked in the motion layer.</li>
+                <li><strong>5. Dry-run first</strong>, and I supervise the first live run of any new motion.</li>
+                <li><strong>6. Keep doc-3 current</strong> whenever a task finishes, a blocker clears or a decision is made.</li>
+                <li><strong>7. Commit and push regularly</strong>, after the tests pass and the staged files are checked for secrets and data. Sub-agents never commit.</li>
+                <li><strong>8. Session and cost discipline</strong>: see below.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Project skills: <code>.pi/skills</code> &#8635;</h4>
+              <ul class="lesson-list"><!-- stats:harness-skills --><li><strong>clarify-before-build</strong>: Before building anything visual or physical, ask clarifying questions, restate the plan and wait for my confirmation.</li><li><strong>human-handoff</strong>: Only for steps that truly need my hands, identity or judgment: write a short checked procedure that I accept, then verify the result.</li><!-- /stats --></ul>
+              <h4>Prompt templates: <code>.pi/prompts</code> &#8635;</h4>
+              <ul class="lesson-list"><!-- stats:harness-prompts --><li><strong>/handoff</strong>: Wrap up a session: task notes, doc-3 update, tests, commit and push, then a one-line “resume with” for the next session.</li><li><strong>/task</strong>: Start a fresh session on one Backlog task: read doc-3 START HERE and that task only, restate the open criteria, wait for my go-ahead.</li><!-- /stats --></ul>
+              <h4>Extensions: <code>.pi/extensions</code> &#8635; and pi packages</h4>
+              <ul class="lesson-list"><!-- stats:harness-extensions --><li><strong>human-handoff (project)</strong>: Adds the human_request, human_queue, human_checkpoint and human_verify tools and the /human command; accepted procedures run one at a time in a separate walkthrough tab.</li><!-- /stats --></ul>
+              <ul class="lesson-list">
+                <li><strong>pi-subagents</strong> (package): delegates narrow tasks to worker, reviewer and scout agents, each in its own git worktree, in the foreground or in the background.</li>
+                <li><strong>show-not-tell</strong> (package): writes readable walkthrough pages of a code change, linked to the commits and the commands behind each claim.</li>
+                <li><strong>mit-parley-pi-extension</strong> (package): connects pi to the MIT Parley models and shows context use and estimated cost in the footer.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Tools the agents use</h4>
+              <ul class="lesson-list">
+                <li><strong>read, bash, edit, write</strong>: pi&rsquo;s built-in file and shell tools.</li>
+                <li><strong>subagent</strong>: start a worker or reviewer on one task with a written brief and a time cap.</li>
+                <li><strong>human_request / human_verify</strong>: propose a procedure for me, then close it only with evidence.</li>
+                <li><strong>walkthrough_record / walkthrough_write</strong>: record the commands behind a claim and write the walkthrough page.</li>
+                <li><strong>Backlog CLI</strong>: tasks, acceptance criteria, notes and the shared docs.</li>
+                <li><strong>uv and pytest</strong>: the robot package and its <!-- stats:tests -->1,863<!-- /stats --> tests.</li>
+                <li><strong>git worktrees</strong>: one isolated checkout per sub-agent.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Shared memory, cost and sandboxing</h4>
+              <ul class="lesson-list">
+                <li><strong>doc-1</strong>: hardware and system reference, the single source of hardware facts.</li>
+                <li><strong>doc-2</strong>: working agreement on requirement stability and change control.</li>
+                <li><strong>doc-3</strong>: live orchestrator state, with a START HERE section and the next action.</li>
+                <li><strong>Backlog.md</strong>: <!-- stats:tasks -->52<!-- /stats --> tasks (<!-- stats:tasks-done -->27<!-- /stats --> done) with <!-- stats:ac-total -->289<!-- /stats --> acceptance criteria, <!-- stats:ac-done -->206<!-- /stats --> met.</li>
+                <li><strong>Session discipline</strong>: a fresh session after each finished unit of work or past about 150k tokens; state goes into doc-3 and task notes first, not into compaction.</li>
+                <li><strong>Sub-agent discipline</strong>: one task each, a written brief, an early deliverable and a 15&ndash;30 minute cap, in its own worktree. Ask me after two hardware probes that explain nothing.</li>
+                <li><strong>Sandboxing</strong>: a nono sandbox profile limiting files, devices and network is drafted and tested, and is being adopted.</li>
+                <li><strong>My own Claude</strong>: component selection and early planning, kept outside pi to keep its context clean.</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <div class="grid-2" style="margin-top:1.25rem">
           <div class="panel">
             <h3>Where the money went</h3>
-            <div class="big-number">$545</div>
-            <p class="muted small">Recorded model cost across 152 sessions, 9/15 to 11/13/26.</p>
-            <div class="cost-bar" aria-hidden="true">
-              <span style="width:66%; background:var(--orange)"></span>
-              <span style="width:26%; background:var(--teal)"></span>
-              <span style="width:8%; background:var(--mustard)"></span>
-            </div>
+            <div class="big-number"><!-- stats:cost -->$603<!-- /stats --></div>
+            <p class="muted small">Recorded model cost across <!-- stats:sessions -->161<!-- /stats --> sessions, <!-- stats:cost-range -->9/15 to 11/17/26<!-- /stats -->.</p>
+            <div class="cost-bar" aria-hidden="true"><!-- stats:cost-bar --><span style="width:69%; background:var(--orange)"></span><span style="width:24%; background:var(--teal)"></span><span style="width:7%; background:var(--mustard)"></span><!-- /stats --></div>
             <ul class="legend">
-              <li><i style="background:var(--orange)"></i>Main sessions $358</li>
-              <li><i style="background:var(--teal)"></i>Sub-agents $144</li>
-              <li><i style="background:var(--mustard)"></i>Walkthrough guide $43</li>
+              <li><i style="background:var(--orange)"></i>Main sessions <!-- stats:cost-main -->$414<!-- /stats --></li>
+              <li><i style="background:var(--teal)"></i>Sub-agents <!-- stats:cost-sub -->$146<!-- /stats --></li>
+              <li><i style="background:var(--mustard)"></i>Walkthrough guide <!-- stats:cost-guide -->$43<!-- /stats --></li>
             </ul>
             <p class="small muted" style="margin-top:0.9rem">Most of the cost came from long sessions that re-read a huge context on every call. Daily breakdown on the <a href="devlog.html#activity">Dev Log</a>.</p>
           </div>
