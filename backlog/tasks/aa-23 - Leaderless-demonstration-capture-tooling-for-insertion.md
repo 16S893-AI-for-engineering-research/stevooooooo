@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-17 19:59'
+updated_date: '2026-11-17 20:13'
 labels: []
 milestone: m-3
 dependencies:
@@ -181,6 +181,8 @@ FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the sa
 2026-11-17 owner: 5 deg in total (2 deg more). hardware.yaml wrist_roll_zero_offset_deg L 176.187, R 175.615 (-5 deg from the original 181.187 / 180.615); fold_allowance roll centres +0.0873 rad from the original (L 0.0405, R 0.0382). Start/stop wrist_roll ticks: L 2005, R 1998 (57 ticks below the original). Soft limits 560..3450 L / 553..3443 R ticks, inside the EEPROM limits (the left lower limit has 10 ticks to spare). Joints 1-4 of the timeline are unchanged. Planner OK; demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
 
 2026-11-17 owner: one more degree, 6 deg in total. wrist_roll_zero_offset_deg L 175.187, R 174.615; fold_allowance roll centres L 0.0579, R 0.0556. Start/stop wrist_roll ticks L 1993, R 1987 (68 ticks below the original). With -2.2165 rad the left lower soft limit would be tick 548, 2 ticks PAST the EEPROM Min 550, so it is TIGHTENED to -2.2130 rad (tick 550.6); right unchanged (tick 542 vs EEPROM 533). This is a stricter limit, not a looser one; the start pose is ~125 deg away from it. Planner OK; demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
+
+2026-11-17 owner: half a degree back, 5.5 deg in total. wrist_roll_zero_offset_deg L 175.687, R 175.115; fold_allowance roll centres L 0.0492, R 0.0469. Start/stop wrist_roll ticks L 1999, R 1992 (63 ticks below the original). The left lower soft limit is back to -2.2165 rad (tick 554, inside the EEPROM 550); right tick 547 vs 533. Planner OK; both dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
