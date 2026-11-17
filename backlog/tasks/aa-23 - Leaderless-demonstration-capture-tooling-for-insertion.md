@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-17 03:24'
+updated_date: '2026-11-17 19:45'
 labels: []
 milestone: m-3
 dependencies:
@@ -177,6 +177,8 @@ FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the sa
 2026-11-16 19:30Z DONE (dry-run/tests only, not yet live): (1) wrist_roll start -2 deg (owner: 2 deg CCW from the side opposite the wires) on both arms: inchworm_plan.START_ROLL_RAD; timeline regenerated (only wrist_roll changed, -0.0349 rad in every frame), planner OK 0 violations, demo-start dry-run: preflight 0, fluid preflight 0, simulation OK. New ticks frame 0 / stop frame 42: wrist_roll L 2062->2039, R 2055->2032 (other joints unchanged). (2) Automatic start adjustment from ANY hand placement: APPROACH_MAX_DEG removed. cycle_replay.approach_plan: one arm at a time (left first, else right first), straight joint line, mesh-checked at >=1 sample/deg, goal must be inside the soft limits; a start joint outside its soft limit is allowed (MotionGuard.check_trajectory inward_start, used only by move_to_start); slow APPROACH_TICKS_S=57 (~5 deg/s, unverified placeholder). ORDER CHANGED in replay_cycle --tube-in-grippers: grippers EMPTY during the adjustment, then a YES prompt to put the tube keys in, then the locks (the arms never drag the tube; also no lock before a possibly refused move). start_check.py: no degree window; READY = torque off + grippers open + approach_plan clear; prints the degrees to move and any outside-limit joints. 02:44Z abort pose plans fine. Tests: main 1863 passed, plugin 48 passed. Previous recordings start from the old roll: re-record. First live run of the new adjustment: owner supervises.
 
 2026-11-17 owner: 3 deg CCW total, by MOVING THE ZERO. A -3 deg plan roll was refused by the planner (start grip 3.42 deg off the CAD middle point vs the 3.0 deg START_GRIP_TOL; -2.5 deg = 2.99 deg). So hardware.yaml wrist_roll_zero_offset_deg -3 deg on both arms (L 181.187->178.187, R 180.615->177.615; roll 0 = tick 2027 L / 2021 R), the fold_allowance roll centres re-expressed (+0.0524 rad), and inchworm_plan START_ROLL_RAD back to 0. Joints 1-4 of the timeline are identical to the original; the start/stop wrist_roll ticks are 34-35 lower than the original. Soft-limit ticks are now 582..3472 L, 576..3466 R (inside the EEPROM limits). The leader map works in ticks, so it is unchanged. Planner OK, demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863 passed, plugin 48 passed. Live 01:28Z run (before this change): the automatic start adjustment worked, left arm first, then the tube, locks and the handoff stop at frame 42.
+
+2026-11-17 owner: 5 deg in total (2 deg more). hardware.yaml wrist_roll_zero_offset_deg L 176.187, R 175.615 (-5 deg from the original 181.187 / 180.615); fold_allowance roll centres +0.0873 rad from the original (L 0.0405, R 0.0382). Start/stop wrist_roll ticks: L 2005, R 1998 (57 ticks below the original). Soft limits 560..3450 L / 553..3443 R ticks, inside the EEPROM limits (the left lower limit has 10 ticks to spare). Joints 1-4 of the timeline are unchanged. Planner OK; demo-start and full-cycle dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
