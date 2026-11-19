@@ -89,7 +89,9 @@ def camera_backend(cfg):
     Found live 2026-11-15: the plugin used the plain HardwareBackend and connect() refused.
     """
     from inchworm.backends import HardwareBackend, V4L2CameraTransport, live_backend
-    live_backend(cfg)                      # same refusal of INCHWORM_BACKEND=mock as live runs
+    backend = live_backend(cfg)            # same refusal of INCHWORM_BACKEND=mock as live runs
+    if getattr(getattr(cfg, "camera_transport", None), "value", "usbip") == "bridge":
+        return backend                     # AA-53: HardwareBackend opens the Windows camera bridge
 
     class _CameraBackend(HardwareBackend):
         def _open_camera(self, device, identity):

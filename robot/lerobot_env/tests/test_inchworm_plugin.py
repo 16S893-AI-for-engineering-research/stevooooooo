@@ -716,3 +716,13 @@ def test_preview_serves_the_last_frame_as_mjpeg_on_localhost_only():
         assert b"--frame" in data and b"\xff\xd8" in data                  # a JPEG part
     finally:
         p.stop()
+
+
+def test_camera_backend_bridge_mode_uses_hardware_backend(monkeypatch):
+    """AA-53: with camera_transport: bridge the plugin uses HardwareBackend, which opens the bridge."""
+    from inchworm import backends as be
+    from inchworm.config import CameraTransportName
+    monkeypatch.delenv(be.BACKEND_ENV_VAR, raising=False)
+    cfg = CFG.model_copy(update={"camera_transport": CameraTransportName.BRIDGE})
+    backend = fmod.camera_backend(cfg)
+    assert type(backend) is be.HardwareBackend

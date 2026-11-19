@@ -75,3 +75,18 @@ def test_no_device_exits_cleanly(monkeypatch, capsys):
     monkeypatch.setattr(diag, "run", boom)
     assert diag.main(["--live"]) == 2
     assert "attach_usb.py" in capsys.readouterr().err
+
+
+def test_verdict_bridge_pass_and_fail():
+    ok = _res(fps30_auto=_v(prod=30, loop=29.5))
+    ok["transport"] = "bridge"
+    assert diag.verdict(ok).startswith("BRIDGE PASS")
+    bad = _res(fps30_auto=_v(prod=8, loop=5))
+    bad["transport"] = "bridge"
+    assert diag.verdict(bad).startswith("BRIDGE FAIL")
+
+
+def test_transport_flag_parses():
+    args = diag._parser().parse_args(["--live", "--transport", "bridge"])
+    assert args.transport == "bridge"
+    assert diag._parser().parse_args([]).transport == "config"

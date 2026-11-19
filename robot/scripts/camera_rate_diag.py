@@ -47,6 +47,9 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--arm", choices=("left", "right"), default="left")
     p.add_argument("--seconds", type=float, default=None,
                    help="Seconds per stage (default 5 live, 0.3 dry-run).")
+    p.add_argument("--transport", choices=("config", "usbip", "bridge"), default="config",
+                   help="Camera path for --live: config (hardware.yaml camera_transport), usbip (V4L2 in WSL) "
+                        "or bridge (Windows DirectShow bridge, AA-53).")
     p.add_argument("--width", type=int, default=640)
     p.add_argument("--height", type=int, default=480)
     p.add_argument("--out", type=Path, default=None, help="Report path (default robot/out/camera_diag_<UTC>.json).")
@@ -161,6 +164,11 @@ def verdict(results: dict) -> str:
     new30 = a30.get("decode", {}).get("new_per_s")
     prod30 = a30.get("prod", {}).get("new_per_s")
     loop30 = a30.get("loop", {}).get("new_per_s")
+    if raw30 is None and results.get("transport") == "bridge":
+        ok = loop30 is not None and loop30 >= 25
+        return (f"BRIDGE {'PASS' if ok else 'FAIL'} (AA-53 AC6 target >= 25 new/s in the 30 Hz loop): "
+                f"grab_valid {prod30} new/s, 30 Hz loop {loop30} new/s (fps30_auto). Raw/decode stages are "
+                "not available through the bridge.")
     if raw30 is None:
         return "Dry-run / no raw stage: no verdict (run with --live)."
     if raw30 < 20 and rawexp is not None and rawexp >= 1.5 * raw30:
@@ -194,7 +202,14 @@ def run(args: argparse.Namespace) -> dict:
 
     seconds = args.seconds if args.seconds is not None else (5.0 if args.live else 0.3)
     config = load_config()
-    if args.live:
+    if args.live and args.transport != "config":
+        from inchworm.config import CameraTransportName
+        config = config.model_copy(update={"camera_transport": CameraTransportName(args.transport)})
+    bridge = args.live and config.camera_transport.value == "bridge"
+    if bridge:
+        from inchworm.backends import live_backend
+        backend = live_backend(config)          # HardwareBackend opens BridgeCameraTransport
+    elif args.live:
         from inchworm.backends import V4L2CameraTransport
 
         class _LiveBackend(MockMjpegBackend):
@@ -206,11 +221,11 @@ def run(args: argparse.Namespace) -> dict:
 
     device = f"camera_{args.arm}_arm"
     dev_node = None
-    if args.live:
+    if args.live and not bridge:
         from inchworm.discovery import require_device
         dev_node = require_device(f"cam_{args.arm}")
     results: dict = {"utc": datetime.now(timezone.utc).isoformat(), "live": args.live, "device": device,
-                     "dev_node": dev_node, "seconds_per_stage": seconds, "v4l2": v4l2_info(dev_node),
+                     "dev_node": dev_node, "transport": config.camera_transport.value if args.live else "mock", "seconds_per_stage": seconds, "v4l2": v4l2_info(dev_node),
                      "variants": {}}
 
     with CameraArbiter(backend).acquire(device) as transport:
