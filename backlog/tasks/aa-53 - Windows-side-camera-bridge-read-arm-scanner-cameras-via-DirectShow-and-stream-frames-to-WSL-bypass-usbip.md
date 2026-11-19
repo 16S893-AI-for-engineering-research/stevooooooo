@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19 18:56'
-updated_date: '2026-11-19 21:07'
+updated_date: '2026-11-19 21:58'
 labels:
   - camera
   - hardware
@@ -51,4 +51,6 @@ Step 2 part A merged (commit on main after f92d007 range; branch camera-bridge).
 2026-11-19 AC4: server resolves camera by usbipd BusId: DirectShow DevicePath -> PnP instance -> parent USB node LocationInformation Port_#P.Hub_#H -> BusId H-P (needs pygrabber on Windows). camera_bridge_server.py --list: 0=11-4 Arducam, 1=9-4 openaicam, 2=2-2 Surface, 3=10-2 openaicam; agent verified opening idx 1/3/0 alone powered only 9-4/10-2/11-4 (DEVPKEY_Device_PowerData D0). vid_pid guard refuses a moved cable. attach_usb.py skips cameras in bridge mode ([SKIP]/[ACTION] detach hint). Tests + both suites rc=0. camera_rate_diag.py --transport bridge added; plugin camera_backend uses HardwareBackend in bridge mode. nono draft: listen_port 50853 added, validates. AC6 PARTIAL EVIDENCE (orchestrator, read-only, no motion): camera_rate_diag --live --arm left --transport bridge, report robot/out/camera_diag_20261119T202816Z.json: fps30_auto grab_valid 60.16 new/s, 30 Hz loop 29.86 new/s, 0 repeats, 0 corrupt; server streamed BusId 9-4 (cam_left). This is the diag's 30 Hz loop, not the LeRobot recorder; AC6 left unchecked until a record_handoff.sh dataset shows >=25 new/s in inspect_dataset.py. BUG: manual exposure via DirectShow uses log2-seconds units (-1 = 0.5 s): exposure 100/50 mapped to -1 gave 2 fps. Do not use manual exposure over the bridge until the unit mapping is fixed. hardware.yaml camera_transport still usbip (owner switches).
 
 Owner decision 2026-11-19: leave wrist-camera exposure on AUTO (follower already requests no manual exposure). The DirectShow manual-exposure unit bug is deferred, not fixed; do not use manual exposure over the bridge.
+
+2026-11-19 test episode datasets/insert_left_20261119T214418Z (1 ep, 1448 frames, 48 s, loop 29.79 Hz, 24 overruns): inspect_dataset wrist new images/s = 16.26; strict alternating new/repeat pattern (camera delivering ~15/s, recorded twice by the 30 Hz loop), same moving and still. AC6 (>=25) NOT met as written. Cause not isolated (recorder requests 30 fps vs diag 60; or auto-exposure slowing to 15 fps in the recording scene). OWNER DECISION 2026-11-19: 15 new images/s is acceptable for recording. AC6 left unchecked pending owner's choice to amend it.
 <!-- SECTION:NOTES:END -->
