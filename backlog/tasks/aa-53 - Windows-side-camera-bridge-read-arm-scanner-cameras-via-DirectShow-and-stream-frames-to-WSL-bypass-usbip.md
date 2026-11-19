@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19 18:56'
-updated_date: '2026-11-19 19:36'
+updated_date: '2026-11-19 20:28'
 labels:
   - camera
   - hardware
@@ -26,7 +26,7 @@ Measured 2026-11-19: over usbip the arm cameras deliver only ~5-8 new images/s (
 - [x] #1 Prototype gate: a Windows DirectShow reader streaming the left arm camera to WSL delivers >= 30 new (non-identical) images/s in WSL over >= 10 s, measured and logged
 - [x] #2 Windows camera program kept in the repo (robot/windows/), DirectShow only, binds to loopback/WSL-reachable address only, serves at most one camera stream at a time
 - [x] #3 Robot-side bridge camera backend in robot/src/inchworm/ selectable in config/hardware.yaml (bridge vs usbip); CameraArbiter single-camera rule, corrupt-frame handling and recorder/LeRobot paths unchanged above it
-- [ ] #4 Camera identity (cam_left, cam_right, scanner) mapped by stable Windows device path/port, not index or serial; documented in doc-1
+- [x] #4 Camera identity (cam_left, cam_right, scanner) mapped by stable Windows device path/port, not index or serial; documented in doc-1
 - [x] #5 Tests with a fake bridge server cover frames, reconnect/failure, and refusal of a second concurrent stream; both suites pass (robot and robot/lerobot_env)
 - [ ] #6 Live measurement through the production backend: left wrist camera >= 25 new images/s in a 30 fps recording loop, report saved
 <!-- AC:END -->
@@ -47,4 +47,6 @@ Measured 2026-11-19: over usbip the arm cameras deliver only ~5-8 new images/s (
 Step 1 prototype PASSED 2026-11-19 (agent run, Opus 5.5): Windows DirectShow -> TCP -> WSL, 640x480, JPEG q90 re-encode (~16 kB/frame). dshow1 and dshow3 (the two arm cameras) each 60.3 new images/s over 12 s, 0 of ~724 identical consecutive frames, 0 decode failures, 0 seq gaps. WSL NAT networking (WSL 172.26.80.62, Windows 172.26.80.1): Windows->WSL inbound listen timed out (likely firewall); reverse direction (WSL listens, Windows server connects out) worked. Windows CPU 24-30% of one core, WSL 8-10%. Open: DirectShow index for cam_left unresolved; camera's own JPEG not passed through (OpenCV returned decoded frames); latency unmeasured (clock offset). Scripts: C:\Users\steph\inchworm_diag\proto_bridge_server.py, proto_bridge_client.py (copy). LeRobot 0.6.1 has a ZMQCamera + image_server (binds tcp://*, re-encodes, no single-camera limit) - reuse its message format or approach where sensible.
 
 Step 2 part A merged (commit on main after f92d007 range; branch camera-bridge). robot/windows/camera_bridge_server.py (DirectShow only, connects OUT to WSL, never listens, single-instance lock, drops stale frames), robot/src/inchworm/camera_bridge.py BridgeCameraTransport (listens on WSL addr, rejects 0.0.0.0, requires CameraArbiter global lock, newest-frame-only with superseded/dropped counters, JPEG integrity check like V4L2, capture timestamps in last_frame), config camera_transport: usbip (default) | bridge. Evidence: tests/test_camera_bridge.py 24 passed; full robot suite rc=0; lerobot_env suite rc=0 (orchestrator-run). Agent timed out at 28 min during its final test run; orchestrator reviewed and ran suites. OPEN: AC4 camera identity (config uses dshow_index 1/3 placeholder, left/right UNRESOLVED); AC6 live >=25 new/s through production loop; nono profile must allow listen on 50853; attach_usb.py must skip cameras when bridge is used.
+
+2026-11-19 AC4: server resolves camera by usbipd BusId: DirectShow DevicePath -> PnP instance -> parent USB node LocationInformation Port_#P.Hub_#H -> BusId H-P (needs pygrabber on Windows). camera_bridge_server.py --list: 0=11-4 Arducam, 1=9-4 openaicam, 2=2-2 Surface, 3=10-2 openaicam; agent verified opening idx 1/3/0 alone powered only 9-4/10-2/11-4 (DEVPKEY_Device_PowerData D0). vid_pid guard refuses a moved cable. attach_usb.py skips cameras in bridge mode ([SKIP]/[ACTION] detach hint). Tests + both suites rc=0. camera_rate_diag.py --transport bridge added; plugin camera_backend uses HardwareBackend in bridge mode. nono draft: listen_port 50853 added, validates. AC6 PARTIAL EVIDENCE (orchestrator, read-only, no motion): camera_rate_diag --live --arm left --transport bridge, report robot/out/camera_diag_20261119T202816Z.json: fps30_auto grab_valid 60.16 new/s, 30 Hz loop 29.86 new/s, 0 repeats, 0 corrupt; server streamed BusId 9-4 (cam_left). This is the diag's 30 Hz loop, not the LeRobot recorder; AC6 left unchecked until a record_handoff.sh dataset shows >=25 new/s in inspect_dataset.py. BUG: manual exposure via DirectShow uses log2-seconds units (-1 = 0.5 s): exposure 100/50 mapped to -1 gave 2 fps. Do not use manual exposure over the bridge until the unit mapping is fixed. hardware.yaml camera_transport still usbip (owner switches).
 <!-- SECTION:NOTES:END -->
