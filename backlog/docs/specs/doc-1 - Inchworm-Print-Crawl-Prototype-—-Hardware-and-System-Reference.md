@@ -3,7 +3,7 @@ id: doc-1
 title: Inchworm Print-Crawl Prototype — Hardware and System Reference
 type: specification
 created_date: '2026-10-20 21:06'
-updated_date: '2026-11-17 20:13'
+updated_date: '2026-11-19 22:02'
 ---
 Single source of truth for hardware, geometry and system constraints of the inchworm print-crawl robot. Tasks reference this doc instead of restating hardware facts. Update this doc (via `backlog doc update doc-1`) whenever a measured value is corrected; do not let per-task copies drift.
 
@@ -55,6 +55,7 @@ The chassis does **not** move. **The tube moves.** The two SO-101 arms alternate
 - All are mono (Y8/greyscale) global-shutter UVC devices. Global shutter matters: laser-line and insertion imagery must not be rolling-shutter skewed during motion.
 - **Measured 2026-10-24 (`lsusb -v` in WSL), correcting the line above:** none of the three cameras advertises a Y8/GREY format. The two arm cameras enumerate as `32e6:9251` "openaicam" and offer **MJPEG only** (640x480, 800x600, 1280x720). The Arducam `0c45:6366` offers MJPEG and uncompressed YUY2 (up to 1280x800). All three are **USB 2.0 High-Speed devices** (`bcdUSB 2.00`, link at 480M). Mono output must therefore come from decoding and converting to greyscale in software. The sensors may still be mono, but the USB format is not.
 - **Measured 2026-10-24, camera identity:** both arm cameras report the **same USB serial `5423534724`** (sysfs `serial` and udev `ID_SERIAL` are identical). Linux serial, by-id and udev rules therefore **cannot tell them apart**. Windows assigns the second camera a port-derived instance ID (`7&69F6256&0&2`) because the serials collide. The only stable distinguisher is the physical dock port, visible as the usbipd BusId: owner mapping cam_left = 9-4, cam_right = 10-2. **Do not move the arm-camera cables between dock ports.** Discovery maps BusId to the WSL node through `/sys/devices/platform/vhci_hcd.0/status` (AA-5).
+- **Measured 2026-11-19, camera transport (AA-53):** over usbip into WSL the arm cameras deliver only ~5-8 NEW images/s (a new image every ~192 ms, the rest exact byte-identical copies; ~15% truncated JPEGs), independent of light, exposure, fps and motion. In Windows via DirectShow the same cameras, dock and cables give 60 new images/s with 0 copies. Cameras are therefore read on **Windows** by `robot/windows/camera_bridge_server.py` (DirectShow only; it connects OUT to the WSL listener on port 50853 because Windows inbound is firewalled) and streamed to `BridgeCameraTransport`; `hardware.yaml camera_transport: bridge`. Servos, DexArm and relay stay on usbip; `attach_usb.py` skips the cameras in bridge mode. **Identity on Windows:** the server maps each DirectShow device's DevicePath to its USB node's LocationInformation `Port_#P.Hub_#H` = usbipd BusId `H-P` (left 9-4, right 10-2, scanner 11-4) and refuses a VID:PID mismatch. DirectShow indices seen 2026-11-19: 0 = scanner, 1 = left, 2 = Surface front camera, 3 = right (not stable; never configure by index). Measured: left camera through the bridge 60 new/s (30 Hz diag loop 29.9 new/s); in a real 30 fps recording ~16 new/s (camera ~15/s, auto exposure). DirectShow manual exposure uses log2-second units and is not mapped yet: use auto exposure.
 
 ## 5. Laser line scanner
 

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-17 20:22'
+updated_date: '2026-11-19 22:03'
 labels: []
 milestone: m-3
 dependencies:
@@ -185,6 +185,8 @@ FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the sa
 2026-11-17 owner: half a degree back, 5.5 deg in total. wrist_roll_zero_offset_deg L 175.687, R 175.115; fold_allowance roll centres L 0.0492, R 0.0469. Start/stop wrist_roll ticks L 1999, R 1992 (63 ticks below the original). The left lower soft limit is back to -2.2165 rad (tick 554, inside the EEPROM 550); right tick 547 vs 533. Planner OK; both dry-runs: preflight 0, fluid 0, simulation OK. Main suite 1863, plugin 48. Not yet run live.
 
 2026-11-17 20:25Z wrap-up. Live 2026-11-17 (owner): 4 demo-start runs 19:33, 19:47, 20:02, 20:17Z, all reached the handoff stop at frame 42; the automatic start adjustment brought each arm in from the hand placement (e.g. 20:02Z: right wrist_flex 1046 -> 985, roll 2001 -> 1989). The 20:17Z run used the final -5.5 deg zero: wrist_roll at the start 1998 L / 1991 R (targets 1999 / 1992). Robot left at the handoff stop, holding, right gripper LOCKED.
+
+2026-11-19 owner request: all 6 earlier datasets moved to robot/datasets/_not_for_training/ (gitignored, kept, not deleted), each with meta/NOT_FOR_TRAINING.json giving the reason: 213741Z empty; 215810Z old wrist roll + 360-degree offset; 222125Z, 015012Z, 025656Z old wrist roll + usbip camera; 20261119T214418Z bridge camera test episode. Train only on datasets recorded after this, directly under robot/datasets/.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19 18:56'
-updated_date: '2026-11-19 21:58'
+updated_date: '2026-11-19 22:02'
 labels:
   - camera
   - hardware
@@ -28,7 +28,7 @@ Measured 2026-11-19: over usbip the arm cameras deliver only ~5-8 new images/s (
 - [x] #3 Robot-side bridge camera backend in robot/src/inchworm/ selectable in config/hardware.yaml (bridge vs usbip); CameraArbiter single-camera rule, corrupt-frame handling and recorder/LeRobot paths unchanged above it
 - [x] #4 Camera identity (cam_left, cam_right, scanner) mapped by stable Windows device path/port, not index or serial; documented in doc-1
 - [x] #5 Tests with a fake bridge server cover frames, reconnect/failure, and refusal of a second concurrent stream; both suites pass (robot and robot/lerobot_env)
-- [ ] #6 Live measurement through the production backend: left wrist camera >= 25 new images/s in a 30 fps recording loop, report saved
+- [ ] #6 Live measurement through the production backend: left wrist camera >= 10 new images/s in a 30 fps recording loop, report saved (owner amended 2026-11-19 from >= 25: 15/s accepted; do not block on brief dips)
 <!-- AC:END -->
 
 ## Definition of Done
