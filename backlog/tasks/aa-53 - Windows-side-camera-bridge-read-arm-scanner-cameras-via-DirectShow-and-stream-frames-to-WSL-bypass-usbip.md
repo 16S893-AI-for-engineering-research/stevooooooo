@@ -3,10 +3,10 @@ id: AA-53
 title: >-
   Windows-side camera bridge: read arm/scanner cameras via DirectShow and stream
   frames to WSL (bypass usbip)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 18:56'
-updated_date: '2026-11-19 22:02'
+updated_date: '2026-11-19 22:03'
 labels:
   - camera
   - hardware
@@ -28,17 +28,17 @@ Measured 2026-11-19: over usbip the arm cameras deliver only ~5-8 new images/s (
 - [x] #3 Robot-side bridge camera backend in robot/src/inchworm/ selectable in config/hardware.yaml (bridge vs usbip); CameraArbiter single-camera rule, corrupt-frame handling and recorder/LeRobot paths unchanged above it
 - [x] #4 Camera identity (cam_left, cam_right, scanner) mapped by stable Windows device path/port, not index or serial; documented in doc-1
 - [x] #5 Tests with a fake bridge server cover frames, reconnect/failure, and refusal of a second concurrent stream; both suites pass (robot and robot/lerobot_env)
-- [ ] #6 Live measurement through the production backend: left wrist camera >= 10 new images/s in a 30 fps recording loop, report saved (owner amended 2026-11-19 from >= 25: 15/s accepted; do not block on brief dips)
+- [x] #6 Live measurement through the production backend: left wrist camera >= 10 new images/s in a 30 fps recording loop, report saved (owner amended 2026-11-19 from >= 25: 15/s accepted; do not block on brief dips)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -53,4 +53,12 @@ Step 2 part A merged (commit on main after f92d007 range; branch camera-bridge).
 Owner decision 2026-11-19: leave wrist-camera exposure on AUTO (follower already requests no manual exposure). The DirectShow manual-exposure unit bug is deferred, not fixed; do not use manual exposure over the bridge.
 
 2026-11-19 test episode datasets/insert_left_20261119T214418Z (1 ep, 1448 frames, 48 s, loop 29.79 Hz, 24 overruns): inspect_dataset wrist new images/s = 16.26; strict alternating new/repeat pattern (camera delivering ~15/s, recorded twice by the 30 Hz loop), same moving and still. AC6 (>=25) NOT met as written. Cause not isolated (recorder requests 30 fps vs diag 60; or auto-exposure slowing to 15 fps in the recording scene). OWNER DECISION 2026-11-19: 15 new images/s is acceptable for recording. AC6 left unchecked pending owner's choice to amend it.
+
+AC6 evidence: real record_handoff.sh episode through the bridge, datasets/_not_for_training/insert_left_20261119T214418Z, inspect_dataset wrist new images/s = 16.26 (>= 10, amended AC), report robot/out/aa53_ac6_inspect_20261119.json; loop 29.79 Hz. Deferred: DirectShow manual-exposure unit mapping (auto used, owner decision); 60 fps request in the recorder could raise the rate (not tried, owner accepted 15/s). Single-camera invariant covered by test_second_concurrent_stream_refused and test_open_refused_without_arbiter_lock; other invariants untouched, suites rc 0.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cameras now bypass usbip (which re-delivered identical frames, 5-8 new/s): robot/windows/camera_bridge_server.py reads them on Windows via DirectShow, selected by usbipd BusId, and connects out to BridgeCameraTransport in WSL (newest-frame only, arbiter lock required). camera_transport: bridge is on; attach_usb.py skips cameras. Verified: prototype 60 new/s; diag loop 29.9 new/s; real recording 16.3 new/s (AC6 amended by owner to >= 10); both test suites rc 0.
+<!-- SECTION:FINAL_SUMMARY:END -->
