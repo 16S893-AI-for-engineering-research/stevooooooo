@@ -355,8 +355,8 @@ def _raw_config() -> dict:
 
 
 def test_default_config_selects_usbip():
-    cfg = load_config()
-    assert cfg.camera_transport is CameraTransportName.USBIP
+    # Schema default stays usbip. The committed hardware.yaml selects bridge since the
+    # owner switched it on 2026-11-19 (AA-53); that is checked separately below.
     raw = _raw_config()
     del raw["camera_transport"]
     del raw["camera_bridge"]
@@ -364,8 +364,14 @@ def test_default_config_selects_usbip():
 
 
 def test_usbip_transport_keeps_hardware_backend_camera_refusal():
+    cfg = load_config().model_copy(update={"camera_transport": CameraTransportName.USBIP})
     with pytest.raises(BackendError, match="V4L2CameraTransport.open"):
-        HardwareBackend(load_config())._open_camera("camera_left_arm", None)
+        HardwareBackend(cfg)._open_camera("camera_left_arm", None)
+
+
+def test_committed_config_selects_bridge():
+    """Owner switched the cameras to the Windows bridge on 2026-11-19 (AA-53)."""
+    assert load_config().camera_transport is CameraTransportName.BRIDGE
 
 
 def test_bridge_transport_requires_bridge_config():

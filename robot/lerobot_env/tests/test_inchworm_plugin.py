@@ -341,12 +341,16 @@ def test_real_camera_path_opens_v4l2_only_under_the_arbiter_lock(monkeypatch):
 
     monkeypatch.setattr(be.V4L2CameraTransport, "open",
                         classmethod(lambda cls, d, ident: seen.append((d, global_lock_held_for(d))) or T()))
-    backend = fmod.camera_backend(CFG)
+    from inchworm.config import CameraTransportName
+    usbip_cfg = CFG.model_copy(update={"camera_transport": CameraTransportName.USBIP})
+    backend = fmod.camera_backend(usbip_cfg)
     assert isinstance(backend, be.HardwareBackend)
     with CameraArbiter(backend).acquire("camera_left_arm"):
         pass
     assert seen == [("camera_left_arm", True)]
     monkeypatch.setenv(be.BACKEND_ENV_VAR, "mock")
+    with pytest.raises(be.BackendError):
+        fmod.camera_backend(usbip_cfg)
     with pytest.raises(be.BackendError):
         fmod.camera_backend(CFG)
 

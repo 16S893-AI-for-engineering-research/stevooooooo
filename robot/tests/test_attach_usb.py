@@ -631,6 +631,9 @@ def test_bridge_transport_main_exits_nonzero_while_camera_attached(bridge_config
 
 
 def test_usbip_transport_still_attaches_cameras(config, state_json_file):
+    from inchworm.config import CameraTransportName
+
+    config = config.model_copy(update={"camera_transport": CameraTransportName.USBIP})
     results = attach_usb.attach_all(config, dry_run=True, state_json_path=state_json_file)
     by_role = {r.role: r for r in results}
     assert "usbipd attach --wsl --busid 9-4" in by_role["cam_left"].message

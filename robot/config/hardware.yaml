@@ -227,7 +227,7 @@ cameras:
 # "bridge": robot/windows/camera_bridge_server.py reads the camera with DirectShow
 # on Windows and connects OUT to this listener (WSL NAT; Windows inbound is
 # firewalled). Measured 2026-11-19: usbip ~5-8 new images/s, bridge 60/s.
-camera_transport: usbip
+camera_transport: bridge
 camera_bridge:
   # "auto" = WSL eth0 address from `hostname -I`; 127.0.0.1 for tests/mirrored
   # networking. Wildcard addresses (0.0.0.0) are rejected by the loader.

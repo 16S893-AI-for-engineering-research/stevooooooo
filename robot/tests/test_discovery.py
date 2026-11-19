@@ -679,6 +679,7 @@ class TestDuplicateInvariant:
         raw = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text())
         # Set cam_right to the same BusId as cam_left (9-4).
         raw["cameras"]["right_arm"]["identity"]["windows_busid"] = "9-4"
+        raw["camera_transport"] = "usbip"   # usbip discovery path (bridge mode cross-checks busids, AA-53)
         bad_config = parse_config(raw)
 
         serial_dir = _make_serial_by_id(tmp_path, _ALL_SERIAL)
