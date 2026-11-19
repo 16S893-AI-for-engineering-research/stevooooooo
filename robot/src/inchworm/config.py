@@ -237,13 +237,26 @@ class CameraTransportName(str, Enum):
 
 
 class BridgeCameraSelector(_Strict):
-    """Which Windows DirectShow camera the bridge server opens for one role.
+    """Which Windows DirectShow camera the bridge server opens for one role (AA-53 AC4).
 
-    AC4 open (AA-53): the DirectShow index is NOT a stable identity; it must be
-    replaced by the Windows device path/port before the bridge is used for data.
+    ``busid`` is the usbipd BusId (hub-port, e.g. ``9-4``) of the physical USB
+    port; the Windows server maps it to a DirectShow index at stream open via
+    the device's LocationInformation ``Port_#0004.Hub_#0009``. POSITIONAL: the
+    cable must stay in that port. ``vid_pid`` is checked against the device
+    found there, so a different device on that port is refused.
+    ``dshow_index`` is an explicit diagnostic override; the DirectShow index is
+    NOT a stable identity and must not be used for recording data.
     """
 
-    dshow_index: int = Field(ge=0)
+    busid: Optional[str] = Field(default=None, pattern=r"^\d+-\d+$")
+    vid_pid: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{4}:[0-9a-f]{4}$")
+    dshow_index: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _busid_or_index(self) -> "BridgeCameraSelector":
+        if (self.busid is None) == (self.dshow_index is None):
+            raise ValueError("bridge camera selector needs exactly one of busid or dshow_index")
+        return self
 
 
 class BridgeCameraSelectors(_Strict):
@@ -1528,6 +1541,23 @@ class HardwareConfig(_Strict):
     def _bridge_transport_needs_bridge_config(self) -> "HardwareConfig":
         if self.camera_transport is CameraTransportName.BRIDGE and self.camera_bridge is None:
             raise ValueError("camera_transport is 'bridge' but camera_bridge is not configured")
+        if self.camera_transport is CameraTransportName.BRIDGE:
+            # The bridge BusId must name the same physical port as the camera identity.
+            for role in ("left_arm", "right_arm", "scanner"):
+                selector = getattr(self.camera_bridge.cameras, role)
+                identity = getattr(self.cameras, role).identity
+                if selector is None or selector.busid is None:
+                    continue
+                if identity.identify_by is IdentifyBy.USBIP_BUSID and selector.busid != identity.windows_busid:
+                    raise ValueError(
+                        f"camera_bridge.cameras.{role}.busid {selector.busid!r} != "
+                        f"cameras.{role}.identity.windows_busid {identity.windows_busid!r}"
+                    )
+                if selector.vid_pid is not None and selector.vid_pid != identity.vid_pid:
+                    raise ValueError(
+                        f"camera_bridge.cameras.{role}.vid_pid {selector.vid_pid!r} != "
+                        f"cameras.{role}.identity {identity.vid_pid!r}"
+                    )
         return self
 
     @model_validator(mode="before")

@@ -14,6 +14,13 @@ device does not appear within the timeout, the attach is retried once.  Reports
 per-device ``[OK]``, ``[RETRY-OK]``, or ``[FAIL]`` and exits nonzero if any
 device fails.
 
+Camera transport ``bridge`` (AA-53): the cameras are read on Windows by
+``robot/windows/camera_bridge_server.py`` through DirectShow, so cam_left,
+cam_right and cam_scanner are NOT attached to WSL (``[SKIP]``). A camera that
+is currently attached to WSL cannot be opened by DirectShow; it is reported
+as ``[ACTION]`` with the ``usbipd detach --busid X`` command to run (never
+detached automatically) and the exit status is nonzero.
+
 BusIds are never hardcoded; they are resolved fresh from ``usbipd state`` each
 run because usbipd BusIds change across reconnects.
 
@@ -50,7 +57,7 @@ _HERE = Path(__file__).resolve()
 _ROBOT_ROOT = _HERE.parents[1]
 sys.path.insert(0, str(_ROBOT_ROOT / "src"))
 
-from inchworm.config import HardwareConfig, load_config  # noqa: E402
+from inchworm.config import CameraTransportName, HardwareConfig, load_config  # noqa: E402
 from inchworm.vhci import (
     VHCI_STATUS_PATH,
     _busid_to_dev_hex,
@@ -488,6 +495,42 @@ def _attach_device(
 # ---------------------------------------------------------------------------
 
 
+#: Roles read through the Windows camera bridge when camera_transport is "bridge".
+BRIDGE_CAMERA_ROLES = ("cam_left", "cam_right", "cam_scanner")
+
+
+def _bridge_camera_result(spec: _DeviceSpec, devices: list[dict]) -> _AttachResult:
+    """Camera read on Windows by the bridge: never attach; ask to detach if attached."""
+    busid = _resolve_busid(spec, devices)
+    if busid is None:
+        return _AttachResult(
+            role=spec.role, busid=None, found=False, already_attached=False,
+            success=False, retried=False,
+            message=(
+                f"[MISSING] {spec.role}: not found in usbipd device list "
+                f"(VID:PID {spec.vid}:{spec.pid}); the camera bridge needs it plugged into Windows."
+            ),
+        )
+    if _is_attached(busid, devices):
+        return _AttachResult(
+            role=spec.role, busid=busid, found=True, already_attached=True,
+            success=False, retried=False,
+            message=(
+                f"[ACTION]  {spec.role}: attached to WSL (BusId {busid}) but camera_transport is "
+                f"'bridge'; DirectShow cannot open it. Run: "
+                f'powershell.exe -NoProfile -Command "usbipd detach --busid {busid}"'
+            ),
+        )
+    return _AttachResult(
+        role=spec.role, busid=busid, found=True, already_attached=False,
+        success=True, retried=False,
+        message=(
+            f"[SKIP]    {spec.role}: camera_transport is 'bridge'; stays on Windows "
+            f"(BusId {busid}), not attached to WSL"
+        ),
+    )
+
+
 def attach_all(
     config: HardwareConfig,
     *,
@@ -498,6 +541,9 @@ def attach_all(
     verify_poll_s: float = ATTACH_VERIFY_POLL_S,
 ) -> list[_AttachResult]:
     """Attach all required devices and return per-device results.
+
+    With ``camera_transport: bridge`` the camera roles in
+    :data:`BRIDGE_CAMERA_ROLES` are not attached (see module docstring).
 
     Parameters
     ----------
@@ -514,8 +560,11 @@ def attach_all(
     state = _get_usbipd_state_json(state_json_path)
     devices: list[dict] = state.get("Devices", [])
     specs = _device_specs_from_config(config)
+    bridge = config.camera_transport is CameraTransportName.BRIDGE
     return [
-        _attach_device(
+        _bridge_camera_result(spec, devices)
+        if bridge and spec.role in BRIDGE_CAMERA_ROLES
+        else _attach_device(
             spec,
             devices,
             dry_run,

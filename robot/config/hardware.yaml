@@ -239,14 +239,24 @@ camera_bridge:
   frame_width: 640
   frame_height: 480
   fps: 60
-  # AA-53 AC4 OPEN: DirectShow index is not a stable identity. The prototype saw
-  # the two arm cameras at indices 1 and 3; which one is cam_left is UNRESOLVED.
-  # Replace with the Windows device path/port mapping before recording data.
+  # AA-53 AC4: cameras are selected by usbipd BusId (= physical hub port; the
+  # arm cameras share VID:PID and serial). The Windows server maps BusId ->
+  # DirectShow index at stream open from LocationInformation "Port_#P.Hub_#H".
+  # Verified 2026-11-19: `camera_bridge_server.py --list` gave 0=11-4 Arducam,
+  # 1=9-4 openaicam, 3=10-2 openaicam; opening index 1/3/0 alone powered up
+  # only the device at 9-4/10-2/11-4 (DEVPKEY_Device_PowerData D0).
+  # POSITIONAL: cables must stay in these ports. dshow_index: N is a
+  # diagnostic override only (unstable; not for data).
   cameras:
     left_arm:
-      dshow_index: 1
+      busid: "9-4"
+      vid_pid: "32e6:9251"
     right_arm:
-      dshow_index: 3
+      busid: "10-2"
+      vid_pid: "32e6:9251"
+    scanner:
+      busid: "11-4"
+      vid_pid: "0c45:6366"
 # --- AA-53 end ---
 
 relay:

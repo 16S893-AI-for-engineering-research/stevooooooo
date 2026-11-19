@@ -572,3 +572,65 @@ def test_busid_identified_cameras_resolve_to_configured_ports(config):
     # A different device on the configured port is refused.
     wrong = [{"BusId": "9-4", "InstanceId": "USB\\\\VID_1A86&PID_7523\\\\X"}]
     assert attach_usb._resolve_busid(specs["cam_left"], wrong) is None
+
+
+# --- AA-53: camera_transport "bridge" keeps the cameras on Windows ---
+@pytest.fixture()
+def bridge_config(config):
+    from inchworm.config import CameraTransportName
+
+    return config.model_copy(update={"camera_transport": CameraTransportName.BRIDGE})
+
+
+def _state_file(tmp_path: Path, attached_busids: set) -> Path:
+    devices = [dict(d, ClientIPAddress="172.26.80.62" if d["BusId"] in attached_busids else None)
+               for d in _USBIPD_STATE["Devices"]]
+    p = tmp_path / "usbipd_state.json"
+    p.write_text(json.dumps({"Devices": devices}), encoding="utf-8")
+    return p
+
+
+def test_bridge_transport_skips_cameras_and_attaches_the_rest(bridge_config, tmp_path):
+    state = _state_file(tmp_path, attached_busids=set())
+    ok_proc = MagicMock(returncode=0, stderr="")
+    with patch("subprocess.run", return_value=ok_proc) as mock_run, \
+            patch.object(attach_usb, "_wait_for_vhci", return_value=True):
+        results = attach_usb.attach_all(bridge_config, dry_run=False, state_json_path=state,
+                                        vhci_status_reader=lambda: "")
+    by_role = {r.role: r for r in results}
+    for role in attach_usb.BRIDGE_CAMERA_ROLES:
+        assert by_role[role].success and by_role[role].message.startswith("[SKIP]"), role
+        assert "not attached to WSL" in by_role[role].message
+    commands = " ".join(" ".join(c.args[0]) for c in mock_run.call_args_list)
+    for busid in ("9-4", "10-2", "11-4"):
+        assert f"--busid {busid}" not in commands
+    assert "--busid 11-3" in commands  # dexarm still attached
+    assert by_role["dexarm"].success
+
+
+def test_bridge_transport_reports_wsl_attached_camera_without_detaching(bridge_config, tmp_path):
+    state = _state_file(tmp_path, attached_busids={d["BusId"] for d in _USBIPD_STATE["Devices"]})
+    with patch("subprocess.run") as mock_run:
+        results = attach_usb.attach_all(bridge_config, dry_run=False, state_json_path=state)
+    mock_run.assert_not_called()  # nothing is detached (or attached) silently
+    by_role = {r.role: r for r in results}
+    for role, busid in (("cam_left", "9-4"), ("cam_right", "10-2"), ("cam_scanner", "11-4")):
+        res = by_role[role]
+        assert not res.success and res.message.startswith("[ACTION]")
+        assert f"usbipd detach --busid {busid}" in res.message
+
+
+def test_bridge_transport_main_exits_nonzero_while_camera_attached(bridge_config, tmp_path, capsys):
+    state = _state_file(tmp_path, attached_busids={"9-4"})
+    with patch.object(attach_usb, "load_config", return_value=bridge_config):
+        rc = attach_usb.main(["--dry-run", "--state-json", str(state)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "usbipd detach --busid 9-4" in out
+    assert "[SKIP]    cam_right" in out
+
+
+def test_usbip_transport_still_attaches_cameras(config, state_json_file):
+    results = attach_usb.attach_all(config, dry_run=True, state_json_path=state_json_file)
+    by_role = {r.role: r for r in results}
+    assert "usbipd attach --wsl --busid 9-4" in by_role["cam_left"].message

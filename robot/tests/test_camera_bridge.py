@@ -146,11 +146,26 @@ class _FakeCamera:
         self.released = True
 
 
+#: DirectShow enumeration measured on the rig 2026-11-19 (camera_bridge_server.py --list).
+_GUID = "#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global"
+_DSHOW_DEVICES = [
+    {"index": 0, "name": "Arducam OV9281 USB Camera", "busid": "11-4",
+     "device_path": "\\\\?\\usb#vid_0c45&pid_6366&mi_00#8&2355927a&0&0000" + _GUID},
+    {"index": 1, "name": "openaicam", "busid": "9-4",
+     "device_path": "\\\\?\\usb#vid_32e6&pid_9251&mi_00#7&2cfe5692&0&0000" + _GUID},
+    {"index": 2, "name": "Surface Camera Front", "busid": "2-2",
+     "device_path": "\\\\?\\usb#vid_045e&pid_0c1e&mi_00#6&2b18d1a0&0&0000" + _GUID},
+    {"index": 3, "name": "openaicam", "busid": "10-2",
+     "device_path": "\\\\?\\usb#vid_32e6&pid_9251&mi_00#8&b59707&0&0000" + _GUID},
+]
+
+
 def _real_server(port: int) -> threading.Thread:
     def run() -> None:
         sock = _connect_with_retry(port)
         try:
-            server_mod.serve_stream(sock, open_camera=_FakeCamera)
+            server_mod.serve_stream(sock, open_camera=_FakeCamera,
+                                    list_video_devices=lambda: list(_DSHOW_DEVICES))
         finally:
             sock.close()
 
@@ -188,7 +203,7 @@ def test_frames_settings_handshake_and_incrementing_counter(bridge_backend, brid
         result = capture.grab()
         assert not result.corrupt and result.data.shape == (48, 64)
     cam = _FakeCamera.instances[0]
-    assert cam.dshow_index == bridge_config.cameras.left_arm.dshow_index
+    assert cam.dshow_index == 1  # BusId 9-4 in _DSHOW_DEVICES
     assert cam.settings[0]["width"] == bridge_config.frame_width
     assert cam.settings[0]["fps"] == bridge_config.fps
     assert cam.settings[1]["exposure"] == 50
@@ -395,7 +410,93 @@ def test_unknown_bridge_field_rejected():
 
 
 def test_bridge_selector_config_parsed():
-    bridge = load_config().camera_bridge
+    cfg = load_config()
+    bridge = cfg.camera_bridge
     assert isinstance(bridge, CameraBridgeConfig)
     assert bridge.listen_host == "auto"
-    assert bridge.cameras.left_arm.dshow_index >= 0
+    cams = bridge.cameras
+    # AA-53 AC4: selected by physical port (usbipd BusId), never by DirectShow index.
+    assert (cams.left_arm.busid, cams.right_arm.busid, cams.scanner.busid) == ("9-4", "10-2", "11-4")
+    assert all(c.dshow_index is None for c in (cams.left_arm, cams.right_arm, cams.scanner))
+    assert cams.left_arm.busid == cfg.cameras.left_arm.identity.windows_busid
+    assert cams.right_arm.busid == cfg.cameras.right_arm.identity.windows_busid
+
+
+@pytest.mark.parametrize(
+    "selector,match",
+    [({}, "exactly one of busid or dshow_index"),
+     ({"busid": "9-4", "dshow_index": 1}, "exactly one of busid or dshow_index"),
+     ({"busid": "port4"}, "busid")],
+)
+def test_bad_bridge_selector_rejected(selector, match):
+    raw = _raw_config()
+    raw["camera_bridge"]["cameras"]["left_arm"] = selector
+    with pytest.raises(ConfigError, match=match):
+        parse_config(raw)
+
+
+def test_bridge_busid_must_match_camera_identity_port():
+    raw = _raw_config()
+    raw["camera_transport"] = "bridge"
+    raw["camera_bridge"]["cameras"]["left_arm"]["busid"] = "10-2"  # right camera's port
+    with pytest.raises(ConfigError, match="windows_busid"):
+        parse_config(raw)
+
+
+def test_bridge_vid_pid_must_match_camera_identity():
+    raw = _raw_config()
+    raw["camera_transport"] = "bridge"
+    raw["camera_bridge"]["cameras"]["scanner"]["vid_pid"] = "32e6:9251"
+    with pytest.raises(ConfigError, match="vid_pid"):
+        parse_config(raw)
+
+
+def test_dshow_index_override_still_accepted():
+    raw = _raw_config()
+    raw["camera_bridge"]["cameras"]["left_arm"] = {"dshow_index": 1}
+    assert parse_config(raw).camera_bridge.cameras.left_arm.dshow_index == 1
+
+
+# --- Windows server: BusId -> DirectShow index (AA-53 AC4) ---
+
+
+@pytest.mark.parametrize("busid,index", [("9-4", 1), ("10-2", 3), ("11-4", 0)])
+def test_server_resolves_busid_to_dshow_index(busid, index):
+    assert server_mod.resolve_dshow_index({"busid": busid}, _DSHOW_DEVICES) == index
+
+
+def test_server_refuses_busid_with_no_camera():
+    with pytest.raises(RuntimeError, match="0 DirectShow cameras at BusId 9-1"):
+        server_mod.resolve_dshow_index({"busid": "9-1"}, _DSHOW_DEVICES)
+
+
+def test_server_refuses_ambiguous_busid():
+    devices = _DSHOW_DEVICES + [dict(_DSHOW_DEVICES[1], index=4)]
+    with pytest.raises(RuntimeError, match="2 DirectShow cameras at BusId 9-4"):
+        server_mod.resolve_dshow_index({"busid": "9-4"}, devices)
+
+
+def test_server_refuses_wrong_device_on_port():
+    with pytest.raises(RuntimeError, match="expected VID:PID 32e6:9251"):
+        server_mod.resolve_dshow_index({"busid": "11-4", "vid_pid": "32e6:9251"}, _DSHOW_DEVICES)
+
+
+def test_server_dshow_index_override_skips_enumeration():
+    assert server_mod.resolve_dshow_index({"dshow_index": 2}, []) == 2
+
+
+def test_handshake_sends_busid_selector(bridge_backend, bridge_config):
+    srv = _RawServer(bridge_config.listen_port, [(0, _jpeg())])
+    srv.start()
+    with bridge_backend.acquire("camera_right_arm"):
+        pass
+    assert srv.request["camera"] == {"busid": "10-2", "vid_pid": "32e6:9251"}
+
+
+def test_server_location_info_and_device_path_parsing():
+    assert server_mod.busid_from_location_info("Port_#0004.Hub_#0009") == "9-4"
+    assert server_mod.busid_from_location_info("Port_#0002.Hub_#0010") == "10-2"
+    assert server_mod.busid_from_location_info("0000.0014.0000.005.002.004.000.000.000") is None
+    assert server_mod.instance_id_from_device_path(_DSHOW_DEVICES[1]["device_path"]) == (
+        "USB\\VID_32E6&PID_9251&MI_00\\7&2CFE5692&0&0000"
+    )

@@ -20,7 +20,9 @@ they match). Every message is ``MSG_HEADER`` = (magic ``b"IWCB"``, version u8,
 msg type u8, payload length u32) followed by the payload:
 
 - robot -> server ``MSG_REQUEST`` (JSON): ``device``, ``camera`` selector
-  (``{"dshow_index": N}``), ``width``, ``height``, ``fps``, ``exposure``,
+  (``{"busid": "9-4", "vid_pid": "32e6:9251"}``, the usbipd BusId of the
+  physical port, resolved to a DirectShow index by the server; or the
+  diagnostic override ``{"dshow_index": N}``), ``width``, ``height``, ``fps``, ``exposure``,
   ``auto_exposure``, ``gain``. Sent once right after the server connects.
 - server -> robot ``MSG_REPLY`` (JSON): ``ok``, ``error``, ``applied`` read-back.
 - robot -> server ``MSG_SETTINGS`` (JSON, same settings keys) at any time;
@@ -254,7 +256,7 @@ class BridgeCameraTransport(CameraTransport):
     def _handshake(self, selector: "object", bridge_config: "object") -> None:
         request = {
             "device": self.device,
-            "camera": {"dshow_index": selector.dshow_index},
+            "camera": selector.model_dump(exclude_none=True),
             "width": bridge_config.frame_width,
             "height": bridge_config.frame_height,
             "fps": bridge_config.fps,
