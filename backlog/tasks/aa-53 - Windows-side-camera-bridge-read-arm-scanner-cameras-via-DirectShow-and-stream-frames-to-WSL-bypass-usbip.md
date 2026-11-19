@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19 18:56'
-updated_date: '2026-11-19 20:28'
+updated_date: '2026-11-19 21:07'
 labels:
   - camera
   - hardware
@@ -49,4 +49,6 @@ Step 1 prototype PASSED 2026-11-19 (agent run, Opus 5.5): Windows DirectShow -> 
 Step 2 part A merged (commit on main after f92d007 range; branch camera-bridge). robot/windows/camera_bridge_server.py (DirectShow only, connects OUT to WSL, never listens, single-instance lock, drops stale frames), robot/src/inchworm/camera_bridge.py BridgeCameraTransport (listens on WSL addr, rejects 0.0.0.0, requires CameraArbiter global lock, newest-frame-only with superseded/dropped counters, JPEG integrity check like V4L2, capture timestamps in last_frame), config camera_transport: usbip (default) | bridge. Evidence: tests/test_camera_bridge.py 24 passed; full robot suite rc=0; lerobot_env suite rc=0 (orchestrator-run). Agent timed out at 28 min during its final test run; orchestrator reviewed and ran suites. OPEN: AC4 camera identity (config uses dshow_index 1/3 placeholder, left/right UNRESOLVED); AC6 live >=25 new/s through production loop; nono profile must allow listen on 50853; attach_usb.py must skip cameras when bridge is used.
 
 2026-11-19 AC4: server resolves camera by usbipd BusId: DirectShow DevicePath -> PnP instance -> parent USB node LocationInformation Port_#P.Hub_#H -> BusId H-P (needs pygrabber on Windows). camera_bridge_server.py --list: 0=11-4 Arducam, 1=9-4 openaicam, 2=2-2 Surface, 3=10-2 openaicam; agent verified opening idx 1/3/0 alone powered only 9-4/10-2/11-4 (DEVPKEY_Device_PowerData D0). vid_pid guard refuses a moved cable. attach_usb.py skips cameras in bridge mode ([SKIP]/[ACTION] detach hint). Tests + both suites rc=0. camera_rate_diag.py --transport bridge added; plugin camera_backend uses HardwareBackend in bridge mode. nono draft: listen_port 50853 added, validates. AC6 PARTIAL EVIDENCE (orchestrator, read-only, no motion): camera_rate_diag --live --arm left --transport bridge, report robot/out/camera_diag_20261119T202816Z.json: fps30_auto grab_valid 60.16 new/s, 30 Hz loop 29.86 new/s, 0 repeats, 0 corrupt; server streamed BusId 9-4 (cam_left). This is the diag's 30 Hz loop, not the LeRobot recorder; AC6 left unchecked until a record_handoff.sh dataset shows >=25 new/s in inspect_dataset.py. BUG: manual exposure via DirectShow uses log2-seconds units (-1 = 0.5 s): exposure 100/50 mapped to -1 gave 2 fps. Do not use manual exposure over the bridge until the unit mapping is fixed. hardware.yaml camera_transport still usbip (owner switches).
+
+Owner decision 2026-11-19: leave wrist-camera exposure on AUTO (follower already requests no manual exposure). The DirectShow manual-exposure unit bug is deferred, not fixed; do not use manual exposure over the bridge.
 <!-- SECTION:NOTES:END -->
