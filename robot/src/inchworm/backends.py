@@ -267,6 +267,14 @@ class HardwareBackend(Backend):
     # --- serial-transport end ---
 
     def _open_camera(self, device: str, identity: DeviceIdentity) -> CameraTransport:
+        # --- AA-53 ---
+        # camera_transport: bridge -> frames come from the Windows DirectShow
+        # bridge server; CameraArbiter still wraps the open (lock check inside).
+        from inchworm.config import CameraTransportName
+        if self.config.camera_transport is CameraTransportName.BRIDGE:
+            from inchworm.camera_bridge import BridgeCameraTransport
+            return BridgeCameraTransport.open(device, self.config.camera_bridge)
+        # --- AA-53 end ---
         # --- AA-14 ---
         # V4L2CameraTransport.open() implements the real camera path; it is
         # invoked by callers that have already confirmed hardware is available

@@ -228,6 +228,60 @@ class CamerasConfig(_Strict):
     scanner: CameraConfig
 
 
+# --- AA-53 ---
+class CameraTransportName(str, Enum):
+    """How hardware cameras are read: usbip + V4L2 in WSL, or the Windows DirectShow bridge."""
+
+    USBIP = "usbip"
+    BRIDGE = "bridge"
+
+
+class BridgeCameraSelector(_Strict):
+    """Which Windows DirectShow camera the bridge server opens for one role.
+
+    AC4 open (AA-53): the DirectShow index is NOT a stable identity; it must be
+    replaced by the Windows device path/port before the bridge is used for data.
+    """
+
+    dshow_index: int = Field(ge=0)
+
+
+class BridgeCameraSelectors(_Strict):
+    left_arm: Optional[BridgeCameraSelector] = None
+    right_arm: Optional[BridgeCameraSelector] = None
+    scanner: Optional[BridgeCameraSelector] = None
+
+
+class CameraBridgeConfig(_Strict):
+    """Robot-side listener for robot/windows/camera_bridge_server.py (AA-53).
+
+    The robot LISTENS and the Windows server connects out (WSL NAT: Windows
+    cannot be reached inbound through its firewall). ``listen_host`` is the WSL
+    address (``auto`` = first ``hostname -I`` address) or loopback; wildcard
+    addresses are rejected so the camera stream is never offered on every interface.
+    """
+
+    listen_host: str = Field(min_length=1)
+    listen_port: int = Field(ge=1024, le=65535)
+    connect_timeout_s: float = Field(gt=0)
+    frame_timeout_s: float = Field(gt=0)
+    settings_timeout_s: float = Field(gt=0)
+    frame_width: int = Field(gt=0)
+    frame_height: int = Field(gt=0)
+    fps: int = Field(gt=0)
+    cameras: BridgeCameraSelectors
+
+    @model_validator(mode="after")
+    def _no_wildcard_listen(self) -> "CameraBridgeConfig":
+        if self.listen_host in ("0.0.0.0", "::", "*"):
+            raise ValueError(
+                f"listen_host {self.listen_host!r} would listen on every interface; "
+                "use 'auto' (WSL address) or 127.0.0.1"
+            )
+        return self
+# --- AA-53 end ---
+
+
 class RelayConfig(_Strict):
     adapter_chip: str
     identity: DeviceIdentity
@@ -1411,6 +1465,10 @@ class HardwareConfig(_Strict):
     arms: ArmsConfig
     dexarm: DexArmConfig
     cameras: CamerasConfig
+    # --- AA-53 ---
+    camera_transport: CameraTransportName = Field(default=CameraTransportName.USBIP, strict=False)
+    camera_bridge: Optional[CameraBridgeConfig] = None
+    # --- AA-53 end ---
     relay: RelayConfig
     laser: LaserConfig
     # --- AA-10 ---
@@ -1465,6 +1523,12 @@ class HardwareConfig(_Strict):
     # --- AA-34 ---
     gcode_intake: Optional["GCodeIntakeConfigSchema"] = None
     # --- AA-34 end ---
+
+    @model_validator(mode="after")
+    def _bridge_transport_needs_bridge_config(self) -> "HardwareConfig":
+        if self.camera_transport is CameraTransportName.BRIDGE and self.camera_bridge is None:
+            raise ValueError("camera_transport is 'bridge' but camera_bridge is not configured")
+        return self
 
     @model_validator(mode="before")
     @classmethod

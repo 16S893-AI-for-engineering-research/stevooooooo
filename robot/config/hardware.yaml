@@ -222,6 +222,33 @@ cameras:
       linux_by_id: usb-Arducam_Technology_Co.__Ltd._Arducam_OV9281_USB_Camera_UC762-video-index0
       windows_busid_observed: "11-4"
 
+# --- AA-53 ---
+# How hardware cameras are read. "usbip" (default): V4L2 in WSL over usbip.
+# "bridge": robot/windows/camera_bridge_server.py reads the camera with DirectShow
+# on Windows and connects OUT to this listener (WSL NAT; Windows inbound is
+# firewalled). Measured 2026-11-19: usbip ~5-8 new images/s, bridge 60/s.
+camera_transport: usbip
+camera_bridge:
+  # "auto" = WSL eth0 address from `hostname -I`; 127.0.0.1 for tests/mirrored
+  # networking. Wildcard addresses (0.0.0.0) are rejected by the loader.
+  listen_host: auto
+  listen_port: 50853
+  connect_timeout_s: 15.0
+  frame_timeout_s: 1.0
+  settings_timeout_s: 3.0
+  frame_width: 640
+  frame_height: 480
+  fps: 60
+  # AA-53 AC4 OPEN: DirectShow index is not a stable identity. The prototype saw
+  # the two arm cameras at indices 1 and 3; which one is cam_left is UNRESOLVED.
+  # Replace with the Windows device path/port mapping before recording data.
+  cameras:
+    left_arm:
+      dshow_index: 1
+    right_arm:
+      dshow_index: 3
+# --- AA-53 end ---
+
 relay:
   # USB serial relay switching laser power. Candidate identity (AA-37):
   # CH340 with no USB serial, identified by VID:PID 1a86:7523 alone.
