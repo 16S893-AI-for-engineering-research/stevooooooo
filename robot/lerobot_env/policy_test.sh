@@ -28,7 +28,12 @@ while [ $# -gt 0 ]; do
 done
 case "$ARM" in
   left) FRAME=42 ;;
-  right) FRAME=67 ;;
+  right)
+    # Owner 2026-11-20 after the first live run: the replay to frame 67 does the LEFT insertion +
+    # lock scripted (frames 43-49), without the policy, and that failed. Disabled until the full
+    # left-policy -> lock -> continue -> right-policy test replaces it.
+    echo "REFUSED: --arm right is disabled (the replay to frame 67 inserts the left arm WITHOUT the policy)"
+    exit 2 ;;
   *) echo "REFUSED: --arm left|right is required"; exit 2 ;;
 esac
 STATE="$ROBOT/out/handoff_state.json"

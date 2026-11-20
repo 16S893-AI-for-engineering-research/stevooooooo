@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-24 16:07'
-updated_date: '2026-11-20 17:31'
+updated_date: '2026-11-20 22:03'
 labels: []
 milestone: m-3
 dependencies:
@@ -68,4 +68,6 @@ Risks: the right wrist camera sees a different scene (the left arm holding, back
 2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
 
 2026-11-20 owner decisions: (1) post-lock pose = measured demo-end pose (redo the timeline from frame 49 from it); owner may switch to accepting the push on the tube; not built. (2) finish rule = still 2 deg / 2 s + within 8 deg of the demo end (built, see AA-26). (3) AA-24 closed not needed; AA-26 ACs reworded.
+
+2026-11-20 21:52-21:59Z FIRST LIVE policy_test.sh --arm right (owner present). Replay 0..67 with the tube: carry worst path error 34/38 ticks; left UNLOCK 1606; frames 24-48 = SCRIPTED left insertion (no policy); left LOCK read LOCKED at 2028 ticks (position band only); right UNLOCK 1589; stop 67. Owner: the scripted left insert failed ('obviously'). SAFETY NOTE: the lock band reads LOCKED by position alone, so a failed key insert can still read LOCKED, and the right gripper then unlocked; the tube may have been held by one unverified gripper. Policy right (mapped): 2 attempts, both hit the 20 s time cap (finish rule did not fire), 0 holds, 0 jump stops, overruns 183/514 and 155/520, return between them clean (worst track 18 ticks). Attempt 1 ended within 1.5 deg of the mapped demo-end pose on joints 1-4 (lift 197.0 vs 198.5). Trace out/rollout/policy_right_20261120T215418Z.jsonl. As of 22:01Z policy_handoff was still waiting at its release prompt (hold logged 21:59:12Z). Owner: the script was wrong; wants a FULL test: left runs the policy, lock, cycle continues, right runs the policy. policy_test.sh --arm right DISABLED (refuses) until that replaces it.
 <!-- SECTION:NOTES:END -->

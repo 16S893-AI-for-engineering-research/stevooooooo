@@ -46,11 +46,10 @@ def _st(frame, locked):
     return {"stop_frame": frame, "locked": locked, "tube_in_grippers": True, "utc": "x"}
 
 
-def test_right_runs_replay_to_67_then_the_mapped_policy(tree):
+def test_right_is_disabled(tree):
+    """Owner 2026-11-20: frames 43-49 insert the left arm without the policy; --arm right refuses."""
     p, calls = _run(tree, "--arm", "right", "--dry-run", state=_st(67, {"left": True, "right": False}))
-    assert p.returncode == 0, p.stdout + p.stderr
-    assert "--stop-after-frame 67 --tube-in-grippers" in calls[0] and "--live" not in calls[0]
-    assert "policy_handoff.py --arm right --policy-arm left" in calls[1] and "--dry-run" in calls[1]
+    assert p.returncode == 2 and calls == [] and "disabled" in p.stdout
 
 
 def test_left_stops_at_42(tree):
@@ -60,11 +59,11 @@ def test_left_stops_at_42(tree):
 
 @pytest.mark.parametrize("state, rc", [
     (None, 0),                                               # YES not given: no state written
-    (_st(42, {"left": False, "right": True}), 0),            # wrong arm's stop
-    (_st(67, {"left": True, "right": False}), 4),            # replay failed
+    (_st(67, {"left": True, "right": False}), 0),            # wrong arm's stop
+    (_st(42, {"left": False, "right": True}), 4),            # replay failed
 ])
 def test_policy_never_starts_without_a_good_replay(tree, state, rc):
-    p, calls = _run(tree, "--arm", "right", "--dry-run", state=state, rc=rc)
+    p, calls = _run(tree, "--arm", "left", "--dry-run", state=state, rc=rc)
     assert p.returncode != 0 and len(calls) == 1 and "replay_cycle" in calls[0]
 
 
