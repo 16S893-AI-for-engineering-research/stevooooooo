@@ -16,6 +16,12 @@ Added here for the policy (all logged; agent proposals, UNVERIFIED, owner to con
   watches and stops it.
 
 Start AFTER  scripts/replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ...
+(or use the single launcher ``policy_test.sh --arm left|right``, AA-39).
+
+AA-39 (owner 2026-11-20): ``--arm right`` runs the LEFT-trained policy on the RIGHT arm without
+retraining (stop frame 67: left LOCKED, right open). Joints are mapped through the per-arm zero
+offsets (``inchworm.arm_transfer``; refused if any joint sign differs). The right wrist camera
+is used as is.
 
     bash ~/893/robot/lerobot_env/policy_handoff.sh --dry-run    # no hardware (simulated servos)
     bash ~/893/robot/lerobot_env/policy_handoff.sh              # live, owner supervising
@@ -136,7 +142,7 @@ class _SimHW:
     """FollowerHardware surface on simulated servos (scripts/replay_sim.SimArmBus), both arms
     holding at the handoff state's present pose. No port, no camera."""
 
-    def __init__(self, cfg, state, frames):
+    def __init__(self, cfg, state, frames, follower="left", clock=time.monotonic):
         import importlib.util
         from inchworm import teleop_live as tl
         s = importlib.util.spec_from_file_location("replay_sim", ROBOT / "scripts" / "replay_sim.py")
@@ -151,14 +157,15 @@ class _SimHW:
         def bus(arm):
             lim = getattr(cfg.motion_guard, f"{arm}_arm_limits").servo_tick_limits
             b = Bus(f"arm_{arm}", list(state["present_ticks"][arm]) + [state["gripper_ticks"][arm]],
-                    time.monotonic, limits={i + 1: tuple(lim[j]) for i, j in enumerate((*tl.J5, "gripper"))})
+                    clock, limits={i + 1: tuple(lim[j]) for i, j in enumerate((*tl.J5, "gripper"))})
             b._bus.read_bytes = b._read_bytes
             for sid in range(1, 7):
                 b.torque[sid] = True
             return b
 
-        self.bus, self.obus = bus("left"), bus("right")
-        self.role = "arm_left"
+        other = "right" if follower == "left" else "left"
+        self.bus, self.obus = bus(follower), bus(other)
+        self.role = f"arm_{follower}"
         self.read_bytes, self.write_bytes = self.bus._read_bytes, self.bus._write_bytes
         self._frames, self._i = frames, 0
 
@@ -196,6 +203,12 @@ def _replay_frames(root: Path, episode: int, n: int):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--checkpoint", type=Path, default=DEFAULT_CKPT)
+    ap.add_argument("--arm", choices=("left", "right"), default="left", help="the arm the policy moves")
+    ap.add_argument("--policy-arm", choices=("left", "right"), default="left",
+                    help="the arm the checkpoint was trained on; differs from --arm = AA-39 joint-offset map")
+    ap.add_argument("--handoff-state", type=Path, default=None,
+                    help="handoff state (default out/handoff_state.json; --dry-run: out/sim_handoff_state.json "
+                         "if it matches --arm, written by replay_cycle.py's dry run)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--max-deg-s", type=float, default=5.0, help="speed cap per joint (0.5..10 deg/s)")
@@ -217,39 +230,57 @@ def main(argv=None) -> int:
     from lerobot.utils.import_utils import register_third_party_plugins
     register_third_party_plugins()
     from inchworm import handoff as ho
+    from inchworm.arm_transfer import JointOffsetMap, MappedPolicy
     from inchworm.config import load_config
     from inchworm.policy_runner import CheckpointLoader, CheckpointPolicy, LeRobotBackend
     from lerobot_robot_inchworm import InchwormFollower, InchwormFollowerConfig
 
+    cfg = load_config()
+    amap = None
+    if a.arm != a.policy_arm:                               # refuses on a sign mismatch, before any load
+        amap = JointOffsetMap(cfg, source=a.policy_arm, target=a.arm)
+        print(f"AA-39 joint-offset map: {a.policy_arm}-trained policy on the {a.arm} arm; "
+              f"{a.policy_arm} deg = {a.arm} deg + {amap.summary()}")
+    state_path = a.handoff_state
+    if state_path is None:
+        state_path = ho.STATE_PATH
+        sim_path = ho.STATE_PATH.with_name("sim_" + ho.STATE_PATH.name)
+        if a.dry_run and sim_path.exists() and not ho.load_state(sim_path)["locked"][a.arm]:
+            state_path = sim_path
     meta = CheckpointLoader(a.checkpoint).load()            # validates: 5 joints, no gripper
-    policy = CheckpointPolicy(meta, LeRobotBackend(device=a.device, follower="left"))
+    policy = CheckpointPolicy(meta, LeRobotBackend(device=a.device, follower=a.policy_arm))
     print(f"checkpoint {a.checkpoint}  sha256 {meta.sha256[:16]}")
     from inchworm.policy_contract import Observation
     t_w = time.perf_counter()                               # warm-up (first CUDA call ~2 s): before connect
     policy.step(Observation(frame=np.zeros((480, 640), np.uint8),
                             joint_positions_deg=np.full(5, 180.0, np.float32), step_index=0))
     policy.reset()
+    if amap is not None:
+        policy = MappedPolicy(policy, amap)
     print(f"policy warm-up {time.perf_counter() - t_w:.1f} s (nothing connected yet)")
 
     robot = InchwormFollower(InchwormFollowerConfig(
-        id="left", follower="left", camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
+        id=a.arm, follower=a.arm, camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
+        handoff_state=str(state_path),
         allow_unverified_soft_limits=a.allow_unverified_soft_limits, control_hz=float(a.fps),
         log_dir=str(ROBOT / "out" / "rollout") if a.dry_run else ""))
     utc = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     tdir = ROBOT / "out" / "rollout"
     tdir.mkdir(parents=True, exist_ok=True)
-    trace_path = tdir / f"policy_{'dry_' if a.dry_run else ''}{utc}.jsonl"
+    trace_path = tdir / f"policy_{'dry_' if a.dry_run else ''}{a.arm}_{utc}.jsonl"
     kw = dict(fps=a.fps, max_deg_s=a.max_deg_s, max_jump_deg=a.max_jump_deg, max_s=a.max_s)
 
     if a.dry_run:
-        cfg = load_config()
-        st = ho.load_state()
+        st = ho.load_state(state_path)
         frames = _replay_frames(a.replay_dataset, a.replay_episode, int(a.max_s * a.fps) + 5)
-        robot._open_hardware = lambda c: _SimHW(cfg, st, frames)
+        robot._open_hardware = lambda c: _SimHW(cfg, st, frames, follower=a.arm)
         robot.prompt = lambda msg: print(msg + "YES (dry run)") or "YES"
-        print(f"DRY RUN: simulated servos at the handoff stop ({st['utc']}), real cell mesh, "
-              f"frames of {a.replay_dataset.name} episode {a.replay_episode}")
+        print(f"DRY RUN ({a.arm} arm): simulated servos at the handoff stop frame {st['stop_frame']} "
+              f"({state_path.name}, {st['utc']}), real cell mesh, frames of {a.replay_dataset.name} "
+              f"episode {a.replay_episode}" + ("" if amap is None else
+                                               " (a LEFT episode: mapping check only)"))
         robot.connect()
+        _log_map(robot, a, amap)
         try:
             with trace_path.open("w") as tr:
                 res = PolicyAttempt(robot, policy, trace=tr, **kw).run()
@@ -285,6 +316,7 @@ def main(argv=None) -> int:
     rc, n = 0, 0
     try:
         robot.connect()                                     # handoff checks + typed YES
+        _log_map(robot, a, amap)
         listener = start_listener()
         if listener is None:
             print("REFUSED: no keyboard listener (run in an interactive terminal)"); return 2
@@ -327,6 +359,11 @@ def main(argv=None) -> int:
             robot.disconnect()                              # support the tube + both arms, Enter
         print(f"trace: {trace_path}")
     return rc
+
+
+def _log_map(robot, a, amap) -> None:
+    robot._log({"event": "policy_arm", "arm": a.arm, "policy_arm": a.policy_arm, "checkpoint": str(a.checkpoint),
+                "joint_offset_map_deg": None if amap is None else amap.summary()})
 
 
 if __name__ == "__main__":

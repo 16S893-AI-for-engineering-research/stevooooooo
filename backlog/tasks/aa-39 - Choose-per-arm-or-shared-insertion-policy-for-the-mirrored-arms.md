@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-24 16:07'
-updated_date: '2026-11-20 13:20'
+updated_date: '2026-11-20 15:18'
 labels: []
 milestone: m-3
 dependencies:
@@ -48,3 +48,18 @@ Facts: doc-1 says the arms are mounted the same way (not mirrored) and all joint
 5. Owner-supervised first live right-arm trial with the same guards (5 deg/s, 10 deg jump, 20 s). Report the result; then the AA-39 comparison (AC1) and the owner's decision (AC2).
 Risks: the right wrist camera sees a different scene (the left arm holding, background, lighting); real key offsets; camera mount differences. If it fails: 10-20 right demos (fit leader_map_right first), then fine-tune the existing checkpoint on left+right.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 step 2: dry-run 'replay_cycle.py --stop-after-frame 67 --tube-in-grippers' passes unchanged (preflight 0 problems/61 s, fluid preflight 0/24 s, sim OK worst 12 ticks, stop at frame 67: left LOCKED, right open, both holding; writes sim_handoff_state.json). NOTE: frames 43-49 are the scripted LEFT insertion + lock WITH the tube, then the right unlock (frame 50); this live path with the tube was never run (the left demo stopped at 42). Owner supervises the first live run.
+
+2026-11-20 steps 1-4 BUILT, dry-run OK, NOT live.
+- src/inchworm/arm_transfer.py: JointOffsetMap (source deg = target deg + zero_source - zero_target; refuses unless every joint sign matches and is +/-1) + MappedPolicy (maps obs in / action out, frame unchanged, extra keys passed through so the joints-1-5 check still refuses). Map L = R + pan -7.998, lift -5.625, elbow +3.867, wrist_flex +3.032, roll +0.572 deg. Tests tests/test_arm_transfer.py (5: offsets, round trip, same URDF q, sign refusal, wrapper).
+- policy_handoff.py: --arm left|right, --policy-arm (default left), --handoff-state; _SimHW arm-generic; logs event policy_arm with the map. Tests: left policy drives the right arm (+3 deg lift in left space = +3 deg on the right, left arm + both grippers untouched, release turns joints of both off, left gripper stays on); right follower refuses a frame-42 state.
+- Return with follower=right: 2 new tests in tests/test_handoff_return.py on the real cell mesh + timeline (stop 67, inserted 73): straight-out 50 mm, then right line, then left (with tube) to its stop; every step checked. Pass.
+- lerobot_env/policy_test.sh --arm left|right [--dry-run] [-- policy args]: subprocess replay_cycle.py (main env) to frame 42/67 with --tube-in-grippers, then policy_handoff.py in lerobot_env. The policy step starts only if the replay exited 0 AND wrote a fresh state file (mtime after launch) for this arm's frame with this arm open, other LOCKED, tube in (replay exits 0 when YES is refused). Tests tests/test_policy_test_sh.py (6, uv stubbed).
+- Dry runs (real checkpoint 20k + real cell mesh, simulated servos): policy_test.sh --arm right --dry-run: replay preflight 0/fluid 0, sim worst 12 ticks, stop 67; policy 20 s, 0 holds, 0 jump stops, max target-present 3.93 deg. --arm left: preflight 0, stop 42, policy OK.
+- FINDING (not fixed, needs owner): right-arm dry run had 359/361 loop overruns (left 63/498). Cause measured: the mesh gate's margin distance query baseforreal vs right_upper_arm (AABBs overlap, meshes 107 mm apart; 14k x 45k faces) costs ~21-32 ms per check on the right vs ~3 ms on the left (46 mm). Median gate 37 ms right vs 12 ms left > 33 ms period. Effect: loop ~18 Hz instead of 30; the 5 deg/s cap is per step, so the arm moves SLOWER, never faster; the policy's action chunk plays slower in wall time. Options for the owner: (a) accept for the first trial; (b) --fps 15 for the right trial; (c) a coarser hull for that one pair (changes the collision model: owner approval).
+- Untested live: replay frames 43-67 with the tube (scripted left insertion + lock at 43-49, right unlock 50, right carry to 67) were never run on hardware. First live policy_test.sh --arm right needs the owner supervising.
+<!-- SECTION:NOTES:END -->

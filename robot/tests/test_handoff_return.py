@@ -139,3 +139,34 @@ def test_run_leg_stops_and_holds_when_something_resists():
     with pytest.raises(hr.ReturnAborted, match="resists"):
         hr.run_leg(core, leg, clock=clock, sleep=clock.sleep)
     assert abs(b.goal[2] - b.pos[2]) <= 2 and all(b.torque[s] for s in range(1, 6))   # holding there
+
+
+# --- AA-39: the same return with the RIGHT arm as the follower (stop frame 67, left LOCKED) ---------
+@pytest.fixture(scope="module")
+def right_cell(cell):
+    from inchworm.kinematics import build_chain, with_soft_limits
+    fr = cell["fr"]
+    assert fr[67].locked == {"left": True, "right": False}
+    home = {a: cr.q_to_ticks(CFG, a, fr[67].q[a]) for a in ("left", "right")}
+    model = hr.CarriedTubeModel(CFG, cell["model"].checker, home, fr[67].tube, follower="right")
+    chain = with_soft_limits(build_chain(CFG.so101_kinematics), CFG.motion_guard.right_arm_limits)
+    return dict(fr=fr, home=home, model=model, chain=chain, lim=cell["lim"])
+
+
+def test_right_follower_carried_tube_is_the_handoff_tube(right_cell):
+    m, home = right_cell["model"], right_cell["home"]
+    assert m.other == "left"
+    assert np.allclose(m.tube(home["left"]), right_cell["fr"][67].tube, atol=1e-9)
+
+
+def test_right_follower_return_from_the_inserted_pose(right_cell):
+    fr, m, chain = right_cell["fr"], right_cell["model"], right_cell["chain"]
+    now = {"right": cr.q_to_ticks(CFG, "right", fr[73].q["right"]), "left": [t + 15 for t in right_cell["home"]["left"]]}
+    plan = hr.plan_return(CFG, m, chain, right_cell["lim"], now)
+    out, line, other = plan.legs
+    assert out.arm == "right" and abs(out.duration_s - 5.0) < 1e-9
+    T = [chain.fk(np.asarray(hr.ticks_to_q(CFG, "right", w))) for w in out.waypoints]
+    assert abs((T[-1][2, 3] - T[0][2, 3]) * 1000 + 50.0) < 0.6
+    assert line.waypoints[-1] == pytest.approx(right_cell["home"]["right"])
+    assert other.arm == "left" and other.waypoints[-1] == pytest.approx(right_cell["home"]["left"])
+    assert plan.checks == sum(len(l.waypoints) - 1 for l in plan.legs)

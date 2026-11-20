@@ -118,3 +118,82 @@ def test_policy_with_gripper_key_is_refused(tmp_path, monkeypatch):
         ph.PolicyAttempt(r, Bad(lambda p, i: p), clock=clock, sleep=clock.sleep, say=lambda *_: None).run()
     assert (hw.bus.goal[6], hw.bus.torque[6]) == g6
     r.disconnect()
+
+
+# --- AA-39: the LEFT policy on the RIGHT arm (stop frame 67: left LOCKED, right open) -----------------
+def _right_state(tmp_path):
+    from inchworm import handoff as ho
+    from inchworm.config import load_config
+    cfg = load_config()
+    left = [1972, 2337, 1775, 1438, 1999]          # replay_cycle dry run, frame 67 (sim_handoff_state.json)
+    right = [2063, 2261, 2140, 1135, 1992]
+    st = ho.write_state(tmp_path / "h67.json", stop_frame=67, step="right regrip middle point", timeline_digest="x",
+                        tube_in_grippers=True, goal_ticks={"left": left, "right": right},
+                        present_ticks={"left": left, "right": right}, gripper_ticks={"left": 2038, "right": 1547},
+                        locked={"left": True, "right": False}, q_rad={"left": [0.0] * 5, "right": [0.0] * 5},
+                        tube_pose=np.eye(4))
+    return cfg, st
+
+
+def test_left_policy_drives_the_right_arm_through_the_offset_map(tmp_path, monkeypatch):
+    from inchworm.arm_transfer import JointOffsetMap, MappedPolicy
+    from lerobot_robot_inchworm import InchwormFollower, InchwormFollowerConfig
+    import lerobot_robot_inchworm.inchworm_follower as fmod
+    monkeypatch.setattr(fmod, "STOP_FILE", tmp_path / "STOP_TELEOP")
+    cfg, st = _right_state(tmp_path)
+    clock = sim.SimClock()
+    hw = ph._SimHW(cfg, st, [np.zeros((48, 64), np.uint8)], follower="right", clock=clock)
+    r = InchwormFollower(InchwormFollowerConfig(
+        id="right", follower="right", tube_support="handoff", allow_unverified_soft_limits="test",
+        handoff_state=str(tmp_path / "h67.json"), camera_width=64, camera_height=48, log_dir=str(tmp_path / "log")))
+    r._open_hardware = lambda c: hw
+    r.prompt = lambda *_: "YES"
+    r._make_gate = lambda *a: Gate()
+    r.connect()
+    m = JointOffsetMap(cfg, source="left", target="right")
+    R0 = np.array(st["goal_ticks"]["right"]) * tl.DEG_PER_TICK
+    L0 = m.to_source(R0)
+    seen = []
+
+    class LeftPolicy:                               # wants +3 deg of lift relative to the LEFT stop pose
+        def reset(self):
+            pass
+
+        def step(self, obs):
+            seen.append(np.array(obs.joint_positions_deg, float))
+            return {j: float(v) for j, v in zip(tl.J5, L0 + np.array([0, 3.0, 0, 0, 0]))}
+    g6 = (hw.bus.goal[6], hw.bus.torque[6], hw.obus.goal[6], hw.obus.torque[6])
+    res = ph.PolicyAttempt(r, MappedPolicy(LeftPolicy(), m), clock=clock, sleep=clock.sleep,
+                           say=lambda *_: None, max_s=2.0).run()
+    assert res["end"] == "time_cap" and res["steps"] > 0
+    assert np.abs(seen[0] - L0).max() < 0.1          # the policy saw LEFT-equivalent degrees of the right arm
+    want = (R0 + np.array([0, 3.0, 0, 0, 0])) / tl.DEG_PER_TICK
+    assert max(abs(hw.bus.pos[i + 1] - want[i]) for i in range(5)) <= 3    # the RIGHT arm went +3 deg lift
+    assert all(abs(hw.obus.pos[i + 1] - st["goal_ticks"]["left"][i]) <= 1 for i in range(5))  # left untouched
+    assert (hw.bus.goal[6], hw.bus.torque[6], hw.obus.goal[6], hw.obus.torque[6]) == g6        # grippers untouched
+    r.prompt = lambda *_: ""
+    r.disconnect()
+    assert not any(hw.bus.torque[s] or hw.obus.torque[s] for s in range(1, 6))
+    assert hw.obus.torque[6]                         # the LOCKED left gripper stays on
+
+
+def test_right_follower_refuses_the_left_stop_state(tmp_path, monkeypatch):
+    """A stop-frame-42 state (right LOCKED) must refuse --arm right (it would pull on the tube)."""
+    from lerobot_robot_inchworm import InchwormFollower, InchwormFollowerConfig
+    from lerobot_robot_inchworm.inchworm_follower import InchwormRefused
+    import lerobot_robot_inchworm.inchworm_follower as fmod
+    from inchworm import handoff as ho
+    monkeypatch.setattr(fmod, "STOP_FILE", tmp_path / "STOP_TELEOP")
+    cfg, st = _right_state(tmp_path)
+    st["locked"] = {"left": False, "right": True}
+    (tmp_path / "h67.json").write_text(__import__("json").dumps(st))
+    hw = ph._SimHW(cfg, st, [np.zeros((48, 64), np.uint8)], follower="right")
+    r = InchwormFollower(InchwormFollowerConfig(
+        id="right", follower="right", tube_support="handoff", allow_unverified_soft_limits="test",
+        handoff_state=str(tmp_path / "h67.json"), camera_width=64, camera_height=48, log_dir=str(tmp_path / "log")))
+    r._open_hardware = lambda c: hw
+    r.prompt = lambda *_: "YES"
+    r._make_gate = lambda *a: Gate()
+    with pytest.raises(InchwormRefused, match="right gripper is LOCKED"):
+        r.connect()
+    assert ho.load_state(tmp_path / "h67.json")["locked"]["right"]
