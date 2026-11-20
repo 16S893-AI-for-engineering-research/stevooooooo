@@ -67,4 +67,7 @@ echo "== 2/2 policy_handoff on the $ARM arm (left-trained checkpoint)"
 cd "$HERE"
 ARGS=(--arm "$ARM" --policy-arm left --handoff-state "$STATE" --allow-unverified-soft-limits "$APPROVAL")
 [ "$DRY" = 1 ] && ARGS+=(--dry-run)
+# Owner 2026-11-20: the right arm's mesh check takes ~37 ms (> 33 ms at 30 Hz); run it slow (15 Hz)
+# for now. A later --fps in the extra arguments overrides this.
+[ "$ARM" = right ] && ARGS+=(--fps 15)
 exec uv run python policy_handoff.py "${ARGS[@]}" ${EXTRA[@]+"${EXTRA[@]}"}

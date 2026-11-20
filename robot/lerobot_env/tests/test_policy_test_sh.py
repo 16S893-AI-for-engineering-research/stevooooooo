@@ -51,11 +51,13 @@ def test_right_runs_replay_to_67_then_the_mapped_policy(tree):
     assert p.returncode == 0, p.stdout + p.stderr
     assert "--stop-after-frame 67 --tube-in-grippers" in calls[0] and "--live" not in calls[0]
     assert "policy_handoff.py --arm right --policy-arm left" in calls[1] and "--dry-run" in calls[1]
+    assert "--fps 15" in calls[1]                       # owner 2026-11-20: right arm slow for now
 
 
 def test_left_stops_at_42(tree):
     p, calls = _run(tree, "--arm", "left", "--dry-run", state=_st(42, {"left": False, "right": True}))
     assert p.returncode == 0 and "--stop-after-frame 42" in calls[0] and "--arm left" in calls[1]
+    assert "--fps" not in calls[1]
 
 
 @pytest.mark.parametrize("state, rc", [

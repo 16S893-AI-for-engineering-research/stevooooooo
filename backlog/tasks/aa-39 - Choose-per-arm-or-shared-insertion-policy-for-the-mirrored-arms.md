@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-24 16:07'
-updated_date: '2026-11-20 15:18'
+updated_date: '2026-11-20 16:53'
 labels: []
 milestone: m-3
 dependencies:
@@ -62,4 +62,6 @@ Risks: the right wrist camera sees a different scene (the left arm holding, back
 - Dry runs (real checkpoint 20k + real cell mesh, simulated servos): policy_test.sh --arm right --dry-run: replay preflight 0/fluid 0, sim worst 12 ticks, stop 67; policy 20 s, 0 holds, 0 jump stops, max target-present 3.93 deg. --arm left: preflight 0, stop 42, policy OK.
 - FINDING (not fixed, needs owner): right-arm dry run had 359/361 loop overruns (left 63/498). Cause measured: the mesh gate's margin distance query baseforreal vs right_upper_arm (AABBs overlap, meshes 107 mm apart; 14k x 45k faces) costs ~21-32 ms per check on the right vs ~3 ms on the left (46 mm). Median gate 37 ms right vs 12 ms left > 33 ms period. Effect: loop ~18 Hz instead of 30; the 5 deg/s cap is per step, so the arm moves SLOWER, never faster; the policy's action chunk plays slower in wall time. Options for the owner: (a) accept for the first trial; (b) --fps 15 for the right trial; (c) a coarser hull for that one pair (changes the collision model: owner approval).
 - Untested live: replay frames 43-67 with the tube (scripted left insertion + lock at 43-49, right unlock 50, right carry to 67) were never run on hardware. First live policy_test.sh --arm right needs the owner supervising.
+
+2026-11-20 owner: (1) will supervise the first live right run incl. the never-run frames 43-67 with the tube; (2) right arm overruns: 'try slow for now' -> policy_test.sh adds --fps 15 for --arm right (overridable). Dry run at 15 Hz: 286 steps/20 s, 11 overruns, 0 holds, max target-present 2.76 deg. Owner question answered: after the policy + lock, the plan of record (AA-23 note 2026-11-13) is to re-plan from the actual pose; not built yet (policy_handoff only holds / returns / releases; lock + continue = AA-26/AA-27).
 <!-- SECTION:NOTES:END -->
