@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-20 17:01'
+updated_date: '2026-11-20 17:31'
 labels: []
 milestone: m-3
 dependencies:
@@ -33,13 +33,13 @@ See doc-1 sections 3 and 9.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The trained checkpoint runs inside the AA-20 supervisor with all limits, bounds, clamps and abort paths active and unchanged
-- [x] #2 On a seated verdict, code takes control, commands the AA-17 lock, verifies the latch is holding, and only then returns success to the cycle runner
-- [x] #3 On abort or an unseated verdict, the arm retracts safely, the coarse approach is retried up to the configured bound, and persistent failure halts the cycle in a safe state without operator input
-- [ ] #4 Policy inference latency is measured on this host and the supervisor loop rate is shown to be compatible, with the measured values recorded
-- [x] #5 Checkpoint identity (path and hash) is logged with every rollout so a run can be traced to the exact model used
-- [x] #6 Loading an incompatible checkpoint or one whose observation and action spaces disagree with the contract fails at load time, not mid-insertion
-- [ ] #7 At least 20 consecutive supervised handoffs are executed with zero operator interventions and the outcome of each is logged
-- [x] #8 Tests cover handback, lock-on-success, unseated retry, abort escalation and the incompatible-checkpoint path
+- [ ] #2 On abort, or when the attempt time cap is reached without the finish rule firing, the arm retracts safely, the coarse approach is retried up to the configured bound, and persistent failure halts the cycle in a safe state without operator input
+- [ ] #3 Policy inference latency is measured on this host and the supervisor loop rate is shown to be compatible, with the measured values recorded
+- [x] #4 Checkpoint identity (path and hash) is logged with every rollout so a run can be traced to the exact model used
+- [x] #5 Loading an incompatible checkpoint or one whose observation and action spaces disagree with the contract fails at load time, not mid-insertion
+- [ ] #6 At least 20 consecutive supervised handoffs are executed with zero operator interventions and the outcome of each is logged
+- [ ] #7 When the finish rule fires (owner 2026-11-20: every joint within 2 deg over the last 2 s AND within 8 deg of the median demo-end pose), code takes control, commands the AA-17 lock, verifies the latch is holding, and only then returns success to the cycle runner
+- [ ] #8 Tests cover handback, the finish rule (fires after 2 s still near the demo end; not before 2 s, not while creeping, not far from the demo end), lock-on-finish, time-cap retry, abort escalation and the incompatible-checkpoint path
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -126,6 +126,10 @@ Compatibility with supervisor_loop_rate_hz 50 (20 ms budget): the mean fits easi
 - NOT done (live wiring; `--live` still aborts on purpose): (1) motion_executor via GuardedArm/MotionGuard with the mesh check; (2) a live frame/joint source (arbiter wrist cam + pose reader; read_arm_ticks refuses with torque on, so it needs a torque-on read path); (3) SeatingEvaluator sample source (AA-24); (4) GripperLockSM (AA-17) wired to the seating result. First live run supervised by the owner.
 
 2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
+
+2026-11-20 OWNER-APPROVED AC change: the seating verdict (AA-24, closed as not needed) is replaced by the finish rule 'the pose does not change for 5 s'. AC #2, #3, #8 reworded and left UNCHECKED (their old evidence was for the seating-verdict path); #1, #5, #6 unchanged and re-checked from their earlier evidence; #4, #7 still open. The still-tolerance for 'does not change' is not yet decided by the owner.
+
+2026-11-20 owner chose the agent recommendation over '5 s still' (5 s never fired on the 3 live attempts): finish = still within 2 deg for 2 s AND within 8 deg of the demo-end median (left ticks 1977/2195/1930/1396/1988, mapped for the right arm). Replayed on the live trace: fires at 13.7 s / 12.4 s (7.7 / 6.4 deg from the demo end), not on attempt 3 (18 deg away). The old #2/#8 (5 s wording) were replaced by the new last two ACs (numbering moved, order otherwise unchanged); unchecked. BUILT in policy_handoff (end='finished', arm HOLDS); the lock after the finish + retry are not built. Tests: 5 new in lerobot_env/tests/test_policy_handoff.py; dry runs policy_test.sh both arms end 'finished' (left 11.7 s, 1.49 deg; right 12.3 s, 1.19 deg).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

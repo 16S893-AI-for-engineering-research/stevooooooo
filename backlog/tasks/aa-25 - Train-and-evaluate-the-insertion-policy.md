@@ -4,7 +4,7 @@ title: Train and evaluate the insertion policy
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-20 13:20'
+updated_date: '2026-11-20 17:15'
 labels: []
 milestone: m-3
 dependencies:
@@ -60,5 +60,11 @@ author: @orchestrator
 created: 2026-10-24 16:07
 ---
 ACs #8-#10 added 2026-10-24 with owner approval (plan item E, decision-1). Start with one arm's policy (item H).
+---
+
+author: @agent
+created: 2026-11-20 17:15
+---
+AA-24 is closed as not needed (owner 2026-11-20). AC #4 says success is judged by the AA-24 detector. Owner: how should success be judged instead (e.g. owner's eye per attempt, logged)? AC not edited until you answer.
 ---
 <!-- COMMENTS:END -->

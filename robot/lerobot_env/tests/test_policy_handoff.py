@@ -197,3 +197,62 @@ def test_right_follower_refuses_the_left_stop_state(tmp_path, monkeypatch):
     with pytest.raises(InchwormRefused, match="right gripper is LOCKED"):
         r.connect()
     assert ho.load_state(tmp_path / "h67.json")["locked"]["right"]
+
+
+# --- owner 2026-11-20 finish rule: still 2 deg for 2 s AND within 8 deg of the demo-end pose ----------
+def test_finish_rule_fires_after_2_s_still_near_the_demo_end(tmp_path, monkeypatch):
+    goal = F_DEG + np.array([0, 3.0, 0, 0, 0])                 # reached in 0.6 s at 5 deg/s, then still
+    r, hw, pol, res, grip = _attempt(tmp_path, monkeypatch, lambda p, i: goal, max_s=10.0,
+                                     finish_ref_deg=goal + np.array([0, 0, 7.0, 0, 0]))
+    assert res["end"] == "finished" and 2.0 <= res["s"] <= 3.5, res
+    assert res["finish_deg_from_ref"] <= 8.0
+    assert all(hw.bus.torque[s] for s in range(1, 6))         # holding; the grippers were not touched
+    assert (hw.bus.goal[6], hw.bus.torque[6], hw.other_bus.goal[6], hw.other_bus.torque[6]) == grip
+    r.disconnect()
+
+
+def test_finish_rule_does_not_fire_when_still_but_far_from_the_demo_end(tmp_path, monkeypatch):
+    r, hw, pol, res, _ = _attempt(tmp_path, monkeypatch, lambda p, i: F_DEG, max_s=4.0,
+                                  finish_ref_deg=F_DEG + np.array([0, 9.0, 0, 0, 0]))
+    assert res["end"] == "time_cap"
+    r.disconnect()
+
+
+def test_finish_rule_does_not_fire_while_the_arm_creeps(tmp_path, monkeypatch):
+    """Creeping 2.65 deg/s (the live median) near the demo end: more than 2 deg in any 2 s window."""
+    r, hw, pol, res, _ = _attempt(tmp_path, monkeypatch, lambda p, i: F_DEG + np.array([0, 2.65 * i / 30, 0, 0, 0]),
+                                  max_s=3.0, finish_ref_deg=F_DEG)
+    assert res["end"] == "time_cap"
+    r.disconnect()
+
+
+def test_no_finish_before_2_s_even_when_still(tmp_path, monkeypatch):
+    r, hw, pol, res, _ = _attempt(tmp_path, monkeypatch, lambda p, i: F_DEG, max_s=1.9, finish_ref_deg=F_DEG)
+    assert res["end"] == "time_cap"
+    r.disconnect()
+
+
+def test_finish_rule_on_the_three_live_attempts():
+    """Replay of the logged 2026-11-20 03:01Z live attempts: the rule fires at 13.7 s / 12.4 s and never
+    on the third (its end is 18 deg from the demo end)."""
+    import json
+    log = ROBOT / "out" / "rollout" / "policy_20261120T030055Z.jsonl"
+    if not log.exists():
+        pytest.skip("live trace not present")
+    att = []
+    for line in log.read_text().splitlines():
+        d = json.loads(line)
+        if "attempt" in d:
+            att.append([])
+        else:
+            att[-1].append((d["t"], np.array(d["present"])))
+    a = ph.PolicyAttempt(None, None, finish_ref_deg=np.array(ph.DEMO_END_LEFT_TICKS) * tl.DEG_PER_TICK)
+    fired = []
+    for rows in att:
+        hist, hit = [], None
+        for t, p in rows:
+            hist.append((t, p))
+            if t >= 2.0 and a._finished(hist, t, p):
+                hit = round(t, 1); break
+        fired.append(hit)
+    assert fired == [13.7, 12.4, None]

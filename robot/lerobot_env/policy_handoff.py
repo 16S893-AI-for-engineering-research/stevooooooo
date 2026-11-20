@@ -12,8 +12,11 @@ Added here for the policy (all logged; agent proposals, UNVERIFIED, owner to con
 * jump guard: a policy target more than ``--max-jump-deg`` (10) from the present pose on any
   joint stops the attempt and HOLDS (the policy is off its training data);
 * time cap ``--max-s`` (20 s; demos were 9-18 s);
-* the policy never judges success: there is no seating detector yet (AA-24). The owner
-  watches and stops it.
+* finish rule (owner 2026-11-20, replaces the AA-24 seating detector, which is not needed): the
+  attempt ends "finished" when every joint has stayed within ``FINISH_STILL_DEG`` (2 deg) for
+  ``FINISH_STILL_S`` (2 s) AND every joint is within ``FINISH_NEAR_DEG`` (8 deg) of the median
+  demo-end pose. The arm then HOLDS; locking after the finish is not automated yet (AA-26).
+  Not finished by the time cap = a failed attempt.
 
 Start AFTER  scripts/replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live ...
 (or use the single launcher ``policy_test.sh --arm left|right``, AA-39).
@@ -45,6 +48,13 @@ import numpy as np
 ROBOT = Path(__file__).resolve().parents[1]
 DEFAULT_CKPT = ROBOT / "out/train/insert_left_20261119T221003Z/checkpoints/020000/pretrained_model"
 DEFAULT_REPLAY = ROBOT / "datasets/insert_left_20261119T221003Z"
+#: Median final pose of the 29 episodes of insert_left_20261119T221003Z (left arm, ticks),
+#: measured 2026-11-20 (AA-39 notes). The finish rule compares against it.
+DEMO_END_LEFT_TICKS = (1977, 2195, 1930, 1396, 1988)
+#: Owner 2026-11-20 (agent recommendation from the three live attempts of 2026-11-20 03:01Z).
+FINISH_STILL_S = 2.0
+FINISH_STILL_DEG = 2.0
+FINISH_NEAR_DEG = 8.0
 
 
 class PolicyAttempt:
@@ -52,11 +62,27 @@ class PolicyAttempt:
     robot/policy/clock so the dry-run and tests use the same loop as the live run."""
 
     def __init__(self, robot, policy, *, fps=30, max_deg_s=5.0, max_jump_deg=10.0, max_s=20.0,
-                 keys=None, clock=time.perf_counter, sleep=time.sleep, say=print, trace=None):
+                 keys=None, clock=time.perf_counter, sleep=time.sleep, say=print, trace=None,
+                 finish_ref_deg=None, finish_still_s=FINISH_STILL_S, finish_still_deg=FINISH_STILL_DEG,
+                 finish_near_deg=FINISH_NEAR_DEG):
         self.robot, self.policy, self.fps = robot, policy, fps
         self.max_deg_s, self.max_jump_deg, self.max_s = max_deg_s, max_jump_deg, max_s
         self.keys = keys or queue.Queue()
         self.clock, self.sleep, self.say, self.trace = clock, sleep, say, trace
+        #: follower degrees of the demo-end pose; None = no finish rule (time cap only)
+        self.finish_ref = None if finish_ref_deg is None else np.asarray(finish_ref_deg, dtype=np.float64)
+        self.finish_still_s, self.finish_still_deg = finish_still_s, finish_still_deg
+        self.finish_near_deg = finish_near_deg
+
+    def _finished(self, hist, now, present) -> bool:
+        """Owner finish rule: still within finish_still_deg over the last finish_still_s, and near the
+        demo-end pose. ``hist`` = [(t, present)] of this attempt."""
+        if self.finish_ref is None or now - hist[0][0] < self.finish_still_s:
+            return False
+        if np.abs(present - self.finish_ref).max() > self.finish_near_deg:
+            return False
+        w = np.array([p for t, p in hist if t >= now - self.finish_still_s])
+        return float((w.max(0) - w.min(0)).max()) <= self.finish_still_deg
 
     def _key(self):
         try:
@@ -74,8 +100,12 @@ class PolicyAttempt:
         period = 1.0 / self.fps
         stats = {"steps": 0, "overruns": 0, "rate_clamped_steps": 0, "holds": 0, "infer_ms": [],
                  "max_target_minus_present_deg": 0.0, "end": "time_cap"}
+        hist = []
         r._log({"event": "policy_attempt_start", "max_deg_s": self.max_deg_s,
                 "max_jump_deg": self.max_jump_deg, "max_s": self.max_s,
+                "finish_rule": None if self.finish_ref is None else {
+                    "still_s": self.finish_still_s, "still_deg": self.finish_still_deg,
+                    "near_deg": self.finish_near_deg, "ref_deg": self.finish_ref.round(2).tolist()},
                 "follower_ticks": r.core.follower_ticks()})
         t0 = self.clock()
         while True:
@@ -87,6 +117,15 @@ class PolicyAttempt:
                 break
             obs = r.get_observation()
             present = np.array([obs[f"{j}.pos"] for j in tl.J5], dtype=np.float64)
+            hist.append((ts, present))
+            while hist and hist[0][0] < ts - self.finish_still_s - 1.0:
+                hist.pop(0)
+            if stats["steps"] and ts - t0 >= self.finish_still_s and self._finished(hist, ts, present):
+                stats["end"] = "finished"
+                stats["finish_deg_from_ref"] = round(float(np.abs(present - self.finish_ref).max()), 2)
+                self.say(f"FINISHED: still {self.finish_still_s:g} s, {stats['finish_deg_from_ref']} deg from the "
+                         "demo end; holding")
+                break
             frame = obs["wrist"][..., 0] if "wrist" in obs else np.zeros((480, 640), np.uint8)
             ti = time.perf_counter()
             act = self.policy.step(Observation(frame=frame, joint_positions_deg=present.astype(np.float32),
@@ -268,7 +307,12 @@ def main(argv=None) -> int:
     tdir = ROBOT / "out" / "rollout"
     tdir.mkdir(parents=True, exist_ok=True)
     trace_path = tdir / f"policy_{'dry_' if a.dry_run else ''}{a.arm}_{utc}.jsonl"
-    kw = dict(fps=a.fps, max_deg_s=a.max_deg_s, max_jump_deg=a.max_jump_deg, max_s=a.max_s)
+    ref = np.array(DEMO_END_LEFT_TICKS, dtype=np.float64) * 360.0 / 4096
+    if a.policy_arm != "left":
+        print("REFUSED: the finish rule's demo-end pose is for the left-trained checkpoint"); return 2
+    if amap is not None:
+        ref = amap.to_target(ref)                           # same URDF pose on the target arm
+    kw = dict(fps=a.fps, max_deg_s=a.max_deg_s, max_jump_deg=a.max_jump_deg, max_s=a.max_s, finish_ref_deg=ref)
 
     if a.dry_run:
         st = ho.load_state(state_path)
@@ -289,7 +333,7 @@ def main(argv=None) -> int:
             robot.disconnect()
         print("dry run result:", json.dumps(res))
         print(f"trace: {trace_path}")
-        ok = res["end"] == "time_cap" and res["steps"] > 0
+        ok = res["end"] in ("time_cap", "finished") and res["steps"] > 0
         return 0 if ok else 1
 
     from lerobot.utils.keyboard_input import create_key_listener
@@ -339,6 +383,11 @@ def main(argv=None) -> int:
                           f"holds {res['holds']}, overruns {res['overruns']}, "
                           f"inference p95 {res['infer_ms_p95']} ms. Arms HOLD.")
                     n += 1
+                    if res["end"] == "finished":
+                        print("FINISHED by the rule (still 2 s near the demo end). The lock is not automated yet: "
+                              "look, then r = return or q = quit.")
+                    elif res["end"] == "time_cap":
+                        print("Time cap without the finish rule: count it as a failed attempt.")
                     if res["end"] == "jump_guard":
                         print("Jump guard: quit (q) and report; do not retry without the agent.")
                     print("IDLE: g = go again from here, r = return to the stop pose, q = quit")

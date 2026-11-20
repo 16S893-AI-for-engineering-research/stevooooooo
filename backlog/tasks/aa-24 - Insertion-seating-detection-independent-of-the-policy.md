@@ -1,12 +1,13 @@
 ---
 id: AA-24
 title: Insertion seating detection independent of the policy
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-20 17:01'
-labels: []
+updated_date: '2026-11-20 17:15'
+labels:
+  - not-needed
 milestone: m-3
 dependencies:
   - AA-8
@@ -76,10 +77,12 @@ AC#3 unchecked — needs real recorded dataset:
   python scripts/record_seating_traces.py fit dataset.jsonl
 
 2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
+
+2026-11-20 owner: closed as not needed. AA-25 AC #4 still names this detector as the success judge: question to the owner recorded in AA-25.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented inchworm/seating.py (AA-24 software half): SeatingDetector callable (AA-20 supervisor-compatible), SeatingVerdict SEATED/NOT_SEATED/UNCERTAIN, ProbeRequest for UNCERTAIN disambiguation, SeatingEvaluator probe loop, ThresholdFitter (FP-minimising, FN-capped). Config: SeatingDetectorConfigSchema in config.py + null-threshold seating_detector block in hardware.yaml. Script: scripts/record_seating_traces.py (dry-run default, --live). Tests: 57/57 pass; latency 0.007 ms vs 20 ms budget; synthetic FP=0.000/FN=0.000. ACs #2 and #3 left unchecked (require owner-supervised hardware session with real data).
+CLOSED AS NOT NEEDED (owner decision 2026-11-20: 'we don't need a seat detector anymore'). Not completed: ACs #2 and #3 stay unchecked on purpose (no 20 seating / 20 jam dataset, no error rates). What exists (detector code, tests, ACs #1, #4-#7) stays in the repo, unused by the policy path. The policy attempt now ends on the owner's finish rule instead (pose unchanged for 5 s; AA-26).
 <!-- SECTION:FINAL_SUMMARY:END -->
