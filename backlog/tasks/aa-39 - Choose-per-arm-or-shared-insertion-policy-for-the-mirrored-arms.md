@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-24 16:07'
-updated_date: '2026-11-20 22:03'
+updated_date: '2026-11-20 22:26'
 labels: []
 milestone: m-3
 dependencies:
@@ -47,6 +47,17 @@ Facts: doc-1 says the arms are mounted the same way (not mirrored) and all joint
 4. Dry runs: both arms (simulated servos + real cell mesh). The right arm sees the camera frames of a left episode in its dry run (a mapping check only).
 5. Owner-supervised first live right-arm trial with the same guards (5 deg/s, 10 deg jump, 20 s). Report the result; then the AA-39 comparison (AC1) and the owner's decision (AC2).
 Risks: the right wrist camera sees a different scene (the left arm holding, background, lighting); real key offsets; camera mount differences. If it fails: 10-20 right demos (fit leader_map_right first), then fine-tune the existing checkpoint on left+right.
+
+FULL TEST (owner 2026-11-20, replaces policy_test.sh --arm right; decisions 1a/2a/3 in notes). One script lerobot_env/full_policy_test.py (+ .sh), one terminal, dry-run first:
+F1. replay_cycle.py --stop-after-frame 42 --tube-in-grippers --live (exists). Arms hold after exit.
+F2. Left policy (InchwormFollower handoff, follower=left, finish rule). Time cap without finish = hold + owner prompt: l lock anyway / r return + retry / q quit.
+F3. Left lock via GripperLockSM (AA-17) on the left gripper only; then owner y/n by eye 'key IN and LOCKED'. n = hold, nothing unlocks; quit path releases joints only (grippers untouched).
+F4. Left joint line (slow, 5 deg/s, mesh-checked, right arm static) to the demo-end median pose (left ticks 1977/2195/1930/1396/1988). Owner accepted the tube push.
+F5. Port handover WITHOUT torque cut: a new follower disconnect mode 'keep holding' (today handoff disconnect turns joints of both arms off), then a new replay_cycle mode --resume-from 49 --stop-after-frame 67 for arms already holding with the left LOCKED: no torque-off refusal, no start adjustment, no fold press, GripperLockSM adopts LOCKED for left (read-back in band) and LOCKED for right; frames 49-67 = the timeline with the left q replaced by the demo-end pose (left static there), right frames and tube unchanged (the actual tube is held where the right gripper holds it; the 29 mm is left-arm model error; owner 3: the right aims at the model point). Preflight + fluid preflight of that path before the YES. Right unlock refused unless left LOCKED (exists).
+F6. Right policy (follower=right, mapped, finish rule; same prompts).
+F7. Right lock + owner y/n; end: both arms hold, then the usual release prompt (support tube + both arms; joints off, grippers untouched).
+Open technical risk: the cell mesh may report left gripper vs tube contact at the demo-end pose (model 29 mm off); if so, ask the owner before adding any allowance.
+Tests: sim end-to-end (replay_sim buses + plugin sim HW), refusals at each gate, gripper commanded only via GripperLockSM, never both unlocked.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -70,4 +81,6 @@ Risks: the right wrist camera sees a different scene (the left arm holding, back
 2026-11-20 owner decisions: (1) post-lock pose = measured demo-end pose (redo the timeline from frame 49 from it); owner may switch to accepting the push on the tube; not built. (2) finish rule = still 2 deg / 2 s + within 8 deg of the demo end (built, see AA-26). (3) AA-24 closed not needed; AA-26 ACs reworded.
 
 2026-11-20 21:52-21:59Z FIRST LIVE policy_test.sh --arm right (owner present). Replay 0..67 with the tube: carry worst path error 34/38 ticks; left UNLOCK 1606; frames 24-48 = SCRIPTED left insertion (no policy); left LOCK read LOCKED at 2028 ticks (position band only); right UNLOCK 1589; stop 67. Owner: the scripted left insert failed ('obviously'). SAFETY NOTE: the lock band reads LOCKED by position alone, so a failed key insert can still read LOCKED, and the right gripper then unlocked; the tube may have been held by one unverified gripper. Policy right (mapped): 2 attempts, both hit the 20 s time cap (finish rule did not fire), 0 holds, 0 jump stops, overruns 183/514 and 155/520, return between them clean (worst track 18 ticks). Attempt 1 ended within 1.5 deg of the mapped demo-end pose on joints 1-4 (lift 197.0 vs 198.5). Trace out/rollout/policy_right_20261120T215418Z.jsonl. As of 22:01Z policy_handoff was still waiting at its release prompt (hold logged 21:59:12Z). Owner: the script was wrong; wants a FULL test: left runs the policy, lock, cycle continues, right runs the policy. policy_test.sh --arm right DISABLED (refuses) until that replaces it.
+
+2026-11-20 OWNER decisions for the FULL test (left policy -> lock -> continue -> right policy): (1a) after each policy lock the owner confirms by eye (y/n) that the key is IN and LOCKED before the other gripper unlocks; (2a) time cap without the finish rule = hold and ask the owner: lock anyway / return + retry / quit; (3) yes: frames 49-67 re-planned from the measured left end pose, the right approach aims at the model point (~29 mm off) and the right policy must absorb it.
 <!-- SECTION:NOTES:END -->
