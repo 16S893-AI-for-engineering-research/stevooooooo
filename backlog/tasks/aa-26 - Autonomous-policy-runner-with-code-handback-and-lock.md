@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-17 22:06'
+updated_date: '2026-11-20 17:01'
 labels: []
 milestone: m-3
 dependencies:
@@ -124,6 +124,8 @@ Compatibility with supervisor_loop_rate_hz 50 (20 ms budget): the mean fits easi
 - New dry-run: `rollout.py --checkpoint CKPT --dataset DS --episode N` replays the recorded observations through the real policy + unchanged supervisor (nothing commanded). Verified on the 30-step audit checkpoint: 600 steps; |policy - recorded| median 8.8 deg (an untrained model, so expected).
 - Tests: main suite rc 0; lerobot_env suite rc 0.
 - NOT done (live wiring; `--live` still aborts on purpose): (1) motion_executor via GuardedArm/MotionGuard with the mesh check; (2) a live frame/joint source (arbiter wrist cam + pose reader; read_arm_ticks refuses with torque on, so it needs a torque-on read path); (3) SeatingEvaluator sample source (AA-24); (4) GripperLockSM (AA-17) wired to the seating result. First live run supervised by the owner.
+
+2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

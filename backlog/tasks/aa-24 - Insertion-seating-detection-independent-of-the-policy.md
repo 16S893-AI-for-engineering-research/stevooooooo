@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-10-24 18:28'
+updated_date: '2026-11-20 17:01'
 labels: []
 milestone: m-3
 dependencies:
@@ -74,6 +74,8 @@ AC#2 unchecked — needs owner-supervised hardware session:
   python scripts/record_seating_traces.py record --label not_seated --out dataset.jsonl --live  (≥20 runs)
 AC#3 unchecked — needs real recorded dataset:
   python scripts/record_seating_traces.py fit dataset.jsonl
+
+2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

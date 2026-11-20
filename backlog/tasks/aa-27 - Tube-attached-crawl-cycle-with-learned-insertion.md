@@ -4,6 +4,7 @@ title: Tube-attached crawl cycle with learned insertion
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:13'
+updated_date: '2026-11-20 17:01'
 labels: []
 milestone: m-4
 dependencies:
@@ -38,3 +39,9 @@ See doc-1 sections 1, 2 and 9.
 - [ ] #6 Cycle time and per-phase durations are recorded and compared against the dry-cycle baseline from AA-21
 - [ ] #7 The run is executed with zero operator intervention between cycles and the intervention count is reported
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
+<!-- SECTION:NOTES:END -->

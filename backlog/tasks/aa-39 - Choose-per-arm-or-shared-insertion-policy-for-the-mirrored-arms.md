@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-24 16:07'
-updated_date: '2026-11-20 16:54'
+updated_date: '2026-11-20 17:01'
 labels: []
 milestone: m-3
 dependencies:
@@ -64,4 +64,6 @@ Risks: the right wrist camera sees a different scene (the left arm holding, back
 - Untested live: replay frames 43-67 with the tube (scripted left insertion + lock at 43-49, right unlock 50, right carry to 67) were never run on hardware. First live policy_test.sh --arm right needs the owner supervising.
 
 2026-11-20 owner: (1) will supervise the first live right run incl. the never-run frames 43-67 with the tube; (2) right-arm loop overruns: accept as is, NO change ('being okay with slow' = keep 30 Hz; the loop runs at ~18 Hz on its own; a 15 Hz commit was reverted). Owner question answered: after the policy + lock, the plan of record (AA-23 note 2026-11-13) is to re-plan from the actual pose; not built yet (policy_handoff only holds / returns / releases; lock + continue = AA-26/AA-27).
+
+2026-11-20 OWNER: no seating detector is needed any more (AA-24). Owner proposal (pending agent caveat): after the policy + lock, move the arm to a FIXED known pose and continue the scripted cycle, no live re-plan. Agent measured: the 29 demo ends (median) and the 3 live policy ends differ from the timeline's planned inserted pose (frame 48) by lift ~-12.5 / elbow ~+13.6 deg = gripper ~28-29 mm in x and 4 deg (FK, tool offset unverified); live ends are within 0-6 deg of the demo median. AC/status changes to AA-24/AA-26/AA-27 await the owner's answers.
 <!-- SECTION:NOTES:END -->
