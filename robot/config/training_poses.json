@@ -1,0 +1,173 @@
+{
+ "schema": "inchworm.training_poses/1",
+ "frozen": true,
+ "owner_rule": "OWNER 2026-11-21: these training positions must NOT change after training unless the owner says so. Code refuses to run if the live timeline/zeros no longer reproduce them; edit only with explicit owner approval recorded in the task.",
+ "saved_utc": "2026-11-21T01:34:04Z",
+ "timeline_sha256": "f80c1f74431898af548fea20e7c9c346936515497e9b11c71e1e8a9467fc9b21",
+ "joints": [
+  "shoulder_pan",
+  "shoulder_lift",
+  "elbow_flex",
+  "wrist_flex",
+  "wrist_roll"
+ ],
+ "units": "raw servo ticks (4096/turn); joint order shoulder_pan..wrist_roll",
+ "zero_offsets_deg_at_save": {
+  "left": {
+   "shoulder_pan": 173.32,
+   "shoulder_lift": 214.893,
+   "elbow_flex": 182.9,
+   "wrist_flex": 178.286,
+   "wrist_roll": 174.687
+  },
+  "right": {
+   "shoulder_pan": 181.318,
+   "shoulder_lift": 220.518,
+   "elbow_flex": 179.033,
+   "wrist_flex": 175.254,
+   "wrist_roll": 174.115
+  }
+ },
+ "positions": {
+  "train_left": {
+   "name": "train_left",
+   "timeline_frame": 42,
+   "timeline_step": "left regrip near point",
+   "inserting_arm": "left",
+   "holding_arm": "right",
+   "joint_ticks": {
+    "left": [
+     1972,
+     2197,
+     2184,
+     1169,
+     1988
+    ],
+    "right": [
+     2063,
+     1730,
+     1941,
+     1865,
+     1981
+    ]
+   },
+   "q_rad": {
+    "left": [
+     0.0,
+     -0.38111,
+     0.157406,
+     -1.318347,
+     0.0
+    ],
+    "right": [
+     0.0,
+     -1.195652,
+     -0.148008,
+     -0.198389,
+     0.0
+    ]
+   },
+   "locked": {
+    "left": false,
+    "right": true
+   },
+   "tube_pose": [
+    [
+     0.999847756,
+     -0.017448758,
+     -7.9451e-05,
+     0.002538508
+    ],
+    [
+     0.017448758,
+     0.999806293,
+     0.009105895,
+     0.089698153
+    ],
+    [
+     -7.9451e-05,
+     -0.009105895,
+     0.999958537,
+     0.168005566
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "note": "Position 1: end of cycle frame 42. Right arm holds the tube, LOCKED; left gripper open, ~50 mm under its next attachment point. Left policy is trained and run from here."
+  },
+  "train_right": {
+   "name": "train_right",
+   "timeline_frame": 67,
+   "timeline_step": "right regrip middle point",
+   "inserting_arm": "right",
+   "holding_arm": "left",
+   "joint_ticks": {
+    "left": [
+     1972,
+     2337,
+     1775,
+     1438,
+     1988
+    ],
+    "right": [
+     2063,
+     2261,
+     2140,
+     1135,
+     1981
+    ]
+   },
+   "q_rad": {
+    "left": [
+     0.0,
+     -0.165895,
+     -0.469584,
+     -0.906571,
+     0.0
+    ],
+    "right": [
+     0.0,
+     -0.38111,
+     0.157406,
+     -1.318347,
+     0.0
+    ]
+   },
+   "locked": {
+    "left": true,
+    "right": false
+   },
+   "tube_pose": [
+    [
+     0.999847756,
+     -0.017448758,
+     -7.9451e-05,
+     0.002538508
+    ],
+    [
+     0.017448758,
+     0.999806293,
+     0.009105895,
+     0.089698153
+    ],
+    [
+     -7.9451e-05,
+     -0.009105895,
+     0.999958537,
+     0.168005566
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "note": "Position 2: cycle frame 67. Left arm holds the tube, LOCKED, at its gait inserted pose (frame 49); right gripper open, ~50 mm under its next attachment point. Right policy is trained and run from here."
+  }
+ }
+}
