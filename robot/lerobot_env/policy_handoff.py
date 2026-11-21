@@ -246,6 +246,34 @@ def _replay_frames(root: Path, episode: int, n: int):
     return [src.item(i)[0] for i in range(min(n, src.length))]
 
 
+def start_preview(get_robot, port: int):
+    """Browser live view of the frames the POLICY gets (robot._last_frame, after format_frame),
+    with the frame mean / std written on it. Never opens a camera (one stream at a time). The
+    view only updates while the policy runs (frames are grabbed per control step). None if off."""
+    if not port:
+        return None
+    import record_handoff as rh
+
+    def frame():
+        r = get_robot()
+        f = None if r is None else r._last_frame
+        if f is None:
+            return None
+        import cv2
+        g = f[:, :, 0] if f.ndim == 3 else f
+        out = np.ascontiguousarray(f).copy()
+        cv2.putText(out, f"{getattr(r.config, 'follower', '')} cam  mean {g.mean():.0f}  std {g.std():.0f}",
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        return out
+    try:
+        pv = rh.Preview(frame, port)
+    except OSError as exc:
+        print(f"(no live view: port {port}: {exc})")
+        return None
+    print(f"LIVE VIEW (what the policy sees): open {pv.url} in a browser")
+    return pv
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--checkpoint", type=Path, default=DEFAULT_CKPT)
@@ -267,6 +295,7 @@ def main(argv=None) -> int:
                          "wrist frames replayed from a recorded episode; runs one attempt")
     ap.add_argument("--replay-dataset", type=Path, default=DEFAULT_REPLAY)
     ap.add_argument("--replay-episode", type=int, default=26)
+    ap.add_argument("--preview-port", type=int, default=8765, help="browser live view of the policy's frames (0 = off)")
     a = ap.parse_args(argv)
     if not 0.5 <= a.max_deg_s <= 10.0:
         print("REFUSED: --max-deg-s must be 0.5..10"); return 2
@@ -365,6 +394,7 @@ def main(argv=None) -> int:
 
     robot.prompt = prompt
     rc, n = 0, 0
+    preview = start_preview(lambda: robot, a.preview_port)
     try:
         robot.connect()                                     # handoff checks + typed YES
         _log_map(robot, a, amap)
@@ -409,6 +439,8 @@ def main(argv=None) -> int:
         rc = 1
     finally:
         closing = True
+        if preview is not None:
+            preview.stop()
         if listener is not None:
             listener.stop()
         if robot.is_connected:

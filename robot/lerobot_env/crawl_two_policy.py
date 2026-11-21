@@ -148,6 +148,7 @@ def main(argv=None, ui=None) -> int:
     ap.add_argument("--allow-unverified-soft-limits", default="owner 2026-11-21 - AA-55 two-policy crawl")
     ap.add_argument("--dry-run", action="store_true", help="simulated servos, real checkpoints + cell mesh")
     ap.add_argument("--replay-episode", type=int, default=0, help="dry run: camera frames from this episode")
+    ap.add_argument("--preview-port", type=int, default=8765, help="browser live view of the policy's frames (0 = off)")
     a = ap.parse_args(argv)
     if not 0.5 <= a.max_deg_s <= 10.0 or not 0 < a.max_jump_deg <= 20.0:
         print("REFUSED: --max-deg-s 0.5..10, --max-jump-deg 0..20"); return 2
@@ -223,6 +224,7 @@ def main(argv=None, ui=None) -> int:
                                      int(a.max_s * a.fps) + 5)
             r._open_hardware = lambda c: ph._SimHW(cfg, st, imgs, follower=arm, buses=sim_buses)
         r.prompt = ui.text
+        current["robot"] = r
         return r
 
     def open_buses():
@@ -257,6 +259,8 @@ def main(argv=None, ui=None) -> int:
         robot.detach_holding()                         # no torque cut; ports closed
         return True
 
+    current = {"robot": None}
+    preview = None if a.dry_run else ph.start_preview(lambda: current["robot"], a.preview_port)
     RUNNER_STOP.unlink(missing_ok=True)
     trace = open(OUT_DIR / f"policy_crawl_{'dry_' if a.dry_run else ''}{utc}.jsonl", "w")
     rc, r, close = 0, None, None
@@ -345,6 +349,8 @@ def main(argv=None, ui=None) -> int:
     finally:
         if close is not None:
             close()                                    # never a torque-off here (holding)
+        if preview is not None:
+            preview.stop()
         trace.close()
         logf.close()
         print(f"log: {logf.name}\ntrace: {trace.name}")
