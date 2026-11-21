@@ -161,8 +161,9 @@ def line_problem(cfg, checker, q_from, q_to, right_q, tube, step_deg: float = 1.
     return None
 
 
-def policy_phase(robot, policy, ui, trace, kw, log) -> bool:
-    """Attempts until the owner chooses. True = lock here (robot still connected), False = quit."""
+def policy_phase(robot, policy, ui, trace, kw, log, warn_far: bool = True) -> bool:
+    """Attempts until the owner chooses. True = lock here (robot still connected), False = quit.
+    ``warn_far``: AA-39 warning that a lock far from the demo end stops the cycle (not in AA-55)."""
     robot.connect()                                              # handoff checks + typed YES
     ui.start_keys()
     arm = robot.config.follower
@@ -183,7 +184,7 @@ def policy_phase(robot, policy, ui, trace, kw, log) -> bool:
         else:
             far = float(np.abs(np.asarray(res["present_deg"]) - kw["finish_ref_deg"]).max())
             note = (f" WARNING: {far:.1f} deg from the demo end (> {ph.FINISH_NEAR_DEG:g}): after a lock the "
-                    "cycle will NOT continue (stop + release)." if far > ph.FINISH_NEAR_DEG else "")
+                    "cycle will NOT continue (stop + release)." if far > ph.FINISH_NEAR_DEG and warn_far else "")
             choice = ui.choose(f"NOT finished ({res['end']}).{note} l = lock anyway, r = return + retry, q = quit",
                                "lrq", "l", f"{arm}_choice")
         log({"event": "owner_choice", "arm": arm, "attempt": n - 1, "end": res["end"], "choice": choice})

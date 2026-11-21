@@ -6,7 +6,7 @@ launcher ``crawl_two_policy.sh`` runs both). Phases = ``inchworm.two_policy.PHAS
 2 left_policy           LEFT checkpoint (inchworm_follower, tube_support=handoff), only if both arms
                         read within POSE_TOL_TICKS of the frozen ``train_left`` ticks. Owner l/r/q.
 3 left_lock             adopt both arms holding, left gripper LOCKS (GripperLockSM) + owner look y/n.
-                        Refused to go on if the left locked > LOCK_NEAR_DEG from its finish reference.
+                        Its distance from the finish reference is LOGGED only (owner 2026-11-21: no 8 deg stop).
    Steps 4-6 are planned from the present pose and preflighted (limits + cell mesh with the tube
    carried by the left) BEFORE the right unlocks; then one typed YES per motion phase.
 4 right_out             right gripper UNLOCKS (GripperLockSM; refused unless the left reads LOCKED by
@@ -115,6 +115,15 @@ def stream(r, frames, segs, ui, log, name: str, what: str) -> None:
     r.abort_on_faults = False                       # owner 2026-11-13: confirmed motion, readings logged
     r.run_fluid(segs)
     log({"event": "phase", "name": name, "status": "done", "ticks": {a: r._ticks(a) for a in ("left", "right")}})
+
+
+def log_lock_offset(arm: str, ticks, ref_ticks, log) -> None:
+    """OWNER 2026-11-21: the 8 deg lock-pose check is dropped (it guarded the AA-39 flow, where the
+    left moved with the tube between two locked grippers). The distance is logged only; every
+    following move is planned from the actual lock pose and mesh-checked with the tube."""
+    d = np.abs(np.asarray(ticks, float) - np.asarray(ref_ticks, float)) * DEG_PER_TICK
+    log({"event": "lock_offset_from_finish_ref", "arm": arm, "max_deg": round(float(d.max()), 2),
+         "joint": J5[int(d.argmax())], "ticks": list(ticks)})
 
 
 def checked(cfg, checker, frames, label: str):
@@ -235,7 +244,7 @@ def main(argv=None, ui=None) -> int:
         robot = make_robot(arm, state_path)
         try:
             lock = fpt.policy_phase(robot, policies[arm][0], ui, trace,
-                                    {**kw, "finish_ref_deg": refs[arm] * DEG_PER_TICK}, log)
+                                    {**kw, "finish_ref_deg": refs[arm] * DEG_PER_TICK}, log, warn_far=False)
         except BaseException:
             ui.stop_keys()
             if robot.is_connected:
@@ -276,9 +285,7 @@ def main(argv=None, ui=None) -> int:
         if look != "y":
             raise Stop("owner: the left key is not in and locked. Nothing unlocks")
         now_t = {s: r._ticks(s) for s in ("left", "right")}
-        p = tw.lock_pose_problem(now_t["left"], refs["left"].tolist(), arm="left")
-        if p:
-            raise Stop(p)
+        log_lock_offset("left", now_t["left"], refs["left"], log)     # owner 2026-11-21: logged, no 8 deg stop
         # ---- plan + preflight 4, 5, 6 before the right unlocks ----------------------------
         now = {s: np.asarray(ticks_to_q(cfg, s, now_t[s])) for s in ("left", "right")}
         tube = tw.CarriedTube(checker, "left", now, np.asarray(st42["tube_pose"]))
@@ -317,9 +324,7 @@ def main(argv=None, ui=None) -> int:
         # ---- 8 right lock + look ------------------------------------------------------------
         fpt.lock_and_look(r, "right", ui, log)
         now_t = {s: r._ticks(s) for s in ("left", "right")}
-        p = tw.lock_pose_problem(now_t["right"], refs["right"].tolist(), arm="right")
-        if p:
-            raise Stop(p)
+        log_lock_offset("right", now_t["right"], refs["right"], log)     # owner 2026-11-21: logged, no 8 deg stop
         # ---- 9 home ---------------------------------------------------------------------------
         now = {s: np.asarray(ticks_to_q(cfg, s, now_t[s])) for s in ("left", "right")}
         try:

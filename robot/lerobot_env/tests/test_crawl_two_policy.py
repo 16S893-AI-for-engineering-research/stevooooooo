@@ -53,13 +53,13 @@ def _state42(tmp_path, nudge=None):
     return p
 
 
-def _run(tmp_path, monkeypatch, answers=None, max_s="30", nudge=None):  # right elbow ~43 deg at 10 deg/s
+def _run(tmp_path, monkeypatch, answers=None, max_s="30", nudge=None, left_aim=None):  # right elbow ~43 deg at 10 deg/s
     import lerobot_robot_inchworm.inchworm_follower as fmod
     monkeypatch.setattr(fmod, "STOP_FILE", tmp_path / "STOP_TELEOP")
     monkeypatch.setattr(ctp, "RUNNER_STOP", tmp_path / "stop_move")
     monkeypatch.setattr(ctp, "OUT_DIR", tmp_path / "out")
     monkeypatch.setattr(ctp, "STATE_TRAIN_RIGHT", tmp_path / "state_tr.json")
-    refs = {"left": ctp.LEFT_FINISH_REF_TICKS, "right": ctp.RIGHT_FINISH_REF_TICKS}
+    refs = {"left": left_aim or ctp.LEFT_FINISH_REF_TICKS, "right": ctp.RIGHT_FINISH_REF_TICKS}
     monkeypatch.setattr(ctp, "load_policy", lambda ckpt, dev, arm: (ToRef(refs[arm]), f"stub-{arm}"))
     ctp.SIM.clear()
     ui = fpt.UI(True, auto=answers or {})
@@ -154,3 +154,17 @@ def test_quit_in_the_right_policy_keeps_both_locked_left(tmp_path, monkeypatch):
     ev = [e["event"] for e in log]
     assert rc == 0 and "crawl_done" not in ev and ("quit" in ev)
     assert _locked(buses, "left") and not _locked(buses, "right") and _joints_off(buses)
+
+
+def test_lock_far_from_the_finish_ref_is_logged_and_the_crawl_continues(tmp_path, monkeypatch):
+    # OWNER 2026-11-21: no 8 deg lock stop. The left stand-in ends 12 deg (elbow) off the finish ref
+    # (like a perturbed demo end): the offset is logged and the right still unlocks and comes out.
+    aim = list(ctp.LEFT_FINISH_REF_TICKS); aim[2] -= round(12.0 / ctp.DEG_PER_TICK)
+    rc, log, buses = _run(tmp_path, monkeypatch, answers={"right_choice": "q"}, left_aim=tuple(aim))
+    off = next(e for e in log if e["event"] == "lock_offset_from_finish_ref")
+    assert off["arm"] == "left" and off["max_deg"] > 8.0
+    ev = [e["event"] for e in log]
+    assert "gripper_unlock" in ev and not any("finish reference" in str(e.get("reason", "")) for e in log)
+    assert [e["name"] for e in log if e["event"] == "phase" and e["status"] == "done"] == [
+        "right_out", "left_to_train_right", "right_to_train_right"]
+    assert _locked(buses, "left") and _joints_off(buses)
