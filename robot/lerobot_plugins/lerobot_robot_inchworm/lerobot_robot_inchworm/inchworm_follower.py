@@ -434,9 +434,11 @@ class InchwormFollower(Robot):
     # -- AA-23 rapid-fire recording: automatic return between demos -------------
     def _make_return_model(self, cfg):                       # tests replace it
         from inchworm.handoff_return import CarriedTubeModel
-        st = self._handoff["state"]
-        return CarriedTubeModel(cfg, self._handoff["gate"].checker, st["goal_ticks"], np.asarray(st["tube_pose"]),
-                                follower=self.config.follower)
+        st, h = self._handoff["state"], self._handoff
+        home, tube = dict(st["goal_ticks"]), np.asarray(st["tube_pose"])
+        if h.get("hold_ticks") is not None:            # AA-54: the holding arm sits at a perturbed pose
+            home[h["other"]], tube = list(h["hold_ticks"]), np.asarray(h["hold_tube"])
+        return CarriedTubeModel(cfg, self._handoff["gate"].checker, home, tube, follower=self.config.follower)
 
     def _make_chain(self, cfg):                              # tests replace it
         from inchworm.kinematics import build_chain, with_soft_limits
@@ -486,6 +488,75 @@ class InchwormFollower(Robot):
         self.returns_done += 1
         self._log({"event": "return_done", "legs": legs})
         return {"legs": legs, "plan": plan.summary}
+
+    # -- AA-54 perturbed tube placement: the HOLDING arm moves the tube between demos -----
+    def move_holding(self, target_ticks, tube_after, confirm: bool = True, interrupted=lambda: False,
+                     clock=time.monotonic, sleep=time.sleep, deg_s: Optional[float] = None) -> dict:
+        """Move the other (holding, gripper LOCKED) arm with the tube along a joint line to
+        ``target_ticks``; the follower holds still (it must be at its start pose, out of the key).
+        Every step is mesh-checked with the tube carried before anything moves; afterwards the
+        teleop gate and the return use the new holding pose and ``tube_after``. Grippers are
+        never commanded. Raises ReturnRefused (nothing moved) / ReturnAborted (holding)."""
+        from inchworm import handoff_return as hr
+        if not self._connected or self._handoff is None:
+            raise RuntimeError("move_holding needs a connected tube_support=handoff robot")
+        tl, cfg, h, f = self._tl, self._cfg, self._handoff, self.config.follower
+        o = h["other"]
+        bus, read, close = self.hw.other_arm_servo_bus(o)
+        try:
+            off = [s for s in range(1, 6) if not read(s, tl.REG_TORQUE_ENABLE, 1)[0]]
+            if off:
+                raise hr.ReturnRefused(f"the {o} arm joints {off} are torque OFF. Nothing moved")
+            o_limits = tl.follower_preflight(cfg, o, read, require_torque_off=False)
+            fnow = self.core.follower_ticks()
+            onow = [int.from_bytes(read(s, tl.REG_PRESENT_POSITION, 2), "little") for s in range(1, 6)]
+            model = self._make_return_model(cfg)
+            expect = model.home[o]
+            drift = max(abs(a - b) for a, b in zip(onow, expect)) * hr.DEG_PER_TICK
+            if drift > hr.RIGHT_DRIFT_MAX_DEG:
+                raise hr.ReturnRefused(f"the {o} arm is {drift:.1f} deg from where it should hold the tube "
+                                       f"(max {hr.RIGHT_DRIFT_MAX_DEG:g}): the tube was probably moved. Nothing moved")
+            target = [float(t) for t in target_ticks]
+            out = [j for j, t in zip(tl.J5, target) if not o_limits[j][0] <= t <= o_limits[j][1]]
+            if out:
+                raise hr.ReturnRefused(f"holding target outside the teleop limits on {out}. Nothing moved")
+            pts = hr._line(onow, target)
+            for w in pts[1:]:
+                p = model.problem(fnow, w)
+                if p is not None:
+                    raise hr.ReturnRefused(f"{o} (with the tube) to the perturbed pose: {p}. Nothing moved")
+            d = hr._deg(onow, target)
+            leg = hr.Leg(o, f"{o} (with the tube) to the next placement", pts,
+                         max(0.5, d / (deg_s or hr.RETURN_DEG_S)))
+            self._log({"event": "holding_move_planned", "from": onow, "to": [round(x) for x in target],
+                       "deg": round(d, 2), "s": round(leg.duration_s, 1), "mesh_checks": len(pts) - 1})
+            if confirm:
+                print(f"\nMOVE THE TUBE (first of this session, owner supervises): the {o} arm (gripper LOCKED) "
+                      f"moves the tube {d:.1f} deg max joint, {leg.duration_s:.1f} s; the {f} arm holds still. "
+                      "Ctrl-C = hold.")
+                if self.prompt("Type YES to move: ").strip() != "YES":
+                    raise hr.ReturnRefused("tube move not confirmed. Nothing moved")
+            ocore = hr.holding_core(cfg, o, bus, read, log=self._log)
+            rep = hr.run_leg(ocore, leg, hz=self.config.control_hz, log=self._log, interrupted=interrupted,
+                             clock=clock, sleep=sleep)
+        except hr.ReturnRefused as exc:
+            self._log({"event": "holding_move_refused", "reason": str(exc)})
+            raise
+        except BaseException as exc:
+            self._log({"event": "holding_move_aborted", "reason": f"{type(exc).__name__}: {exc}"})
+            raise
+        finally:
+            close()
+        from inchworm.so101_pose_reader import ticks_to_q
+        h["hold_ticks"] = [int(round(x)) for x in target]
+        h["hold_tube"] = np.asarray(tube_after, dtype=float).tolist()
+        gate = h["gate"]
+        gate.other_q = np.asarray(ticks_to_q(cfg, o, h["hold_ticks"]), dtype=float)
+        gate.tube = np.asarray(tube_after, dtype=float)
+        h["catching_up"], h["held"] = True, 0
+        self.holding_moves_done = getattr(self, "holding_moves_done", 0) + 1
+        self._log({"event": "holding_move_done", "leg": rep, "hold_ticks": h["hold_ticks"]})
+        return rep
 
     def _frame(self) -> np.ndarray:
         c = self.config
