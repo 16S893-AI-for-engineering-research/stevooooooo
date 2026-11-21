@@ -258,6 +258,12 @@ def main(argv=None) -> int:
     robot.prompt = prompt
     teleop.connect()
     try:
+        teleop.get_action()                    # the leader answers before the follower connects (2026-11-21)
+    except Exception as exc:  # noqa: BLE001
+        teleop.disconnect()
+        print(f"REFUSED: the leader arm does not answer ({exc}): check its power and cable "
+              "(scripts/scan_leader.py). Both arms still hold where they are"); return 2
+    try:
         robot.connect()
         dataset = rh.make_dataset(robot, root, f"local/{name}", a.fps)
         out = root / "perturbations.json"

@@ -34,6 +34,14 @@ if [ "$DRY" = 0 ] && [ ! -f "calibration_data/leader_map_$ARM.json" ]; then
   echo "REFUSED: no calibration_data/leader_map_$ARM.json (fit it first: scripts/leader_mapping.py --follower $ARM)"; exit 2
 fi
 
+if [ "$DRY" = 0 ]; then
+  echo "== leader check (read-only)"
+  uv run python scripts/scan_leader.py --seconds 0.5 > /tmp/record_train_leader.txt 2>&1 || true
+  grep "answering IDs" /tmp/record_train_leader.txt || true
+  grep -q "answering IDs: \[1, 2, 3, 4, 5, 6\]" /tmp/record_train_leader.txt || {
+    echo "REFUSED: the leader arm does not answer on all 6 servos: check its power and cable; nothing moved"; exit 2; }
+fi
+
 echo "== 1/3 replay_cycle: frames 0..$FRAME WITHOUT the tube, stop holding (train_$ARM)"
 if [ "$DRY" = 1 ]; then
   uv run python scripts/replay_cycle.py --stop-after-frame "$FRAME"
