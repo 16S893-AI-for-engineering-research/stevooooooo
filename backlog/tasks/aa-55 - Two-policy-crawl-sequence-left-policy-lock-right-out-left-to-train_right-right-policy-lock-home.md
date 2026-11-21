@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:55'
-updated_date: '2026-11-21 17:04'
+updated_date: '2026-11-21 20:16'
 labels: []
 milestone: m-3
 dependencies:
@@ -59,4 +59,6 @@ Owner plan 2026-11-21: new full sequence with two per-arm policies (trained per 
 2026-11-21 ~16:45Z: live view added: policy_handoff.start_preview (browser MJPEG of robot._last_frame = exactly what the policy gets, mean/std overlay; never opens a camera; record_handoff.Preview), --preview-port 8765 (0 = off) in policy_handoff.py (policy_test.sh) and crawl_two_policy.py. Suites 1960 + 100 pass. Camera exposure: the bridge handshake sends auto_exposure=None = camera default (doc-1 AA-53: use auto exposure, DirectShow manual exposure not mapped), same in recording and policy runs, so not a recording/run mismatch; auto exposure does not remove daylight vs lamp differences. OWNER PLAN: record daylight demos, merge with the night v2 sets, retrain both arms. Merge verified 2026-11-21 (lerobot-edit-dataset merge of the two v2 sets -> /tmp/merge_test, 100 ep / 36159 frames, exit 0).
 
 2026-11-21: OWNER chose brightness/contrast augmentation for the v3 retrain. LeRobot's default image_transforms are OFF (v2 train_config: enable false) and its defaults also jitter saturation/hue (meaningless on grey copied to 3 channels), sharpness and affine. Written robot/out/train/run_v3_both.sh (git-ignored): v2 recipe on insert_left_v3 / insert_right_v3 + --dataset.image_transforms.enable=true, max_num_transforms=2, tfs = ColorJitter brightness [0.6,1.4] and contrast [0.6,1.4] (wider than LeRobot's 0.8-1.2 for daylight vs lamp). Verified: draccus parses the flags; ImageTransforms on a test image gives means 0.41-0.67 from 0.50.
+
+2026-11-21 20:14Z v3 TRAINING STARTED (owner: no more recording; use all sets incl. the interrupted one). Sets (all decode-checked first/mid/last frame per episode, 0 problems): left night 050907Z 50 ep + day 190451Z 30 ep (6 nominal) + day nominal 195711Z 8 + day nominal 200358Z 4 (run stopped by an error after 4 saves + 2 discards; the 4 saved episodes are complete) -> datasets/insert_left_v3 92 ep 36302 frames; right night 055710Z 50 + day 192908Z 30 (6 nominal) -> datasets/insert_right_v3 80 ep 20461 frames. Merged with lerobot-edit-dataset merge (exit 0); action + observation.state columns identical to the source concatenation, all episodes decode. Nominal per arm: left 10 night + 18 day = 28, right 10 + 6 = 16. Training: nohup bash robot/out/train/run_v3_both.sh (log robot/out/train/logs/run_v3_both.log, per arm logs/insert_<arm>_v3.log), image_transforms enable True confirmed in the config, ~2.5 step/s, left ~2.2 h then right ~2.2 h. Outputs robot/out/train/insert_<arm>_v3/checkpoints/{005000..020000}. The cause of the left recording error at ~20:10Z was not investigated (owner moved on).
 <!-- SECTION:NOTES:END -->
