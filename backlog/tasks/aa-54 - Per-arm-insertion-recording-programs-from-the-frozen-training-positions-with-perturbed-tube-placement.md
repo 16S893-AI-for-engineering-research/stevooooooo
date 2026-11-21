@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:54'
-updated_date: '2026-11-21 03:38'
+updated_date: '2026-11-21 04:41'
 labels: []
 milestone: m-3
 dependencies:
@@ -25,12 +25,12 @@ Owner plan 2026-11-21 (replaces the AA-39 full test flow). The left policy faile
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Two launchers exist, one per arm (left, right); each moves both arms without the tube to that arm's frozen training position from config/training_poses.json and refuses if the live calibration/timeline no longer reproduce those ticks
-- [ ] #2 After the owner places the tube and confirms by typed answer, the holding gripper is locked only through the AA-17 GripperLockSM; the inserting gripper is never commanded
+- [x] #1 Two launchers exist, one per arm (left, right); each moves both arms without the tube to that arm's frozen training position from config/training_poses.json and refuses if the live calibration/timeline no longer reproduce those ticks
+- [x] #2 After the owner places the tube and confirms by typed answer, the holding gripper is locked only through the AA-17 GripperLockSM; the inserting gripper is never commanded
 - [ ] #3 Before each episode the holding arm moves the tube (slow, mesh-checked with the tube) so the attachment point is rotated at most 2 deg and translated at most 20 mm per axis from the frozen pose; the inserting arm starts at its frozen training pose
-- [ ] #4 A seeded 50-episode schedule per arm has exactly 10 nominal (zero-perturbation) and 40 perturbed entries; the requested and the achieved (FK) perturbation of each episode are saved with the dataset
+- [x] #4 A seeded 50-episode schedule per arm has exactly 10 nominal (zero-perturbation) and 40 perturbed entries; the requested and the achieved (FK) perturbation of each episode are saved with the dataset
 - [ ] #5 After save/discard the inserting arm returns out of the key and to its frozen start, and the holding arm returns to the frozen holding pose before the next perturbation, verified in a dry run with simulated servos and the real cell mesh
-- [ ] #6 Tests cover the schedule counts, the perturbation bounds, refusal on frozen-pose drift, and the never-both-unlocked rule
+- [x] #6 Tests cover the schedule counts, the perturbation bounds, refusal on frozen-pose drift, and the never-both-unlocked rule
 <!-- AC:END -->
 
 ## Definition of Done
@@ -47,4 +47,6 @@ Owner plan 2026-11-21 (replaces the AA-39 full test flow). The left policy faile
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21 session 1: a sub-agent timed out with nothing written. Design to use: robot/src/inchworm/perturb.py: attachment point P = the inserting arm's <arm>_gripper link pose at its inserted frame (48 left / 73 right) in the cell frame; perturbation = rotation about P (angle U[0,2] deg, random axis) + translation U[-20,20] mm per axis; HOLDING arm realises it: G' = D_aboutP @ G0, 5-DOF DLS IK (kinematics.KinematicChain.ik, seed = frozen holding q, soft limits); keep only if FK-achieved rotation <= 2 deg and |t| <= 20 mm per axis and the mesh check with the carried tube is clean, else resample (bounded). Seeded schedule 50 = 10 nominal + 40 perturbed, saved per episode (requested, achieved, holding ticks). Return model: use the current (perturbed) holding pose as the holding arm's home in the follower return (5 deg drift rule unchanged), return the inserting arm first, then move_holding() back to frozen, then the next perturbation. Files: perturb.py, tests/test_perturb.py, lerobot_env/record_train.py + .sh --arm, scripts/place_training_tube.py, move_holding in inchworm_follower.py, lerobot_env/tests/test_record_train.py. Leader map right needed (refuse without it).
+
+2026-11-21 implemented (commit 27613f9 + follow-up). Files: src/inchworm/perturb.py (Planner: attachment point P0 = inserting gripper at timeline frame 48/73 carried into the frozen tube; D = rotation about P0 U[0,2] deg random axis + U[-20,20] mm per axis; holding arm solves a bound-normalised Gauss-Newton fit in ticks; ACHIEVED D by FK kept only if <=2 deg / <=20 mm per axis, inserting arm can reach the perturbed inserted pose within 3 mm/1 deg, and the holding joint line is mesh-clean with the tube carried; else resample, max 200), scripts/place_training_tube.py, lerobot_env/record_train.py + record_train.sh --arm + record_train_left.sh / record_train_right.sh, follower InchwormFollower.move_holding (mesh-checked holding-arm line, 5 deg drift refusal, typed YES on the first move; return model then uses the perturbed holding pose), tests tests/test_perturb.py (7) + lerobot_env/tests/test_record_train.py (12). Evidence: full suites pass (robot rc=0, lerobot_env rc=0). Dry runs (no hardware): replay_cycle --stop-after-frame 42 and 67 without the tube: simulation OK, stop holding; place_training_tube --arm left/right on simulated servos: holding gripper opened only after 'tube NOT attached' YES, locked via GripperLockSM, inserting gripper never commanded, state written (frame 42 locked R / frame 67 locked L, tube in). record_train --dry-run: left seed 1: 50 = 10 nominal + 40 perturbed, max rot 1.92 deg, max |t| [15.3,19.8,19.7] mm, mean rot 0.83 deg, 45 tries for 40 (sampling works almost first time), every tube move from the frozen placement and every return from the perturbed inserted pose plan clean with the real cell mesh; right seed 1: 50 = 10+40, max rot 1.81 deg, max |t| [18.5,19.9,19.2] mm, 41 tries, all clean. Planning 50 placements takes ~23 s. Session: a discarded take repeats its placement; between perturbed placements the tube goes back to the frozen placement first. AC #3/#5 left open until a supervised live run (the session test uses simulated servos with stand-in models; the mesh-checked dry run has no servo simulation). Before right recording: leader_map_right.json must be fitted (record_train refuses without it). Achieved rotation is limited by the 5-DOF holding arm: samples whose achieved pose leaves the bounds are rejected, not clipped.
 <!-- SECTION:NOTES:END -->

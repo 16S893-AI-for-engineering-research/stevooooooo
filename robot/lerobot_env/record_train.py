@@ -12,7 +12,8 @@ Per arm: N_EPISODES saved episodes (owner: 50), N_NOMINAL of them at the exact f
 <= 20 mm per x/y/z) by the HOLDING arm moving the tube (inchworm.perturb; NOT a per-joint
 jitter). The schedule is planned and mesh-checked up front (seeded, saved). Before each episode
 the holding arm moves the tube to that episode's placement (mesh-checked, slow; the first move of
-the session asks for a typed YES); the inserting arm starts at its frozen pose. A DISCARDED
+the session asks for a typed YES); the inserting arm starts at its frozen pose. Between two perturbed placements the tube goes back
+to the frozen placement first (AA-54 AC). A DISCARDED
 episode keeps its placement (the next take repeats it), so the saved episodes hold exactly the
 schedule. Keys as record_handoff.py: r record, s save, d discard, q quit.
 
@@ -76,6 +77,14 @@ class TrainSession(rh.Session):
         self.records = []
         self.placed = None                     # schedule index the tube is at now (None = frozen)
 
+    def frozen(self):
+        """(holding ticks, tube pose) at the frozen training position (the first nominal entry)."""
+        e = next((x for x in self.schedule if x.nominal), None)
+        if e is None:
+            st = self.robot._handoff["state"]
+            return st["goal_ticks"][self.robot._handoff["other"]], st["tube_pose"]
+        return e.holding_ticks, e.tube_pose
+
     def place_next(self) -> bool:
         """Move the tube to the placement of episode ``saved``. False = schedule complete."""
         i = self.saved
@@ -84,6 +93,17 @@ class TrainSession(rh.Session):
         if self.placed == i:
             return True
         e = self.schedule[i]
+        frozen = self.frozen()
+        h = self.robot._handoff or {}
+        if h.get("hold_ticks") is not None and list(h["hold_ticks"]) != list(frozen[0]):
+            # AA-54 AC: back to the frozen holding pose before the next perturbation
+            self.say("TUBE: back to the frozen placement first")
+            self.robot.move_holding(frozen[0], frozen[1], confirm=getattr(self.robot, "holding_moves_done", 0) == 0,
+                                    clock=self.clock, sleep=self.sleep)
+        if e.nominal and list((self.robot._handoff or {}).get("hold_ticks") or frozen[0]) == list(frozen[0]):
+            self.placed = i
+            self.say(f"TUBE: episode {i} placement NOMINAL (frozen)")
+            return True
         self.say(f"TUBE: episode {i} placement " + ("NOMINAL (frozen)" if e.nominal else
                  f"rotated {e.achieved['rot_deg']:.2f} deg, moved {e.achieved['trans_mm']} mm"))
         self.robot.move_holding(e.holding_ticks, e.tube_pose,
@@ -143,7 +163,8 @@ def plan(cfg, arm: str, seed: int, n: int, n_nominal: int, timeline: Path = TIME
 
 def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> int:
     """No hardware: plan the schedule, then plan + mesh-check, per placement, the tube move to it
-    (from the previous one) and the inserting arm's return from the perturbed inserted pose."""
+    from the frozen placement (and the same line back), and the inserting arm's return from the
+    perturbed inserted pose."""
     import numpy as np
     from inchworm import handoff_return as hr, perturb as pb
     from inchworm.config import load_config
@@ -151,12 +172,13 @@ def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> in
     cfg = load_config()
     pl, eps = plan(cfg, arm, seed, n, n_nominal)
     chain = with_soft_limits(build_chain(cfg.so101_kinematics), getattr(cfg.motion_guard, f"{arm}_arm_limits"))
-    bad, prev = 0, list(pl.ticks[pl.hold])
+    bad = 0
     for e in eps:
         home = {arm: pl.ticks[arm], pl.hold: e.holding_ticks}
         model = hr.CarriedTubeModel(cfg, pl.checker, home, np.asarray(e.tube_pose), follower=arm)
         try:
-            for w in hr._line(prev, e.holding_ticks)[1:]:
+            frozen = list(pl.ticks[pl.hold])
+            for w in hr._line(frozen, e.holding_ticks)[1:]:          # always from the frozen placement (AC)
                 p = model.problem(pl.ticks[arm], w)
                 if p is not None:
                     raise hr.ReturnRefused(f"tube move: {p}")
@@ -166,7 +188,6 @@ def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> in
         except hr.ReturnRefused as exc:
             bad += 1
             print(f"  episode {e.index:2d}: REFUSED: {exc}")
-        prev = e.holding_ticks
     if out is not None:
         pb.write(out, pl, seed, eps, {"dry_run": True})
         print(f"schedule: {out}")
