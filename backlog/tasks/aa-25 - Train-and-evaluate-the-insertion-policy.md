@@ -4,7 +4,7 @@ title: Train and evaluate the insertion policy
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-20 17:15'
+updated_date: '2026-11-21 01:55'
 labels: []
 milestone: m-3
 dependencies:
@@ -51,6 +51,8 @@ See doc-1 sections 7 and 9.
 2026-11-20 owner: go straight to a physical test. Built robot/lerobot_env/policy_handoff.py/.sh (+ tests/test_policy_handoff.py, 6 tests): ACT checkpoint (default 20k) drives the left arm through inchworm_follower tube_support=handoff (handoff checks + YES, mesh gate per goal, limits, stop file, joints 1-5 only, release prompt). Agent placeholders UNVERIFIED: speed cap 5 deg/s, jump guard 10 deg (stop+hold), 20 s cap. No software success judgement (AA-24 not wired). Dry run (simulated servos at the handoff stop, real checkpoint + cell mesh, ep 26 frames): 20 s, 0 holds, inference p50 8 ms p95 34-64 ms, ~6% loop overruns; arm moved elbow -280 / wrist_flex +233 ticks, demo-like. Trace robot/out/rollout/policy_dry_*.jsonl. First live run: owner-supervised.
 
 2026-11-20 03:01-03:05Z FIRST LIVE policy test (owner present, policy_handoff.sh, 20k checkpoint, left arm, tube in): 3 attempts, each ran the 20 s cap, 0 collision holds, 0 jump-guard stops, max target-present 2.6-3.3 deg, inference p50 ~8 ms p95 32-75 ms, ~7% loop overruns; 2 automatic returns clean (worst track 19 ticks); released 03:05:38Z (joints 1-5 of both arms off, right gripper left LOCKED). Owner: 'It worked really well.' Owner's visual judgement only; no seating detector (AA-24), so no AC is checked. Traces robot/out/rollout/policy_20261120T030055Z.jsonl, log calibration_data/teleop_lerobot_2026-11-19.jsonl.
+
+2026-11-21 OWNER: train TWO policies (left, right), each on its AA-54 dataset (50 episodes, 10 nominal + 40 perturbed), same ACT recipe as the 2026-11-19 smoke train (doc-3 'LeRobot pipeline'). Online evaluation from the frozen training positions via AA-55.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

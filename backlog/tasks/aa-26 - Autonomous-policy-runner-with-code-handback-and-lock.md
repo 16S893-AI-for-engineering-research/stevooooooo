@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-20 17:31'
+updated_date: '2026-11-21 01:55'
 labels: []
 milestone: m-3
 dependencies:
@@ -130,6 +130,8 @@ Compatibility with supervisor_loop_rate_hz 50 (20 ms budget): the mean fits easi
 2026-11-20 OWNER-APPROVED AC change: the seating verdict (AA-24, closed as not needed) is replaced by the finish rule 'the pose does not change for 5 s'. AC #2, #3, #8 reworded and left UNCHECKED (their old evidence was for the seating-verdict path); #1, #5, #6 unchanged and re-checked from their earlier evidence; #4, #7 still open. The still-tolerance for 'does not change' is not yet decided by the owner.
 
 2026-11-20 owner chose the agent recommendation over '5 s still' (5 s never fired on the 3 live attempts): finish = still within 2 deg for 2 s AND within 8 deg of the demo-end median (left ticks 1977/2195/1930/1396/1988, mapped for the right arm). Replayed on the live trace: fires at 13.7 s / 12.4 s (7.7 / 6.4 deg from the demo end), not on attempt 3 (18 deg away). The old #2/#8 (5 s wording) were replaced by the new last two ACs (numbering moved, order otherwise unchanged); unchecked. BUILT in policy_handoff (end='finished', arm HOLDS); the lock after the finish + retry are not built. Tests: 5 new in lerobot_env/tests/test_policy_handoff.py; dry runs policy_test.sh both arms end 'finished' (left 11.7 s, 1.49 deg; right 12.3 s, 1.19 deg).
+
+2026-11-21 OWNER: after each policy + lock the sequence no longer goes to a demo-end pose; see AA-55 (right out of its key, left carries the tube to the frozen train_right holding pose, right policy, lock, home).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

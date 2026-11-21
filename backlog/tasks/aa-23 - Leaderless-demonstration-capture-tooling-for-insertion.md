@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-19 22:41'
+updated_date: '2026-11-21 01:55'
 labels: []
 milestone: m-3
 dependencies:
@@ -189,6 +189,8 @@ FOUND + FIXED (data): in the first dataset (insert_left_20261115T215810Z) the sa
 2026-11-19 owner request: all 6 earlier datasets moved to robot/datasets/_not_for_training/ (gitignored, kept, not deleted), each with meta/NOT_FOR_TRAINING.json giving the reason: 213741Z empty; 215810Z old wrist roll + 360-degree offset; 222125Z, 015012Z, 025656Z old wrist roll + usbip camera; 20261119T214418Z bridge camera test episode. Train only on datasets recorded after this, directly under robot/datasets/.
 
 2026-11-19 22:39Z: first real dataset robot/datasets/insert_left_20261119T221003Z (29 episodes, 13,887 frames, 17-21 new wrist images/s, 360-offset pass; owner: none were failures). ACT training started in background: script robot/out/train/run_insert_left_20261119T221003Z.sh, log robot/out/train/logs/insert_left_20261119T221003Z.log, output robot/out/train/insert_left_20261119T221003Z. Episodes 0-25 train, 26-28 held out. 20k steps, bs 8, n_action_steps 20, save every 5k, pyav decode. Verified on GPU: CUDA check passed, GPU util 89%, 2.9 GB used, ~2.7 steps/s (ETA ~2 h). Loss at step 200: l1 0.473, kld 0.650.
+
+2026-11-21 OWNER: re-recording for BOTH arms moves to AA-54 (frozen training positions, perturbed attachment point via the holding arm, 50 episodes/arm, 10 nominal + 40 perturbed). The 2026-11-19 insert_left dataset was recorded at the old wrist_roll zero (1 deg off) and is superseded for training. The right arm needs leader_map_right.json fitted first (scripts/leader_mapping.py capture/fit --follower right; owner at the arms).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
