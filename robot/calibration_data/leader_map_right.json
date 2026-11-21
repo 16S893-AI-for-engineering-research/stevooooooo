@@ -1,0 +1,86 @@
+{
+ "joints": {
+  "shoulder_pan": {
+   "sign": 1,
+   "offset_ticks": 157.0,
+   "residual_ticks": [
+    63.0,
+    -34.0,
+    -29.0
+   ],
+   "worst_ticks": 63.0,
+   "leader_span_ticks": 1011.0,
+   "sign_ambiguous": false,
+   "sign_determined": true,
+   "worst_deg": 5.54
+  },
+  "shoulder_lift": {
+   "sign": 1,
+   "offset_ticks": 2305.0,
+   "residual_ticks": [
+    -14.0,
+    29.0,
+    -15.0
+   ],
+   "worst_ticks": 29.0,
+   "leader_span_ticks": 1083.0,
+   "sign_ambiguous": false,
+   "sign_determined": true,
+   "worst_deg": 2.55
+  },
+  "elbow_flex": {
+   "sign": 1,
+   "offset_ticks": 3016.3,
+   "residual_ticks": [
+    29.7,
+    -32.3,
+    2.7
+   ],
+   "worst_ticks": 32.3,
+   "leader_span_ticks": 1975.0,
+   "sign_ambiguous": false,
+   "sign_determined": true,
+   "worst_deg": 2.84
+  },
+  "wrist_flex": {
+   "sign": 1,
+   "offset_ticks": 3678.0,
+   "residual_ticks": [
+    18.0,
+    1.0,
+    -19.0
+   ],
+   "worst_ticks": 19.0,
+   "leader_span_ticks": 984.0,
+   "sign_ambiguous": false,
+   "sign_determined": true,
+   "worst_deg": 1.67
+  },
+  "wrist_roll": {
+   "sign": 1,
+   "offset_ticks": 1349.3,
+   "residual_ticks": [
+    -68.3,
+    36.7,
+    31.7
+   ],
+   "worst_ticks": 68.3,
+   "leader_span_ticks": 483.0,
+   "sign_ambiguous": false,
+   "sign_determined": true,
+   "worst_deg": 6.0
+  }
+ },
+ "problems": [],
+ "labels": [
+  "P1",
+  "P2",
+  "P3"
+ ],
+ "min_span_deg": 15.0,
+ "tol_deg": 6.5,
+ "follower": "right",
+ "utc": "2026-11-21T05:52:09Z",
+ "unverified": true,
+ "note": "cleared only by the supervised low-speed teleop check (AA-44 AC #4)"
+}
