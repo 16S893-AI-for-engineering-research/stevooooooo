@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:55'
-updated_date: '2026-11-21 01:55'
+updated_date: '2026-11-21 03:38'
 labels: []
 milestone: m-3
 dependencies:
@@ -42,3 +42,9 @@ Owner plan 2026-11-21: new full sequence with two per-arm policies (trained per 
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 session 1: robot/src/inchworm/two_policy.py (phase list PHASES, training_pose_problems, lock_pose_problem, CarriedTube, tube_offset, joint_line, straight_out, plan_right_out, plan_left_to_train_right, plan_right_to_train_right, plan_home_timeline/plan_home_line, frames_problems, fluid_problems) + tests/test_two_policy.py (9 tests pass), committed. Owner/supervisor decisions: step-5 lock check = 8 deg vs a --left-lock-ref flag defaulting to full_policy_test DEMO_END_LEFT_TICKS (later: the retrained left policy's demo-end median); tube rigidly carried by the left from its ACTUAL lock pose, that carried pose goes in the train_right handoff state, only LOG its offset from the frozen train_right tube pose. NOT done: lerobot_env/crawl_two_policy.py + .sh (reuse full_policy_test.py policy_phase/lock_and_look/hold_and_release/open_live_buses/load_policy by import), lerobot_env/tests/test_crawl_two_policy.py, dry run. Note: tests/test_constants.py forbids the bare literal 67 in src (it is a design value) -> take the train_right frame from training_poses.position('train_right')['timeline_frame'].
+<!-- SECTION:NOTES:END -->

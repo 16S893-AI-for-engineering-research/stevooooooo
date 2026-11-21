@@ -7,7 +7,7 @@ policies see), not as timeline radians, so a later zero-offset or timeline chang
 them silently.
 
 * ``train_left``  = cycle frame 42: right LOCKED holding, left open ~50 mm under its point.
-* ``train_right`` = cycle frame 67: left LOCKED holding (gait inserted pose), right open
+* ``train_right`` = the cycle frame of config/training_poses.json: left LOCKED holding (gait inserted pose), right open
   ~50 mm under its point.
 
 ``check_against_timeline`` reports any drift between the frozen ticks and what the current

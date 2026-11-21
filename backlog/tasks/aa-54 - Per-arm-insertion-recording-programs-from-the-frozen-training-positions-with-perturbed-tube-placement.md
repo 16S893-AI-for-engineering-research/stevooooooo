@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:54'
-updated_date: '2026-11-21 01:55'
+updated_date: '2026-11-21 03:38'
 labels: []
 milestone: m-3
 dependencies:
@@ -42,3 +42,9 @@ Owner plan 2026-11-21 (replaces the AA-39 full test flow). The left policy faile
 - [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
 - [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 session 1: a sub-agent timed out with nothing written. Design to use: robot/src/inchworm/perturb.py: attachment point P = the inserting arm's <arm>_gripper link pose at its inserted frame (48 left / 73 right) in the cell frame; perturbation = rotation about P (angle U[0,2] deg, random axis) + translation U[-20,20] mm per axis; HOLDING arm realises it: G' = D_aboutP @ G0, 5-DOF DLS IK (kinematics.KinematicChain.ik, seed = frozen holding q, soft limits); keep only if FK-achieved rotation <= 2 deg and |t| <= 20 mm per axis and the mesh check with the carried tube is clean, else resample (bounded). Seeded schedule 50 = 10 nominal + 40 perturbed, saved per episode (requested, achieved, holding ticks). Return model: use the current (perturbed) holding pose as the holding arm's home in the follower return (5 deg drift rule unchanged), return the inserting arm first, then move_holding() back to frozen, then the next perturbation. Files: perturb.py, tests/test_perturb.py, lerobot_env/record_train.py + .sh --arm, scripts/place_training_tube.py, move_holding in inchworm_follower.py, lerobot_env/tests/test_record_train.py. Leader map right needed (refuse without it).
+<!-- SECTION:NOTES:END -->
