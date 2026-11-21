@@ -242,6 +242,31 @@ def tube_problems(frames: Sequence[Frame]) -> List[str]:
     return [f"frame {f.index}: the timeline has no tube pose" for f in frames if f.tube is None]
 
 
+def resume_frames(frames: Sequence[Frame], start: int, stop: int, held_arm: str,
+                  held_q: Sequence[float]) -> List[Frame]:
+    """AA-39 full test (owner 2026-11-20): timeline frames ``start..stop`` with ``held_arm``
+    static at ``held_q``, the pose where it actually locked after its policy insertion (the
+    planned insert pose is replaced). The rest is unchanged: the other arm's frames and the
+    tube's pose (the tube is where the OTHER arm holds it; the held arm's offset is model
+    error, owner decision 3). Refused unless ``held_arm`` is LOCKED and static in every one of
+    those frames, so nothing in the replaced range was meant to move it."""
+    if not 0 <= start < stop < len(frames):
+        raise ValueError(f"resume range {start}..{stop} outside the timeline (0..{len(frames) - 1})")
+    sub = [f for f in frames if start <= f.index <= stop]
+    if [f.index for f in sub] != list(range(start, stop + 1)):
+        raise ValueError(f"timeline frames {start}..{stop} are not contiguous")
+    q = np.asarray(held_q, dtype=float)
+    if q.shape != (5,) or not np.all(np.isfinite(q)):
+        raise ValueError(f"held pose must be 5 finite joint values, got {held_q!r}")
+    for f in sub:
+        if not f.locked[held_arm]:
+            raise ValueError(f"frame {f.index}: the {held_arm} gripper is not LOCKED there")
+        if not np.allclose(f.q[held_arm], sub[0].q[held_arm]):
+            raise ValueError(f"frame {f.index}: the timeline moves the {held_arm} arm in {start}..{stop}")
+    return [Frame(f.index, f.step, {**{a: f.q[a].copy() for a in ARMS}, held_arm: q.copy()},
+                  dict(f.locked), None if f.tube is None else f.tube.copy()) for f in sub]
+
+
 def preflight(cfg, frames: Sequence[Frame], checker, samples: int = PREFLIGHT_SAMPLES,
               tube: bool = False) -> List[str]:
     """Offline check of the whole replay. ``tube`` False = no tube in the cell; True = the tube
@@ -477,14 +502,17 @@ def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO,
     V = tempo / ANIM_FRAME_S
     ev = gripper_events(frames)
     # A gripper action at frame c happens with the arms still at frame c-1 (as in run()).
-    starts = [0] + [c - 1 for c in sorted(ev)]
+    # a0/a1 are list positions; ``off`` maps them to timeline indices (AA-39: a resumed
+    # piece of the timeline starts at frame 49, not 0).
+    off = frames[0].index
+    starts = [0] + [c - 1 - off for c in sorted(ev)]
     ends = starts[1:] + [len(frames) - 1]
     segs: List[Segment] = []
     for i, (a0, a1) in enumerate(zip(starts, ends)):
-        before = ev.get(a0 + 1, []) if i else []
+        before = ev.get(a0 + 1 + off, []) if i else []
         n = a1 - a0
         if n <= 0 or all(np.allclose(frames[a0].q[a], frames[k].q[a]) for k in range(a0, a1 + 1) for a in ARMS):
-            segs.append(Segment(a0, a1, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS},
+            segs.append(Segment(a0 + off, a1 + off, before, 0.0, {a: (lambda t, q=frames[a1].q[a].copy(): q) for a in ARMS},
                                 (lambda t, e=float(frames[a1].index): e)))
             continue
         fs = {}
@@ -502,7 +530,7 @@ def build_segments(frames: Sequence[Frame], tempo: float = DEFAULT_TEMPO,
         paths = {a: (lambda t, f=fs[a], s_of_t=s_of_t: np.asarray(f(s_of_t(t)), dtype=np.float64))
                  for a in ARMS}
         base = float(frames[a0].index)
-        segs.append(Segment(a0, a1, before, T, paths, (lambda t, s_of_t=s_of_t, base=base: base + s_of_t(t))))
+        segs.append(Segment(a0 + off, a1 + off, before, T, paths, (lambda t, s_of_t=s_of_t, base=base: base + s_of_t(t))))
     return segs
 
 
@@ -725,6 +753,30 @@ class ReplayRunner:
         for a in ARMS:
             self._lock(a)
 
+    def adopt_holding(self, require: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """AA-39 resume (owner 2026-11-20): both arms are ALREADY holding (another process left
+        them torque on) and the grippers stay as they are. Joints: drive profile, torque kept on
+        (goal := present, no motion). Grippers: state adopted by read-back first (no write;
+        outside both bands = GripperLockError), then the slow drive profile (goal := present)."""
+        states = {}
+        for a, h in self.arms.items():
+            states[a] = h.sm.adopt_readback().name
+        bad = {a: s for a, s in states.items() if require and require.get(a, s) != s}
+        if bad:
+            raise ReplayAborted(f"gripper states {states} (required {require}); nothing energised")
+        for a, h in self.arms.items():
+            for j in JOINTS:
+                sid = h.ids[j]
+                h.bus.set_goal_speed(sid, MIN_SPEED_TICKS_S)
+                h.bus.set_acceleration(sid, ARM_ACCEL)
+                h.bus.set_torque_limit(sid, self.arm_torque_limit)
+                h.bus.set_torque_enable(sid, True)
+            h.sm.energise_slow()
+            self.targets[a] = None
+        self.log({"event": "adopted_holding", "grippers": states,
+                  "ticks": {a: self._ticks(a) for a in ARMS}})
+        return states
+
     def present_q(self) -> Dict[str, np.ndarray]:
         from inchworm.so101_pose_reader import ticks_to_q
         return {a: np.asarray(ticks_to_q(self.cfg, a, self._ticks(a))) for a in ARMS}
@@ -867,7 +919,7 @@ class ReplayRunner:
             rest = STREAM_PERIOD_S - (self.clock() - now)
             if rest > 0:
                 self.sleep(rest)
-        end = self.frames[seg.last]
+        end = self.frames[seg.last - self.frames[0].index]
         goals = {a: q_to_ticks(self.cfg, a, end.q[a]) for a in ARMS}
         strict, self.abort_on_faults = self.abort_on_faults, False
         try:

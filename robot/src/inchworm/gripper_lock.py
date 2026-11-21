@@ -744,6 +744,29 @@ class GripperLockSM:
             {"prev_state": prev.name, "new_state": "UNLOCKED", "position_deg": pos},
         )
 
+    def adopt_readback(self) -> GripperState:
+        """AA-39 (owner 2026-11-20): take over a gripper that another process left as it is
+        (the cycle resumes after a policy lock). Reads the position only, NO write: inside the
+        locked band = LOCKED (hold goal = the lock goal), inside the unlocked band = UNLOCKED,
+        anywhere else = FAULT and :class:`GripperLockError`. Live mode only (dry-run refuses)."""
+        if self._dry_run:
+            raise GripperLockError(f"{self._role}: adopt_readback needs a real (or simulated) bus")
+        self._require_bands_or_dry_run("adopt_readback")
+        bands = self._bands_for_role()
+        pos = self._bus.read_position_deg(self._bus._servo_id_for_joint("gripper"))
+        if _in_band(pos, bands.locked_low_deg, bands.locked_high_deg):
+            self._state = GripperState.LOCKED
+            self._last_commanded_pos_deg = (bands.lock_goal_deg if bands.lock_goal_deg is not None
+                                            else _mid(bands.locked_low_deg, bands.locked_high_deg))
+        elif _in_band(pos, bands.unlocked_low_deg, bands.unlocked_high_deg):
+            self._state = GripperState.UNLOCKED
+        else:
+            self._state = GripperState.FAULT
+            raise GripperLockError(f"{self._role}: gripper at {pos:.2f} deg is in neither the locked "
+                                   f"nor the unlocked band; not adopted")
+        self._emit("info", "gripper_adopted", {"position_deg": pos, "state": self._state.name})
+        return self._state
+
     def set_approach_ready(self) -> None:
         """Transition UNLOCKED → APPROACH_READY.
 

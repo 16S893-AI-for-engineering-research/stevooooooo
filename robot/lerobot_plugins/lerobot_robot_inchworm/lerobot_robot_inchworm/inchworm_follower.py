@@ -576,6 +576,27 @@ class InchwormFollower(Robot):
                 self._connected = False
                 self._close_all()
 
+    def detach_holding(self) -> dict:
+        """AA-39 full test (owner 2026-11-20): end the session WITHOUT the torque-off: the
+        follower re-commands its present pose (torque on) and its port closes; the other arm is
+        not touched. The servos keep holding by themselves (STS3215, no host watchdog), so the
+        next step (the resumed cycle) can open both ports. No prompt. Grippers never touched."""
+        if not self._connected:
+            raise RuntimeError(f"{self} is not connected")
+        from inchworm.torque import TorqueManager
+        try:
+            held = TorqueManager({self.hw.role: self.hw.bus}).hold_all()
+            rec = {"event": "detached_holding", "hold": {k: str(v) for k, v in held.items()},
+                   "follower_ticks": self.core.follower_ticks()}
+            self._log(rec)
+        finally:
+            self._handoff = None
+            self._connected = False
+            self._close_all()
+        if any(v != "None" for v in rec["hold"].values()):
+            raise RuntimeError(f"hold before detaching failed: {rec['hold']}")
+        return rec
+
     def _close_all(self) -> None:
         try:
             if self.hw is not None:

@@ -169,7 +169,8 @@ class PolicyAttempt:
                       "infer_ms_p95": round(float(np.percentile(ms, 95)), 1),
                       "infer_ms_max": round(float(ms.max()), 1),
                       "max_target_minus_present_deg": round(stats["max_target_minus_present_deg"], 2),
-                      "follower_ticks": r.core.follower_ticks()})
+                      "follower_ticks": r.core.follower_ticks(),
+                      "present_deg": [round(t * tl.DEG_PER_TICK, 2) for t in r.core.follower_ticks()]})
         r._log({"event": "policy_attempt_end", **stats})
         return stats
 
@@ -177,33 +178,39 @@ class PolicyAttempt:
 # ---------------------------------------------------------------------------
 # Dry run: simulated servos at the handoff stop pose, frames from a recorded episode
 # ---------------------------------------------------------------------------
+def sim_buses(cfg, state, clock=time.monotonic) -> dict:
+    """Both arms as simulated servos (scripts/replay_sim.SimArmBus), holding at the handoff
+    state's present pose (joints and grippers torque on); drive registers read sane."""
+    import importlib.util
+    from inchworm import teleop_live as tl
+    s = importlib.util.spec_from_file_location("replay_sim", ROBOT / "scripts" / "replay_sim.py")
+    sim = importlib.util.module_from_spec(s); s.loader.exec_module(sim)
+
+    class Bus(sim.SimArmBus):
+        def _read_bytes(self, sid, reg, n):
+            if reg in (16, 21, 28, 48):           # drive registers: sane, non-zero
+                return bytes([100, 0])[:n]
+            return super()._read_bytes(sid, reg, n)
+
+    def bus(arm):
+        lim = getattr(cfg.motion_guard, f"{arm}_arm_limits").servo_tick_limits
+        b = Bus(f"arm_{arm}", list(state["present_ticks"][arm]) + [state["gripper_ticks"][arm]],
+                clock, limits={i + 1: tuple(lim[j]) for i, j in enumerate((*tl.J5, "gripper"))})
+        b._bus.read_bytes = b._read_bytes
+        for sid in range(1, 7):
+            b.torque[sid] = True
+        return b
+    return {a: bus(a) for a in ("left", "right")}
+
+
 class _SimHW:
     """FollowerHardware surface on simulated servos (scripts/replay_sim.SimArmBus), both arms
     holding at the handoff state's present pose. No port, no camera."""
 
-    def __init__(self, cfg, state, frames, follower="left", clock=time.monotonic):
-        import importlib.util
-        from inchworm import teleop_live as tl
-        s = importlib.util.spec_from_file_location("replay_sim", ROBOT / "scripts" / "replay_sim.py")
-        sim = importlib.util.module_from_spec(s); s.loader.exec_module(sim)
-
-        class Bus(sim.SimArmBus):
-            def _read_bytes(self, sid, reg, n):
-                if reg in (16, 21, 28, 48):           # drive registers: sane, non-zero
-                    return bytes([100, 0])[:n]
-                return super()._read_bytes(sid, reg, n)
-
-        def bus(arm):
-            lim = getattr(cfg.motion_guard, f"{arm}_arm_limits").servo_tick_limits
-            b = Bus(f"arm_{arm}", list(state["present_ticks"][arm]) + [state["gripper_ticks"][arm]],
-                    clock, limits={i + 1: tuple(lim[j]) for i, j in enumerate((*tl.J5, "gripper"))})
-            b._bus.read_bytes = b._read_bytes
-            for sid in range(1, 7):
-                b.torque[sid] = True
-            return b
-
+    def __init__(self, cfg, state, frames, follower="left", clock=time.monotonic, buses=None):
         other = "right" if follower == "left" else "left"
-        self.bus, self.obus = bus(follower), bus(other)
+        buses = buses or sim_buses(cfg, state, clock)        # AA-39 full test: shared across phases
+        self.bus, self.obus = buses[follower], buses[other]
         self.role = f"arm_{follower}"
         self.read_bytes, self.write_bytes = self.bus._read_bytes, self.bus._write_bytes
         self._frames, self._i = frames, 0
