@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:55'
-updated_date: '2026-11-21 16:59'
+updated_date: '2026-11-21 17:04'
 labels: []
 milestone: m-3
 dependencies:
@@ -57,4 +57,6 @@ Owner plan 2026-11-21: new full sequence with two per-arm policies (trained per 
 2026-11-21 16:15Z FIRST LIVE crawl_two_policy.sh (owner supervising), log robot/out/rollout/crawl_two_policy_20261121T161520Z.jsonl, trace policy_crawl_20261121T161520Z.jsonl. train_left gate 0 problems. LEFT POLICY FAILED: 3 attempts (r, r, l), each hit the 20 s cap; it went the WRONG way: elbow 193 -> 199 deg, wrist_flex 103 -> 96.5 (finish ref elbow 168.7, wrist_flex 122). Same pattern as the AA-39 live failure 2026-11-21 00:11Z (old checkpoint). The open-loop dry run on recorded training frames moves the right way (elbow 192 -> 163), so the policy follows the training images and not the live ones -> suspect an image difference (daylight vs the night recording 05:09-06:30Z = local 00:09-01:30; or the scene/camera). Owner locked anyway (look y); lock 30.9 deg (elbow) off the ref; plans passed; carried tube 61.8 mm / 4.4 deg off the frozen train_right tube. Right unlocked and came out OK (right_out worst path error 5 ticks). 16:19:45Z the AGENT stopped the left_to_train_right move (touch /tmp/inchworm_stop_move, own judgement, not asked): failed insertion + tube 62 mm off training. Both arms HOLD; left LOCKED holding the tube alone, right UNLOCKED and clear. Release prompt pending.
 
 2026-11-21 ~16:45Z: live view added: policy_handoff.start_preview (browser MJPEG of robot._last_frame = exactly what the policy gets, mean/std overlay; never opens a camera; record_handoff.Preview), --preview-port 8765 (0 = off) in policy_handoff.py (policy_test.sh) and crawl_two_policy.py. Suites 1960 + 100 pass. Camera exposure: the bridge handshake sends auto_exposure=None = camera default (doc-1 AA-53: use auto exposure, DirectShow manual exposure not mapped), same in recording and policy runs, so not a recording/run mismatch; auto exposure does not remove daylight vs lamp differences. OWNER PLAN: record daylight demos, merge with the night v2 sets, retrain both arms. Merge verified 2026-11-21 (lerobot-edit-dataset merge of the two v2 sets -> /tmp/merge_test, 100 ep / 36159 frames, exit 0).
+
+2026-11-21: OWNER chose brightness/contrast augmentation for the v3 retrain. LeRobot's default image_transforms are OFF (v2 train_config: enable false) and its defaults also jitter saturation/hue (meaningless on grey copied to 3 channels), sharpness and affine. Written robot/out/train/run_v3_both.sh (git-ignored): v2 recipe on insert_left_v3 / insert_right_v3 + --dataset.image_transforms.enable=true, max_num_transforms=2, tfs = ColorJitter brightness [0.6,1.4] and contrast [0.6,1.4] (wider than LeRobot's 0.8-1.2 for daylight vs lamp). Verified: draccus parses the flags; ImageTransforms on a test image gives means 0.41-0.67 from 0.50.
 <!-- SECTION:NOTES:END -->
