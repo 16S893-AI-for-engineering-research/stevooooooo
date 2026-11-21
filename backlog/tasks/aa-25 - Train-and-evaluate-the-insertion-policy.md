@@ -4,7 +4,7 @@ title: Train and evaluate the insertion policy
 status: To Do
 assignee: []
 created_date: '2026-10-20 21:12'
-updated_date: '2026-11-21 01:55'
+updated_date: '2026-11-21 06:42'
 labels: []
 milestone: m-3
 dependencies:
@@ -53,6 +53,8 @@ See doc-1 sections 7 and 9.
 2026-11-20 03:01-03:05Z FIRST LIVE policy test (owner present, policy_handoff.sh, 20k checkpoint, left arm, tube in): 3 attempts, each ran the 20 s cap, 0 collision holds, 0 jump-guard stops, max target-present 2.6-3.3 deg, inference p50 ~8 ms p95 32-75 ms, ~7% loop overruns; 2 automatic returns clean (worst track 19 ticks); released 03:05:38Z (joints 1-5 of both arms off, right gripper left LOCKED). Owner: 'It worked really well.' Owner's visual judgement only; no seating detector (AA-24), so no AC is checked. Traces robot/out/rollout/policy_20261120T030055Z.jsonl, log calibration_data/teleop_lerobot_2026-11-19.jsonl.
 
 2026-11-21 OWNER: train TWO policies (left, right), each on its AA-54 dataset (50 episodes, 10 nominal + 40 perturbed), same ACT recipe as the 2026-11-19 smoke train (doc-3 'LeRobot pipeline'). Online evaluation from the frozen training positions via AA-55.
+
+2026-11-21 06:31Z TRAINING STARTED (owner asked): robot/out/train/run_v2_both.sh (nohup, background) trains left then right sequentially, ACT, same recipe as the 2026-11-19 smoke train: n_action_steps 20, 20000 steps, batch 8, save every 5000, pyav, cuda (RTX 3050 Ti 4 GB, ~2.6 GB used). Datasets insert_left_v2_20261121T050907Z (50 ep, 23022 frames) and insert_right_v2_20261121T055710Z (50 ep, 13137). Outputs out/train/<dataset>/checkpoints/0{05,10,15,20}000; logs out/train/logs/<dataset>.log and run_v2_both.log ('exit N' line per arm). Speed: first 1.46 s/step (GPU power-capped, P5, 17 W), after the owner's power settings 2.2 step/s = ~2.4 h per arm. If interrupted: resume with lerobot-train --resume=true --config_path=out/train/<dataset>/checkpoints/last/pretrained_model/train_config.json.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

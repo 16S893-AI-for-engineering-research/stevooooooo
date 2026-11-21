@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:54'
-updated_date: '2026-11-21 05:52'
+updated_date: '2026-11-21 06:42'
 labels: []
 milestone: m-3
 dependencies:
@@ -55,4 +55,6 @@ Owner plan 2026-11-21 (replaces the AA-39 full test flow). The left policy faile
 2026-11-21 LEFT RECORDING DONE (owner, live): datasets/insert_left_v2_20261121T050907Z: 50 episodes, 23022 frames (30 fps), schedule + per-take record in perturbations.json (50 saved takes). Next: right needs calibration_data/leader_map_right.json (leader_mapping.py capture x3 / fit / watch, follower right torque off), then record_train_right.sh.
 
 2026-11-21 05:50Z leader_map_right.json fitted from P1-P3 (owner captures). Default tolerance 5 deg failed on shoulder_pan (worst 5.54 deg) and wrist_roll (6.00 deg). OWNER APPROVED accepting it: saved with --tol-deg 6.5 (fit-quality tolerance of the leader map only; follower soft limits, mesh gate and catch-up speed unchanged). Cause looks like an eye-matching error in one pose: P1 and P3 have the same leader pan (1950/1953) but follower pan 2170/2081 (7.8 deg apart); roll leader 585/549 vs follower 1866/1930. Effect: the follower can sit up to ~6 deg off the leader's pose; recorded actions are the follower's own targets, so the dataset stays consistent. Map stays unverified: true until the first supervised catch-up of the right recording shows every joint moving the right way.
+
+2026-11-21 RIGHT RECORDING DONE (owner, live): datasets/insert_right_v2_20261121T055710Z: 50 episodes, 13137 frames. First supervised right catch-up with leader_map_right OK (owner continued recording). Both arms recorded.
 <!-- SECTION:NOTES:END -->
