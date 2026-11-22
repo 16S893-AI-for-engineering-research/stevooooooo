@@ -48,14 +48,16 @@ STATE_TRAIN_RIGHT = ROBOT / "out" / "crawl_state_train_right.json"
 RUNNER_STOP = Path("/tmp/inchworm_stop_move")
 DEG_PER_TICK = 360.0 / 4096
 J5 = fpt.J5
-LEFT_DATASET = ROBOT / "datasets/insert_left_v2_20261121T050907Z"
-RIGHT_DATASET = ROBOT / "datasets/insert_right_v2_20261121T055710Z"
-LEFT_CKPT = ROBOT / "out/train/insert_left_v2_20261121T050907Z/checkpoints/020000/pretrained_model"
-RIGHT_CKPT = ROBOT / "out/train/insert_right_v2_20261121T055710Z/checkpoints/020000/pretrained_model"
-#: Finish references = median last-frame observation.state of each dataset's 50 episodes (ticks),
-#: measured 2026-11-21 (AA-55 notes; test_crawl_two_policy recomputes them from the datasets).
-LEFT_FINISH_REF_TICKS = (1982, 2203, 1919, 1388, 1986)
-RIGHT_FINISH_REF_TICKS = (2062, 2482, 1646, 1395, 2007)
+LEFT_DATASET = ROBOT / "datasets/insert_left_v3"
+RIGHT_DATASET = ROBOT / "datasets/insert_right_v3"
+LEFT_CKPT = ROBOT / "out/train/insert_left_v3/checkpoints/020000/pretrained_model"
+RIGHT_CKPT = ROBOT / "out/train/insert_right_v3/checkpoints/020000/pretrained_model"
+#: v3 (2026-11-22, owner: night + daylight sets, brightness/contrast augmentation). Finish references
+#: = median last-frame observation.state of each v3 dataset's episodes (left 92, right 80), ticks;
+#: test_crawl_two_policy recomputes them. v2 values were left (1982, 2203, 1919, 1388, 1986),
+#: right (2062, 2482, 1646, 1395, 2007).
+LEFT_FINISH_REF_TICKS = (1977, 2194, 1952, 1380, 1988)
+RIGHT_FINISH_REF_TICKS = (2066, 2470, 1671, 1382, 2002)
 
 SIM: dict = {}                               # dry run: the simulated buses (tests inspect them)
 Stop = fpt.Stop

@@ -16,7 +16,7 @@ _s = importlib.util.spec_from_file_location("crawl_two_policy", ROBOT / "lerobot
 ctp = importlib.util.module_from_spec(_s); _s.loader.exec_module(ctp)
 fpt = ctp.fpt
 pytestmark = pytest.mark.skipif(not ctp.TIMELINE.exists() or not ctp.LEFT_DATASET.exists()
-                                or not ctp.RIGHT_DATASET.exists(), reason="needs the timeline and both v2 datasets")
+                                or not ctp.RIGHT_DATASET.exists(), reason="needs the timeline and both training datasets")
 ARMS = ("left", "right")
 LOCK_BAND = (2013, 2066)                     # ticks: both grippers' LOCKED bands lie inside this
 

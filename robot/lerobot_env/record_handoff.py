@@ -6,8 +6,10 @@ Start AFTER  scripts/replay_cycle.py --stop-after-frame 42 --tube-in-grippers --
     bash ~/893/robot/lerobot_env/record_handoff.sh            # or: uv run python record_handoff.py --help
 
 Keys (terminal focused):
-    r  start: the left arm catches up slowly to the leader (NOT recorded), then recording starts
-       by itself once it has caught up (owner 2026-11-15: every recorded action = what the arm did)
+    r  start: recording starts AT ONCE (owner 2026-11-22), including the slow catch-up of the arm
+       to the leader. During the catch-up the saved action is the rate-limited goal the arm was
+       actually sent, so every recorded action is still what the arm did (owner 2026-11-15).
+       (Old behaviour, catch-up not recorded: Session(record_catchup=False).)
     s  stop + SAVE the episode, then the automatic return
     d  stop + DISCARD the episode, then the automatic return
     q  quit. While recording: SAVE the episode and quit (no return; the arms hold, then the
@@ -47,10 +49,12 @@ class Session:
     """Idle -> recording -> (save | discard) -> return -> idle. Hardware/dataset injected."""
 
     def __init__(self, robot, teleop, dataset, task: str, fps: int = 30, keys=None,
-                 clock=time.perf_counter, sleep=time.sleep, say=print, max_s: float = EPISODE_MAX_S):
+                 clock=time.perf_counter, sleep=time.sleep, say=print, max_s: float = EPISODE_MAX_S,
+                 record_catchup: bool = True):
         self.robot, self.teleop, self.dataset, self.task = robot, teleop, dataset, task
         self.fps, self.keys, self.clock, self.sleep, self.say = fps, keys or queue.Queue(), clock, sleep, say
         self.max_s = max_s
+        self.record_catchup = record_catchup     # owner 2026-11-22: record from r, catch-up included
         self.saved = self.discarded = 0
         self.quit = False
 
@@ -67,29 +71,35 @@ class Session:
                 **build_dataset_frame(self.dataset.features, act, prefix=ACTION), "task": self.task}
 
     def _tick(self, record: bool) -> None:
-        """One control step: follow the leader; add the frame only when ``record``."""
+        """One control step: follow the leader; add the frame only when ``record``. While the arm
+        catches up (or holds after a collision stop) the saved action is the goal it was actually
+        sent, not the leader target it is still crawling towards."""
         obs = self.robot.get_observation()
         act = self.teleop.get_action()
-        self.robot.send_action(act)
+        lagging = bool(getattr(self.robot, "catching_up", False))
+        sent = self.robot.send_action(act)
         if record:
-            self.dataset.add_frame(self._frame(obs, unwrap_to(act, obs)))
+            use = sent if lagging and isinstance(sent, dict) and sent else act
+            self.dataset.add_frame(self._frame(obs, unwrap_to(use, obs)))
 
     def record_episode(self) -> str:
         """Returns 'save' or 'discard'."""
         n = self.dataset.num_episodes
         self.robot.episode = n
         self.robot._log({"event": "episode_start", "episode": n})
-        self.say(f"CATCHING UP (not recorded) for episode {n}: hold the leader still near the follower")
+        if not self.record_catchup:
+            self.say(f"CATCHING UP (not recorded) for episode {n}: hold the leader still near the follower")
         t0 = self.clock()
-        t_rec = None                 # recording starts when the catch-up is done (owner 2026-11-15)
+        t_rec = None                 # set at once (record_catchup) or when the catch-up is done
         period = 1.0 / self.fps
         why = "save"
         ticks = overruns = 0         # recorded control steps; steps that took longer than the period
         while True:
             ts = self.clock()
-            if t_rec is None and not self.robot.catching_up:
+            if t_rec is None and (self.record_catchup or not self.robot.catching_up):
                 t_rec = ts
-                self.robot._log({"event": "recording_start", "episode": n, "catchup_s": round(ts - t0, 2)})
+                self.robot._log({"event": "recording_start", "episode": n, "catchup_s": round(ts - t0, 2),
+                                 "catchup_recorded": self.record_catchup})
                 self.say(f"RECORDING episode {n}  (s = save, d = discard, q = save + quit; "
                          f"auto-save after {self.max_s:g} s)")
             k = self._key()

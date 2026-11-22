@@ -40,3 +40,10 @@
 {"utc": "2026-11-21T20:03:47Z", "arm": "right", "live": true, "event": "gripper_lock", "state": "LOCKED", "ticks": 2030}
 {"utc": "2026-11-21T20:03:50Z", "arm": "right", "live": true, "event": "owner_observation", "key_in_and_locked": "y"}
 {"utc": "2026-11-21T20:03:50Z", "arm": "left", "live": true, "event": "state_written", "path": "/home/stevotimp/893/robot/out/handoff_state.json", "present_ticks": {"left": [1974, 2198, 2199, 1170, 1989], "right": [2061, 1728, 1951, 1866, 1983]}}
+{"utc": "2026-11-22T04:57:27Z", "arm": "left", "live": true, "event": "adopted_holding", "grippers": {"left": "UNLOCKED", "right": "LOCKED"}, "ticks": {"left": [1974, 2199, 2196, 1171, 1986], "right": [2061, 1728, 1949, 1866, 1982]}}
+{"utc": "2026-11-22T04:57:27Z", "arm": "left", "live": true, "event": "adopted", "grippers": {"left": "UNLOCKED", "right": "LOCKED"}}
+{"utc": "2026-11-22T04:57:41Z", "arm": "left", "live": true, "event": "owner_confirmed", "what": "tube not attached"}
+{"utc": "2026-11-22T04:57:44Z", "arm": "right", "live": true, "event": "gripper_open"}
+{"utc": "2026-11-22T04:57:50Z", "arm": "right", "live": true, "event": "gripper_lock", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-22T04:57:55Z", "arm": "right", "live": true, "event": "owner_observation", "key_in_and_locked": "y"}
+{"utc": "2026-11-22T04:57:55Z", "arm": "left", "live": true, "event": "state_written", "path": "/home/stevotimp/893/robot/out/handoff_state.json", "present_ticks": {"left": [1974, 2199, 2199, 1171, 1985], "right": [2061, 1728, 1951, 1866, 1983]}}

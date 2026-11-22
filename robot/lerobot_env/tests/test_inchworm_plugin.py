@@ -683,7 +683,7 @@ def test_session_records_only_after_the_catch_up(tmp_path, monkeypatch):
     t, lead = _leader(tmp_path, _leader_ticks_for(far)); t.connect()
     ds = rh.make_dataset(r, tmp_path / "ds", "local/handoff_cu", 30)
     s = rh.Session(r, t, ds, "insert", 30, Keys(["r", 30, "d", 3, "r", 100, "s", 3, "q"]),
-                   clock=clock, sleep=clock.sleep, say=lambda *_: None)
+                   clock=clock, sleep=clock.sleep, say=lambda *_: None, record_catchup=False)
     s.run()
     assert (s.saved, s.discarded) == (1, 1)                            # 1 s: still catching up -> nothing to save
     ds.finalize(); r.disconnect(); t.disconnect()
@@ -698,6 +698,33 @@ def test_session_records_only_after_the_catch_up(tmp_path, monkeypatch):
     assert ends[0]["result"] == "discard" and ends[0]["recorded_s"] is None
     starts = [e for e in ev if e["event"] == "recording_start"]
     assert len(starts) == 1 and 1.5 <= starts[0]["catchup_s"] <= 2.6
+
+
+def test_session_records_from_r_including_the_catch_up_with_the_sent_goal(tmp_path, monkeypatch):
+    """Owner 2026-11-22: recording starts at r, catch-up included. During the catch-up the saved
+    action is the rate-limited goal the arm was sent (what it did), never the far leader target."""
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+    clock = sim.SimClock()
+    r, hw = _return_robot(tmp_path, monkeypatch, clock, answers=("YES", "YES", ""))
+    r.connect()
+    far = list(F_TICKS); far[1] += 114                                  # leader 10 deg away: ~2 s at 5 deg/s
+    t, lead = _leader(tmp_path, _leader_ticks_for(far)); t.connect()
+    ds = rh.make_dataset(r, tmp_path / "ds", "local/handoff_cu2", 30)
+    s = rh.Session(r, t, ds, "insert", 30, Keys(["r", 100, "s", 3, "q"]),
+                   clock=clock, sleep=clock.sleep, say=lambda *_: None)
+    s.run()
+    assert s.saved == 1
+    ds.finalize(); r.disconnect(); t.disconnect()
+    ds = LeRobotDataset("local/handoff_cu2", root=tmp_path / "ds")
+    n = ds.meta.episodes[0]["length"]
+    assert n >= 90                                                     # all ~100 polls, catch-up included
+    a = np.stack([np.asarray(ds[i]["action"]) for i in range(n)])
+    o = np.stack([np.asarray(ds[i]["observation.state"]) for i in range(n)])
+    assert np.abs(a - o).max() < 2.0          # catch-up actions are the sent goals, not the leader 10 deg away
+    assert a[-1, 1] - a[0, 1] > 7.0                                     # and they do walk to the leader
+    ev = _log(tmp_path)
+    starts = [e for e in ev if e["event"] == "recording_start"]
+    assert len(starts) == 1 and starts[0]["catchup_s"] < 0.2 and starts[0]["catchup_recorded"] is True
 
 
 def test_unwrap_to_keeps_the_turn_of_the_observation():
