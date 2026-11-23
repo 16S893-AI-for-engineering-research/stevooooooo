@@ -36,7 +36,7 @@
         <div class="stat"><b>3 arms</b><span>two SO-101 grippers and a DexArm print head</span></div>
         <div class="stat"><b><!-- stats:ms-pct -->68%<!-- /stats --></b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
         <div class="stat"><b><!-- stats:tests -->1,960<!-- /stats --></b><span>automated software tests</span></div>
-        <div class="stat"><b>~<!-- stats:cost -->$704<!-- /stats --></b><span>total AI agent cost so far</span></div>
+        <div class="stat"><b>~<!-- stats:cost -->$705<!-- /stats --></b><span>total AI agent cost so far</span></div>
       </div>
     </div>
 
@@ -195,11 +195,11 @@
         <div class="grid-2" style="margin-top:1.25rem">
           <div class="panel">
             <h3>Where the money went</h3>
-            <div class="big-number"><!-- stats:cost -->$704<!-- /stats --></div>
+            <div class="big-number"><!-- stats:cost -->$705<!-- /stats --></div>
             <p class="muted small">Recorded model cost across <!-- stats:sessions -->175<!-- /stats --> sessions, <!-- stats:cost-range -->9/15 to 11/23/26<!-- /stats -->.</p>
             <div class="cost-bar" aria-hidden="true"><!-- stats:cost-bar --><span style="width:70%; background:var(--orange)"></span><span style="width:24%; background:var(--teal)"></span><span style="width:6%; background:var(--mustard)"></span><!-- /stats --></div>
             <ul class="legend">
-              <li><i style="background:var(--orange)"></i>Main sessions <!-- stats:cost-main -->$491<!-- /stats --></li>
+              <li><i style="background:var(--orange)"></i>Main sessions <!-- stats:cost-main -->$493<!-- /stats --></li>
               <li><i style="background:var(--teal)"></i>Sub-agents <!-- stats:cost-sub -->$170<!-- /stats --></li>
               <li><i style="background:var(--mustard)"></i>Walkthrough guide <!-- stats:cost-guide -->$43<!-- /stats --></li>
             </ul>
@@ -225,9 +225,92 @@
         </div>
       </section>
 
-      <!-- 04 Why -->
+      <!-- 04 Testing -->
+      <section class="section" id="testing">
+        <div class="section-head"><span class="num">04</span><h2>How it&rsquo;s tested</h2></div>
+        <p class="section-lead">
+          Nothing new moves the real robot until it has passed four levels of checking.
+          Most of the work is in the first level: <!-- stats:tests-all -->2,188<!-- /stats --> automated tests that run on
+          simulated servos and the robot model, with no hardware attached.
+        </p>
+
+        <ol class="flow flow-4">
+          <li><span class="who ai">Every commit</span><b>Automated tests</b>Simulated servos, cameras and DexArm, plus the real robot model and collision meshes. A failure blocks the commit.</li>
+          <li><span class="who ai">New program</span><b>Dry run</b>The real program end to end on simulated servos, fed with recorded camera images, before anything is powered.</li>
+          <li><span class="who me">First live run</span><b>I supervise</b>I watch the first powered run of every new motion, ready to stop it, and confirm steps like a lock by eye.</li>
+          <li><span class="who both">Evidence</span><b>Logged result</b>Every run writes a log. An acceptance criterion is only checked with a test result, a measurement or a logged run.</li>
+        </ol>
+
+        <div class="panel" style="margin-top:1.25rem">
+          <h3><!-- stats:tests-all -->2,188<!-- /stats --> automated tests in <!-- stats:tests-files -->80<!-- /stats --> files</h3>
+          <div class="test-bar" role="img" aria-label="Automated tests by group"><!-- stats:tests-bar --><span class="tg-safety" style="width:15.3%" title="334 tests"></span><span class="tg-drivers" style="width:19.6%" title="428 tests"></span><span class="tg-geometry" style="width:12%" title="263 tests"></span><span class="tg-crawl" style="width:12.5%" title="273 tests"></span><span class="tg-learning" style="width:12%" title="263 tests"></span><span class="tg-printing" style="width:9.5%" title="207 tests"></span><span class="tg-tooling" style="width:13.6%" title="298 tests"></span><span class="tg-sim" style="width:5.6%" title="122 tests"></span><!-- /stats --></div>
+          <ul class="legend"><li><i class="tg-safety"></i>Safety rules</li><li><i class="tg-drivers"></i>Hardware drivers</li><li><i class="tg-geometry"></i>Geometry &amp; motion</li><li><i class="tg-crawl"></i>Crawl logic &amp; recovery</li><li><i class="tg-learning"></i>Learned policy &amp; teleop</li><li><i class="tg-printing"></i>Printing &amp; leveling</li><li><i class="tg-tooling"></i>Tools &amp; logging</li><li><i class="tg-sim"></i>Paper simulation</li></ul>
+          <table class="role-table" style="margin-top:1rem">
+            <thead><tr><th>Suite</th><th>Tests</th><th>How often it runs</th></tr></thead>
+            <tbody>
+              <tr><td>Robot (<code>robot/tests</code>)</td><td class="num-cell"><!-- stats:tests-suite-robot -->1,960<!-- /stats --></td><td><b>Before every commit</b>, as a required rule for the agents. About 7&ndash;12 minutes.</td></tr>
+              <tr><td>Learning (<code>robot/lerobot_env/tests</code>)</td><td class="num-cell"><!-- stats:tests-suite-lerobot -->106<!-- /stats --></td><td>When policy, recording or crawl code changes. Slower (about 14 minutes) because it trains tiny models.</td></tr>
+              <tr><td>Paper simulation (<code>sim/tests</code>)</td><td class="num-cell"><!-- stats:tests-suite-sim -->122<!-- /stats --></td><td>Not regularly: the code hasn&rsquo;t changed since September. Re-run and passing on Nov 23.</td></tr>
+            </tbody>
+          </table>
+          <p class="small muted" style="margin-top:0.75rem">There is no automatic test server: the agents run the suites on my laptop. Counts are refreshed from the test files by <code>tools/update-site-stats.py</code>.</p>
+        </div>
+
+        <div class="tg-grid">
+          <div class="tg-card tg-safety">
+            <div class="tg-head"><h3>Safety rules</h3><span class="tg-count"><!-- stats:tests-group-safety -->334<!-- /stats --></span></div>
+            <p>The rules that must never break: the gripper only moves through the lock state machine, never both grippers open with the tube attached, the laser is off on every exit, one camera at a time, joint limits and collisions are checked before every move, and the emergency stop holds.</p>
+            <p class="tg-note">One check even reads the source code and fails if any file other than the motion layer can command a servo.</p>
+            <p class="tg-files">e.g. <code>gripper_lock, motion_guard, cell_collision, estop, laser, camera_arbiter</code></p>
+          </div>
+          <div class="tg-card tg-drivers">
+            <div class="tg-head"><h3>Hardware drivers</h3><span class="tg-count"><!-- stats:tests-group-drivers -->428<!-- /stats --></span></div>
+            <p>Talking to the hardware: the servo bus protocol, the DexArm&rsquo;s G-code replies, camera frames (including damaged ones), the Windows camera bridge, and finding each USB device by its fixed name.</p>
+            <p class="tg-note">Run against simulated servos and recorded replies, so no hardware is needed.</p>
+            <p class="tg-files">e.g. <code>servo_bus, dexarm, camera_capture, camera_bridge, discovery</code></p>
+          </div>
+          <div class="tg-card tg-geometry">
+            <div class="tg-head"><h3>Geometry &amp; motion</h3><span class="tg-count"><!-- stats:tests-group-geometry -->263<!-- /stats --></span></div>
+            <p>Where everything is and how it moves: tube coordinate frames, arm kinematics to under a millimetre, the approach and fold moves, and the crawl-cycle animation replayed frame by frame on the robot model.</p>
+            <p class="tg-note">Catches a wrong angle or sign in software before it becomes a crash on the bench.</p>
+            <p class="tg-files">e.g. <code>frames, kinematics, approach, fold, cycle_replay</code></p>
+          </div>
+          <div class="tg-card tg-crawl">
+            <div class="tg-head"><h3>Crawl logic &amp; recovery</h3><span class="tg-count"><!-- stats:tests-group-crawl -->273<!-- /stats --></span></div>
+            <p>The order of a crawl step and what happens when it goes wrong: missed insertions, a latch that won&rsquo;t hold, a moved tube, a stopped run that must resume, and the two-policy handover.</p>
+            <p class="tg-note">Faults are injected on purpose to check the robot ends in a safe, holding state.</p>
+            <p class="tg-files">e.g. <code>supervisor, cycle, recovery, handoff, two_policy</code></p>
+          </div>
+          <div class="tg-card tg-learning">
+            <div class="tg-head"><h3>Learned policy &amp; teleop</h3><span class="tg-count"><!-- stats:tests-group-learning -->263<!-- /stats --></span></div>
+            <p>Teaching and running the policies: the leader-arm mapping, recording demonstrations, the frozen training poses, loading a trained checkpoint, and the full two-policy crawl with a stand-in policy.</p>
+            <p class="tg-note">Most of these run in the separate LeRobot suite with tiny trained models.</p>
+            <p class="tg-files">e.g. <code>teleop_live, policy_runner, training_poses, crawl_two_policy, record_train</code></p>
+          </div>
+          <div class="tg-card tg-printing">
+            <div class="tg-head"><h3>Printing &amp; leveling</h3><span class="tg-count"><!-- stats:tests-group-printing -->207<!-- /stats --></span></div>
+            <p>Getting ready to print: sliced G-code stays inside the safe workspace, the laser line is found in the image, the part&rsquo;s tilt and height are fitted, and the print frame is corrected.</p>
+            <p class="tg-note">Uses made-up scans with known answers, since the scanner isn&rsquo;t calibrated yet.</p>
+            <p class="tg-files">e.g. <code>gcode_intake, laser_line, leveling, print_frame</code></p>
+          </div>
+          <div class="tg-card tg-tooling">
+            <div class="tg-head"><h3>Tools &amp; logging</h3><span class="tg-count"><!-- stats:tests-group-tooling -->298<!-- /stats --></span></div>
+            <p>The helpers around the robot: every script still loads, run logs are written and summarised, and the bench tools used for homing, direction checks and servo setup behave as written.</p>
+            <p class="tg-note">Added after some scripts&rsquo; live options called code that didn&rsquo;t exist.</p>
+            <p class="tg-files">e.g. <code>script_imports, events_summarizer, telemetry, home_servos</code></p>
+          </div>
+          <div class="tg-card tg-sim">
+            <div class="tg-head"><h3>Paper simulation</h3><span class="tg-count"><!-- stats:tests-group-sim -->122<!-- /stats --></span></div>
+            <p>My September recreation of a published in-space printing simulation: transforms, thruster use, the compensation method and the paper&rsquo;s own reported numbers.</p>
+            <p class="tg-note">Separate from the robot; checks my simulation still matches the paper.</p>
+            <p class="tg-files">e.g. <code>test_paper_results, test_compensation</code></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 Why -->
       <section class="section">
-        <div class="section-head"><span class="num">04</span><h2>Why it matters</h2></div>
+        <div class="section-head"><span class="num">05</span><h2>Why it matters</h2></div>
         <div class="grid-2">
           <div class="card">
             <h3>Decouple size from launch</h3>

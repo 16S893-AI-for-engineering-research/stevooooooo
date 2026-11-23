@@ -6,7 +6,7 @@ Every value lives between markers in the HTML, for example
 markers is rewritten, so rerunning is idempotent for unchanged inputs.
 
 Sources: ``backlog task list --json`` (tasks, acceptance criteria, milestones),
-``uv run pytest --co`` in robot/ (test count), the Pi session records via
+``uv run pytest --co`` in robot/, robot/lerobot_env/ and sim/ (test counts per group), the Pi session records via
 generate-session-activity.py (cost, sessions; also rewrites the SVG chart), and
 the .pi/skills, .pi/prompts and .pi/extensions directories (harness lists).
 """
@@ -82,12 +82,54 @@ def task_stats() -> dict[str, str]:
     return stats
 
 
+# Test groups shown on the Project page ("How it's tested"). Every test file of every suite must be listed
+# here, so a new file fails the refresh instead of silently missing from the chart.
+TEST_SUITES = {  # suite -> (directory, pytest command)
+    "robot": ("robot", ["uv", "run", "pytest", "-q", "--co", "-p", "no:warnings"]),
+    "lerobot": ("robot/lerobot_env", ["uv", "run", "pytest", "-q", "--co", "-p", "no:warnings"]),
+    "sim": ("sim", ["uv", "run", "--extra", "dev", "pytest", "-q", "--co", "-p", "no:warnings"]),
+}
+TEST_GROUPS = {
+    "safety": ("pink", "gripper_lock motion_guard cell_collision dexarm_guard estop torque homing laser camera_arbiter "
+               "ast_guard constants start_pose_check start_check"),
+    "drivers": ("orange", "servo_bus dexarm camera_capture camera_bridge discovery attach_usb vhci backends config camera_rate_diag"),
+    "geometry": ("mustard", "frames kinematics approach fold cycle_replay inchworm_plan system_model calibration jog_live"),
+    "crawl": ("teal", "supervisor cycle recovery seating handoff handoff_return resume_cycle hold_tube fault_inject_hw two_policy"),
+    "learning": ("violet", "lerobot_adapter policy_runner teleop_capture teleop_live leader_mapping perturb training_poses "
+                 "arm_transfer lerobot:*"),
+    "printing": ("blue", "gcode_intake print_frame laser_line leveling scanner_calibration calibrate_scanner_live"),
+    "tooling": ("grey", "script_imports events_summarizer telemetry home_servos direction_check powered_move_check "
+                "restore_drive_config record_joint_ranges gripper_empty_moves gripper_lock_probe"),
+    "sim": ("sky", "sim:*"),
+}
+
+
 def test_stats() -> dict[str, str]:
-    out = subprocess.run(["uv", "run", "pytest", "-q", "--co"], cwd=REPO / "robot", check=True, capture_output=True, text=True).stdout
-    count = sum(int(m.group(1)) for m in re.finditer(r"^tests/\S+: (\d+)$", out, re.MULTILINE))
-    if not count:
-        raise SystemExit("pytest collection reported no tests")
-    return {"tests": f"{count:,}", "tests-floor": f"{count // 100 * 100:,}"}
+    per_file: dict[tuple[str, str], int] = {}
+    for suite, (folder, cmd) in TEST_SUITES.items():
+        out = subprocess.run(cmd, cwd=REPO / folder, check=True, capture_output=True, text=True).stdout
+        for m in re.finditer(r"^(?:\S+/)?tests/test_(\w+)\.py: (\d+)$", out, re.MULTILINE):
+            per_file[(suite, m.group(1))] = int(m.group(2))
+        if not any(key[0] == suite for key in per_file):
+            raise SystemExit(f"pytest collection reported no tests in {folder}")
+    groups = {name: 0 for name in TEST_GROUPS}
+    for (suite, name), n in per_file.items():
+        owners = [g for g, (_, files) in TEST_GROUPS.items()
+                  if f"{suite}:*" in files.split() or (suite == "robot" and name in files.split())]
+        if len(owners) != 1:
+            raise SystemExit(f"test file {suite}:test_{name}.py needs exactly one TEST_GROUPS entry (found {owners})")
+        groups[owners[0]] += n
+    robot = sum(n for (suite, _), n in per_file.items() if suite == "robot")
+    everything = sum(per_file.values())
+    stats = {"tests": f"{robot:,}", "tests-floor": f"{robot // 100 * 100:,}", "tests-all": f"{everything:,}",
+             "tests-files": str(len(per_file))}
+    for suite in TEST_SUITES:
+        stats[f"tests-suite-{suite}"] = f"{sum(n for (s, _), n in per_file.items() if s == suite):,}"
+    for name, n in groups.items():
+        stats[f"tests-group-{name}"] = f"{n:,}"
+    stats["tests-bar"] = "".join(
+        f'<span class="tg-{name}" style="width:{fmt_pct(n, everything)}%" title="{n:,} tests"></span>' for name, n in groups.items())
+    return stats
 
 
 def cost_stats() -> dict[str, str]:
