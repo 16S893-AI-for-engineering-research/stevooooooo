@@ -50,8 +50,10 @@ DEG_PER_TICK = 360.0 / 4096
 J5 = fpt.J5
 LEFT_DATASET = ROBOT / "datasets/insert_left_v3"
 RIGHT_DATASET = ROBOT / "datasets/insert_right_v3"
-LEFT_CKPT = ROBOT / "out/train/insert_left_v3/checkpoints/020000/pretrained_model"
-RIGHT_CKPT = ROBOT / "out/train/insert_right_v3/checkpoints/020000/pretrained_model"
+#: The policies of the first successful live crawl (2026-11-23 14:04Z, AA-55): 30 frozen-pose demos
+#: per arm recorded from r incl. the catch-up, ACT 16000 steps, brightness/contrast augmentation.
+LEFT_CKPT = ROBOT / "out/train/insert_left_v5nom/checkpoints/016000/pretrained_model"
+RIGHT_CKPT = ROBOT / "out/train/insert_right_v5nom/checkpoints/016000/pretrained_model"
 #: v3 (2026-11-22, owner: night + daylight sets, brightness/contrast augmentation). Finish references
 #: = median last-frame observation.state of each v3 dataset's episodes (left 92, right 80), ticks;
 #: test_crawl_two_policy recomputes them. v2 values were left (1982, 2203, 1919, 1388, 1986),

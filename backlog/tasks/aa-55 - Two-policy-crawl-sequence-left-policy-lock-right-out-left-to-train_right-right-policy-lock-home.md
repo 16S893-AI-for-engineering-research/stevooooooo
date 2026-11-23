@@ -3,11 +3,11 @@ id: AA-55
 title: >-
   Two-policy crawl sequence: left policy, lock, right out, left to train_right,
   right policy, lock, home
-status: In Progress
+status: Done
 assignee:
   - '@agent'
 created_date: '2026-11-21 01:55'
-updated_date: '2026-11-22 16:00'
+updated_date: '2026-11-23 14:55'
 labels: []
 milestone: m-3
 dependencies:
@@ -25,22 +25,22 @@ Owner plan 2026-11-21: new full sequence with two per-arm policies (trained per 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 One launcher runs the 9-step sequence with dry-run first (simulated servos, real cell mesh, both checkpoints) and live mode; every motion phase is preflighted and mesh-checked with the tube before its typed YES
-- [ ] #2 Each policy phase starts only if both arms read within tolerance of that arm's frozen training position; otherwise it refuses without moving
-- [ ] #3 Gripper lock/unlock goes only through GripperLockSM; the right unlock is refused unless the left reads LOCKED and the owner confirmed it by eye; never both unlocked, verified by a test
-- [ ] #4 The left arm's move to its train_right holding pose happens only after the right gripper is unlocked and the right arm is out of the key, verified by a test of the phase order
-- [ ] #5 The end phase moves both arms (both LOCKED) to the cycle home pose; any stop holds both arms and gives the usual release prompt (joints off, grippers untouched)
-- [ ] #6 The first live run is owner-supervised and its log path and outcome are recorded in the task notes
+- [x] #1 One launcher runs the 9-step sequence with dry-run first (simulated servos, real cell mesh, both checkpoints) and live mode; every motion phase is preflighted and mesh-checked with the tube before its typed YES
+- [x] #2 Each policy phase starts only if both arms read within tolerance of that arm's frozen training position; otherwise it refuses without moving
+- [x] #3 Gripper lock/unlock goes only through GripperLockSM; the right unlock is refused unless the left reads LOCKED and the owner confirmed it by eye; never both unlocked, verified by a test
+- [x] #4 The left arm's move to its train_right holding pose happens only after the right gripper is unlocked and the right arm is out of the key, verified by a test of the phase order
+- [x] #5 The end phase moves both arms (both LOCKED) to the cycle home pose; any stop holds both arms and gives the usual release prompt (joints off, grippers untouched)
+- [x] #6 The first live run is owner-supervised and its log path and outcome are recorded in the task notes
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
-- [ ] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
-- [ ] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
-- [ ] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
-- [ ] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
-- [ ] #6 Implementation notes record measured values, deviations from plan, and anything deferred
+- [x] #1 Acceptance criteria are each verified by concrete evidence (test output, measurement, or a logged hardware run) and not by code inspection or intent
+- [x] #2 Acceptance criteria and task description were NOT altered to match the implementation; any scope or criterion change was approved by the owner first and is recorded in the task
+- [x] #3 Hardware facts used came from doc-1; any corrected measurement was written back to doc-1 via `backlog doc update doc-1` in the same task
+- [x] #4 Tests pass via `uv run pytest` from robot/, including mock-backend tests that run with no hardware attached
+- [x] #5 Safety invariants still hold and are covered by a test: single-camera USB exclusivity, always-one-arm-holding, gripper servo commanded only by the AA-17 state machine, laser off on every exit path
+- [x] #6 Implementation notes record measured values, deviations from plan, and anything deferred
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -67,4 +67,18 @@ Owner plan 2026-11-21: new full sequence with two per-arm policies (trained per 
 2026-11-22 OWNER DECISION: v4 = ONLY the 120 new nominal demos (per arm: one night set + one day set of 30, record_train_<arm>.sh -- --episodes 30 --nominal 30); left and right are distinct, separate policies (trained separately, one dataset each). Script robot/out/train/run_v4.sh <arm> <sets...> (git-ignored): refuses a set of the other arm or any non-nominal episode, merges -> datasets/insert_<arm>_v4, trains the v3 ACT recipe (20000 steps, batch 8, brightness/contrast augmentation) -> out/train/insert_<arm>_v4. Checked: refuses the perturbed daylight set and a right set for left.
 
 2026-11-22 ~15:45Z: v4night (30 nominal night demos per arm, separate left/right policies; loss left 0.102, right 0.103) live LEFT in daylight 15:21Z, 8 deg/s 40 s cap, 3 attempts: right direction but stalls (wrist_flex 103->113-115 of ~121, elbow 193->190-192 of ~175). Found: demo first frames are NOT the frozen start (left night set median start lift 188.7 vs frozen 193.1, elbow 195.4 vs 192.0; spread up to 12 deg) because recording began only after the follower caught up to wherever the leader was; live runs always start exactly at the frozen pose. OWNER DECISION 2026-11-22: recording starts at r, INCLUDING the catch-up. Implemented in record_handoff.Session (record_catchup=True default; also used by record_train): during the catch-up / collision hold the saved action is the rate-limited goal actually sent (send_action return), so actions stay = what the arm did; event recording_start gets catchup_recorded. Old behaviour kept as record_catchup=False (its test now passes that). New test test_session_records_from_r_including_the_catch_up_with_the_sent_goal. Suites: lerobot_env 101, robot 1960 pass. Also committed: crawl_two_policy defaults -> v3 checkpoints + v3 finish refs (dry run all steps OK 04:15Z; v4night crawl dry run all steps OK 15:15Z). Owner decision: v4 = night+day nominal sets combined, one policy per arm (run_v4.sh).
+
+2026-11-22 23:20Z night sets recorded the NEW way (recording from r incl. catch-up; all 95 starts catchup_recorded True; first frames within 1.2 deg of the frozen start): left nominal insert_left_v2_20261122T215018Z (30), left MOVED insert_left_v2_20261122T224828Z (30, all perturbed), right nominal insert_right_v2_20261122T221538Z (30); all decode-checked. OWNER ORDER (4 separate policies, to compare): 1 left nominal -> insert_left_v5nom, 2 left moved -> insert_left_v5moved, 3 left nominal+moved -> insert_left_v5mix, 4 right nominal -> insert_right_v5nom. Right moved set only if moved helps on the left. Brightness/contrast image_transforms ON for all. Script robot/out/train/run_v5_night.sh (git-ignored; run_v4.sh got --allow-moved and v5 tags; set checks validated for all four). NOT STARTED: owner will say when.
+
+2026-11-23 03:27Z v5 training STARTED (owner: overnight, done by 9 AM EST = 14:00Z). Four separate policies in the owner's order via robot/out/train/run_v5_night.sh (log robot/out/train/logs/run_v5_night.log): left v5nom, left v5moved, left v5mix, right v5nom. To fit the deadline: 16000 steps each (not 20000), checkpoints every 4000 (run_v4.sh now takes STEPS / SAVE_FREQ env, default 20000/5000). Justification: v4night loss 0.170 @10K, 0.123 @15K, 0.104 @20K (left), so 16K is near the plateau; constant ACT lr, so 16K = the 16K point of a 20K run. Brightness/contrast augmentation ON (confirmed in the config). Speed 3.1 step/s at start (~1.4 h/run if it holds; ~2.3 h at the 1.9 step/s seen under load).
+
+2026-11-23 13:50Z: OWNER: left v5nom (30 nominal night demos recorded from r incl. catch-up, 16000 steps, brightness/contrast aug) INSERTED in a live policy test, IN DAYLIGHT (log out/rollout/policy_left_20261123T133513Z.jsonl). All four v5 runs exit 0 (final loss left nom 0.117, moved 0.096, mix 0.115; right nom 0.109). Crawl dry run with left v5nom + right v5nom 016000, --max-deg-s 8 --max-s 40: exit 0, both policies ended 'finished', all phases done. Finish refs unchanged (v3; v5 nominal demo-end medians within 5.0 deg left / 1.8 deg right, inside the 8 deg near-rule). Next: owner-supervised live full crawl.
+
+2026-11-23 14:04-14:07Z FIRST SUCCESSFUL FULL LIVE CRAWL, owner-supervised (log robot/out/rollout/crawl_two_policy_20261123T140434Z.jsonl, trace policy_crawl_20261123T140434Z.jsonl). Checkpoints left insert_left_v5nom + right insert_right_v5nom 016000, --max-deg-s 8 --max-s 40. train_left pose gate 0 problems; left policy finished by the rule in 16.1 s (attempt 0), owner saw key in, LOCKED (lock 2.2 deg from finish ref, shoulder_lift); right unlocked + out; left to train_right; carried tube vs frozen train_right 13.5 mm / 1.5 deg (logged only); right to its start; right policy finished in 17.0 s (attempt 0), owner saw key in, LOCKED (4.57 deg, elbow_flex); both home. Total 2 min 23 s. What made it work (vs v2/v3/v4night which never inserted): demos ONLY at the frozen pose, recorded from r incl. the catch-up so every demo starts at the live start pose (<=1.2 deg), plus brightness/contrast augmentation (left v5nom also inserted in DAYLIGHT although trained on night demos only). Suites after: robot 1960 passed, lerobot_env 101 passed. Not yet tested live: left v5moved, left v5mix (owner comparison pending); right moved set not recorded (owner: only if moved helps on the left).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Two-policy inchworm crawl works end to end on hardware. crawl_two_policy.py/.sh run the 9 steps (left policy from frozen train_left, owner-confirmed left lock via GripperLockSM, right unlock + out, left to train_right, right to its start, right policy, right lock, both home), dry-run first, every motion phase preflighted/mesh-checked with the tube and its own typed YES, pose gates before each policy, never both unlocked (crawl tests 7/7; owner-approved: the 8 deg lock-pose check became log-only). Verified by dry runs (logs out/rollout/crawl_two_policy_dry_*) and the owner-supervised live run 2026-11-23 14:04Z (crawl_two_policy_20261123T140434Z.jsonl): both policies inserted on the first attempt (16.1 s, 17.0 s), both locks confirmed by eye, both arms home. The policies that worked are insert_left_v5nom / insert_right_v5nom (30 frozen-pose demos each, recorded from r including the catch-up, ACT 16000 steps, brightness/contrast augmentation). Earlier failures and the path to this are in the notes. Suites: robot 1960, lerobot_env 101 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->

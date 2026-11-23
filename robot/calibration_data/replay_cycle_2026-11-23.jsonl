@@ -1,0 +1,52 @@
+{"utc": "2026-11-23T13:34:15Z", "event": "start", "ticks": {"left": [1976, 1427, 3117, 937, 1984], "right": [2110, 1470, 3076, 942, 1961]}, "gripper_ticks": {"left": 1567, "right": 1556}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-20 - AA-39 policy test", "stop_after_frame": 42, "tube_in_grippers": true, "diff_to_start_deg": {"left": [0.3518750000000068, 0.04298299726416201, 3.1640625000000018, -5.777575311164963, -0.3120000000000118], "right": [4.131218749999989, -1.8027201277358413, 3.515625000000001, -2.3061221861649446, -1.761484375000009]}, "approach_problems": [], "approach_order": ["left", "right"], "start_outside_soft_limits": ["left arm joint 'wrist_flex' value -1.6743 rad is outside soft limits [-1.6581, 1.6581] rad"]}
+{"utc": "2026-11-23T13:34:20Z", "event": "frame", "frame": -1, "step": "start adjustment left", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 1988]}, "final_ticks": {"left": [1972, 1426, 3092, 983, 1984]}, "error_ticks": {"left": [0, -1, 11, -20, -4]}, "peak_abs_load": {"left": [36, 0, 140, 60, 44]}, "expected_s": 1.15, "took_s": 0.91}
+{"utc": "2026-11-23T13:34:22Z", "event": "frame", "frame": 0, "step": "start adjustment right", "goal_ticks": {"right": [2063, 1491, 3036, 968, 1981]}, "final_ticks": {"right": [2074, 1486, 3055, 967, 1978]}, "error_ticks": {"right": [11, -5, 19, -1, -3]}, "peak_abs_load": {"right": [60, 64, 140, 52, 60]}, "expected_s": 0.82, "took_s": 0.68}
+{"utc": "2026-11-23T13:34:22Z", "event": "at_start", "ticks": {"left": [1972, 1425, 3092, 1002, 1985], "right": [2074, 1486, 3054, 967, 1978]}}
+{"utc": "2026-11-23T13:34:32Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-23T13:34:36Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-23T13:34:36Z", "event": "stream", "t": 0.49, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:37Z", "event": "stream", "t": 0.99, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:37Z", "event": "stream", "t": 1.5, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:38Z", "event": "stream", "t": 2.0, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:38Z", "event": "stream", "t": 2.51, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:39Z", "event": "stream", "t": 3.02, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:39Z", "event": "stream", "t": 3.52, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:40Z", "event": "stream", "t": 4.03, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:40Z", "event": "stream", "t": 4.54, "frames": [0, 24]}
+{"utc": "2026-11-23T13:34:41Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 5.0, "took_s": 5.01, "loops": 247, "worst_path_error_ticks": {"left": 36, "right": 38}, "max_temp_read_c": {"left": 57, "right": 65}, "read_errors": 0, "final_error_ticks": {"left": [-2, -4, 1, -5, -2], "right": [2, 1, 6, -2, -3]}, "peak_abs_load": {"left": [24, 172, 240, 124, 48], "right": [48, 116, 252, 104, 32]}}
+{"utc": "2026-11-23T13:34:44Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1609}
+{"utc": "2026-11-23T13:34:44Z", "event": "stream", "t": 0.49, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:45Z", "event": "stream", "t": 0.99, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:45Z", "event": "stream", "t": 1.5, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:46Z", "event": "stream", "t": 2.01, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:46Z", "event": "stream", "t": 2.51, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:47Z", "event": "stream", "t": 3.02, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:47Z", "event": "stream", "t": 3.52, "frames": [24, 42]}
+{"utc": "2026-11-23T13:34:47Z", "event": "segment", "frames": [24, 42], "step": "left regrip near point", "planned_s": 3.79, "took_s": 3.82, "loops": 188, "worst_path_error_ticks": {"left": 18, "right": 7}, "max_temp_read_c": {"left": 41, "right": 34}, "read_errors": 0, "final_error_ticks": {"left": [1, -8, 14, 3, -1], "right": [1, 0, 6, 1, -3]}, "peak_abs_load": {"left": [24, 160, 196, 136, 0], "right": [24, 0, 64, 24, 32]}}
+{"utc": "2026-11-23T13:34:48Z", "event": "handoff_stop", "schema": "inchworm.handoff/1", "stop_frame": 42, "step": "left regrip near point", "timeline_sha256": "f80c1f74431898af548fea20e7c9c346936515497e9b11c71e1e8a9467fc9b21", "tube_in_grippers": true, "goal_ticks": {"left": [1972, 2197, 2184, 1169, 1988], "right": [2063, 1730, 1941, 1865, 1981]}, "present_ticks": {"left": [1973, 2191, 2196, 1171, 1987], "right": [2064, 1730, 1947, 1866, 1978]}, "gripper_ticks": {"left": 1566, "right": 2036}, "locked": {"left": false, "right": true}, "q_rad": {"left": [0.0, -0.3811096710007199, 0.15740619189447375, -1.3183465208687684, 0.0], "right": [0.0, -1.1956522549726862, -0.14800846131151704, -0.19838928371903042, 0.0]}, "tube_pose": [[0.9998477556688874, -0.01744875844954731, -7.945098016205932e-05, 0.0025385082000428318], [0.01744875844954731, 0.9998062929871403, 0.009105895446458245, 0.08969815306841206], [-7.945098016205932e-05, -0.009105895446458245, 0.999958537318253, 0.16800556635013886], [0.0, 0.0, 0.0, 1.0]]}
+{"utc": "2026-11-23T14:04:01Z", "event": "start", "ticks": {"left": [1973, 1378, 3118, 1028, 1999], "right": [2066, 1501, 3076, 947, 1980]}, "gripper_ticks": {"left": 1562, "right": 1556}, "speed": 150, "mode": "fluid tempo 1", "soft_limits_override": "owner 2026-11-21 - AA-55 two-policy crawl", "stop_after_frame": 42, "tube_in_grippers": true, "diff_to_start_deg": {"left": [0.08820312500000682, -4.263657627735846, 3.2519531249999987, 2.220471563835039, 1.0063593749999882], "right": [0.26403124999998795, 0.9218892472641654, 3.515625000000001, -1.8666690611649495, -0.0915625000000091]}, "approach_problems": [], "approach_order": ["left", "right"], "start_outside_soft_limits": []}
+{"utc": "2026-11-23T14:04:07Z", "event": "frame", "frame": -1, "step": "start adjustment left", "goal_ticks": {"left": [1972, 1427, 3081, 1003, 1988]}, "final_ticks": {"left": [1973, 1414, 3101, 1008, 1988]}, "error_ticks": {"left": [1, -13, 20, 5, 0]}, "peak_abs_load": {"left": [0, 64, 172, 60, 52]}, "expected_s": 0.85, "took_s": 0.72}
+{"utc": "2026-11-23T14:04:09Z", "event": "frame", "frame": 0, "step": "start adjustment right", "goal_ticks": {"right": [2063, 1491, 3036, 968, 1981]}, "final_ticks": {"right": [2065, 1492, 3055, 967, 1980]}, "error_ticks": {"right": [2, 1, 19, -1, -1]}, "peak_abs_load": {"right": [36, 36, 148, 52, 0]}, "expected_s": 0.7, "took_s": 0.61}
+{"utc": "2026-11-23T14:04:09Z", "event": "at_start", "ticks": {"left": [1973, 1424, 3096, 1004, 1988], "right": [2065, 1492, 3054, 968, 1980]}}
+{"utc": "2026-11-23T14:04:16Z", "event": "gripper_lock", "arm": "left", "state": "LOCKED", "ticks": 2027}
+{"utc": "2026-11-23T14:04:20Z", "event": "gripper_lock", "arm": "right", "state": "LOCKED", "ticks": 2029}
+{"utc": "2026-11-23T14:04:20Z", "event": "stream", "t": 0.49, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:21Z", "event": "stream", "t": 0.99, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:21Z", "event": "stream", "t": 1.5, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:22Z", "event": "stream", "t": 2.0, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:22Z", "event": "stream", "t": 2.51, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:23Z", "event": "stream", "t": 3.02, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:23Z", "event": "stream", "t": 3.52, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:24Z", "event": "stream", "t": 4.03, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:24Z", "event": "stream", "t": 4.53, "frames": [0, 24]}
+{"utc": "2026-11-23T14:04:25Z", "event": "segment", "frames": [0, 24], "step": "carry tube right (both locked)", "planned_s": 5.0, "took_s": 5.01, "loops": 247, "worst_path_error_ticks": {"left": 36, "right": 39}, "max_temp_read_c": {"left": 80, "right": 43}, "read_errors": 0, "final_error_ticks": {"left": [0, -3, 1, -5, -2], "right": [2, -1, 8, -2, -3]}, "peak_abs_load": {"left": [0, 168, 244, 132, 24], "right": [24, 112, 248, 108, 36]}}
+{"utc": "2026-11-23T14:04:28Z", "event": "gripper_unlock", "arm": "left", "state": "UNLOCKED", "ticks": 1608}
+{"utc": "2026-11-23T14:04:28Z", "event": "stream", "t": 0.49, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:29Z", "event": "stream", "t": 0.99, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:29Z", "event": "stream", "t": 1.5, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:30Z", "event": "stream", "t": 2.0, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:30Z", "event": "stream", "t": 2.51, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:31Z", "event": "stream", "t": 3.02, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:31Z", "event": "stream", "t": 3.52, "frames": [24, 42]}
+{"utc": "2026-11-23T14:04:32Z", "event": "segment", "frames": [24, 42], "step": "left regrip near point", "planned_s": 3.79, "took_s": 3.82, "loops": 188, "worst_path_error_ticks": {"left": 18, "right": 8}, "max_temp_read_c": {"left": 70, "right": 31}, "read_errors": 0, "final_error_ticks": {"left": [2, -7, 13, 2, -1], "right": [1, -2, 6, 0, -3]}, "peak_abs_load": {"left": [28, 160, 192, 132, 24], "right": [24, 24, 72, 24, 40]}}
+{"utc": "2026-11-23T14:04:32Z", "event": "handoff_stop", "schema": "inchworm.handoff/1", "stop_frame": 42, "step": "left regrip near point", "timeline_sha256": "f80c1f74431898af548fea20e7c9c346936515497e9b11c71e1e8a9467fc9b21", "tube_in_grippers": true, "goal_ticks": {"left": [1972, 2197, 2184, 1169, 1988], "right": [2063, 1730, 1941, 1865, 1981]}, "present_ticks": {"left": [1974, 2190, 2197, 1171, 1987], "right": [2064, 1728, 1947, 1865, 1978]}, "gripper_ticks": {"left": 1566, "right": 2036}, "locked": {"left": false, "right": true}, "q_rad": {"left": [0.0, -0.3811096710007199, 0.15740619189447375, -1.3183465208687684, 0.0], "right": [0.0, -1.1956522549726862, -0.14800846131151704, -0.19838928371903042, 0.0]}, "tube_pose": [[0.9998477556688874, -0.01744875844954731, -7.945098016205932e-05, 0.0025385082000428318], [0.01744875844954731, 0.9998062929871403, 0.009105895446458245, 0.08969815306841206], [-7.945098016205932e-05, -0.009105895446458245, 0.999958537318253, 0.16800556635013886], [0.0, 0.0, 0.0, 1.0]]}
