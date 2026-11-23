@@ -25,7 +25,7 @@
 
   <main>
     <div class="container page-head">
-      <p class="eyebrow">Progress &middot; updated <!-- stats:updated -->Nov 17, 2026<!-- /stats --></p>
+      <p class="eyebrow">Progress &middot; updated <!-- stats:updated -->Nov 23, 2026<!-- /stats --></p>
       <h1 class="page-title">Dev Log</h1>
       <p class="subtitle">
         Where the inchworm robot stands, what is finished, and dated notes on
@@ -42,14 +42,14 @@
         <div class="glance-top">
           <div class="panel overall">
             <h3>Overall progress</h3>
-            <div class="pct"><!-- stats:ms-pct -->69%<!-- /stats --><small>of <!-- stats:ms-ac-total -->245<!-- /stats --> milestone acceptance criteria met</small></div>
-            <!-- stats:overall-bar --><div class="progress lg" role="img" aria-label="15 of 36 milestone tasks done, 14 in progress, 7 to do"><span class="done" style="width:41.7%"></span><span class="doing" style="width:38.9%"></span><span class="todo" style="width:19.4%"></span></div><!-- /stats -->
+            <div class="pct"><!-- stats:ms-pct -->68%<!-- /stats --><small>of <!-- stats:ms-ac-total -->257<!-- /stats --> milestone acceptance criteria met</small></div>
+            <!-- stats:overall-bar --><div class="progress lg" role="img" aria-label="17 of 38 milestone tasks done, 15 in progress, 6 to do"><span class="done" style="width:44.7%"></span><span class="doing" style="width:39.5%"></span><span class="todo" style="width:15.8%"></span></div><!-- /stats -->
             <ul class="legend">
-              <li><i class="key-done"></i><!-- stats:ms-done -->15<!-- /stats --> tasks done</li>
-              <li><i class="key-doing"></i><!-- stats:ms-doing -->14<!-- /stats --> in progress</li>
-              <li><i class="key-todo"></i><!-- stats:ms-todo -->7<!-- /stats --> to do</li>
+              <li><i class="key-done"></i><!-- stats:ms-done -->17<!-- /stats --> tasks done</li>
+              <li><i class="key-doing"></i><!-- stats:ms-doing -->15<!-- /stats --> in progress</li>
+              <li><i class="key-todo"></i><!-- stats:ms-todo -->6<!-- /stats --> to do</li>
             </ul>
-            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by <!-- stats:tests -->1,863<!-- /stats --> automated tests. Both real arms have run the full crawl cycle without the tube, and the first teaching demonstrations with the tube have been recorded. Most remaining criteria need the tube, the DexArm or the cameras on the real robot.</p>
+            <p class="small muted" style="margin-top:0.9rem">Software exists for every subsystem and is covered by <!-- stats:tests -->1,960<!-- /stats --> automated tests. The robot has made its first full crawl step with the tube: two learned policies, one per arm, each inserted its gripper on the first try and the arms handed the tube over and returned home. Most remaining criteria need the DexArm, the laser scanner or repeated autonomous runs.</p>
           </div>
           <div class="panel">
             <h3>Phases</h3>
@@ -59,8 +59,9 @@
               <li><strong>Late Oct</strong> &mdash; Robot software planned and written by agents</li>
               <li><strong>Early Nov</strong> &mdash; Arms rebuilt; model checked against reality with an animation</li>
               <li><strong>Mid Nov</strong> &mdash; Full crawl cycle runs on the real arms, without the tube</li>
-              <li><strong>Now</strong> &mdash; Recording teaching demonstrations with the tube and the leader arm</li>
-              <li><strong>Next</strong> &mdash; Learned insertion, then full autonomous print-crawl</li>
+              <li><strong>Late Nov</strong> &mdash; Teaching demonstrations, policy training, first full crawl step with the tube</li>
+              <li><strong>Now</strong> &mdash; Making the crawl hands-free and more robust</li>
+              <li><strong>Next</strong> &mdash; Multi-cycle crawling, then printing and leveling with the DexArm</li>
             </ul>
           </div>
         </div>
@@ -78,8 +79,8 @@
               <!-- stats:bar-m-2 --><div class="progress"><span class="done" style="width:50%"></span><span class="doing" style="width:50%"></span></div><!-- /stats -->
               <span class="ms-count"><!-- stats:count-m-2 --><b>4/8</b> tasks<br>45/54 criteria<!-- /stats --></span></li>
             <li><span class="ms-name"><span class="ms-id">M3</span>Learned insertion<span class="ms-desc">Demonstrations, training, seating detection</span></span>
-              <!-- stats:bar-m-3 --><div class="progress"><span class="done" style="width:16.7%"></span><span class="doing" style="width:50%"></span></div><!-- /stats -->
-              <span class="ms-count"><!-- stats:count-m-3 --><b>1/6</b> tasks<br>27/46 criteria<!-- /stats --></span></li>
+              <!-- stats:bar-m-3 --><div class="progress"><span class="done" style="width:37.5%"></span><span class="doing" style="width:50%"></span></div><!-- /stats -->
+              <span class="ms-count"><!-- stats:count-m-3 --><b>3/8</b> tasks<br>34/58 criteria<!-- /stats --></span></li>
             <li><span class="ms-name"><span class="ms-id">M4</span>Crawl cycle<span class="ms-desc">Move the real tube; recover from faults</span></span>
               <!-- stats:bar-m-4 --><div class="progress"><span class="done" style="width:50%"></span></div><!-- /stats -->
               <span class="ms-count"><!-- stats:count-m-4 --><b>1/2</b> tasks<br>7/14 criteria<!-- /stats --></span></li>
@@ -100,13 +101,15 @@
         <div class="status-cards">
           <div class="card blocker">
             <h3>Current blocker</h3>
-            <p>No hard blocker. The left wrist camera delivers only about 8 new images per second during recording; I still need to check its frame rate outside WSL to find out whether the camera or the USB link is the limit.</p>
+            <p>No hard blocker. The working policies were trained only from one fixed tube position, so they may not cope when the tube sits a little differently. Testing how robust they are is the current focus.</p>
           </div>
           <div class="card">
             <h3>Up next</h3>
             <ul>
-              <li>Re-record the teaching demonstrations with the corrected wrist-roll zero <span class="task-id">AA-23</span></li>
-              <li>Check the wrist camera frame rate outside WSL <span class="task-id">AA-23</span></li>
+              <li>First supervised hands-free crawl, with no prompts between steps <span class="task-id">AA-56</span></li>
+              <li>Compare policies trained with a moved tube against the working one <span class="task-id">AA-25</span></li>
+              <li>Repeat the crawl several times in a row <span class="task-id">AA-27</span></li>
+              <li>Try CAD, simulation and PCB tools that agents can drive through an API</li>
               <li>Supervised first DexArm move against the robot model</li>
               <li>Measure how repeatable the DexArm is <span class="task-id">AA-13</span></li>
               <li>Calibrate the scanner camera with the chessboard <span class="task-id">AA-30</span></li>
@@ -156,16 +159,18 @@
             </ul>
           </div>
           <div class="panel done-group">
-            <h3>M3&ndash;M6 Insertion, crawl, leveling, autonomy <small>4 of 16</small></h3>
+            <h3>M3&ndash;M6 Insertion, crawl, leveling, autonomy <small>6 of 18</small></h3>
             <ul class="done-list">
               <li><b>Robot-learning toolkit installed</b>: LeRobot set up and connected to the SO-101 arms for recording demonstrations and training. <span class="task-id">AA-22</span></li>
+              <li><b>First full crawl step with learned insertion</b>: the left policy inserts and locks, the right lets go and moves out, the tube is carried over, the right policy inserts and locks, and both arms go home. <span class="task-id">AA-55</span></li>
+              <li><b>No separate seating detector</b>: I decided it was not needed; I check the insertion by eye and the gripper lock confirms it. <span class="task-id">AA-24</span></li>
               <li><b>Recovering from bad cycles</b>: detects a missed insertion, a latch that won't hold or a shifted tube, and gets back to a safe state. <span class="task-id">AA-28</span></li>
               <li><b>Applying the leveling correction</b>: the measured tilt and height of the part shift the DexArm's print frame before every section. <span class="task-id">AA-33</span></li>
               <li><b>From slicer to printer</b>: a DexArm profile in Cura, and checks that every sliced file stays inside the safe workspace. <span class="task-id">AA-34</span></li>
             </ul>
           </div>
           <div class="panel done-group" style="grid-column:1 / -1">
-            <h3>Model checks &amp; real-arm tests <small>8 of 12</small></h3>
+            <h3>Model checks &amp; real-arm tests <small>9 of 14</small></h3>
             <ul class="done-list">
               <li><b>A robot model I can trust</b>: the collision model was compared with the real arms at the fold and marked verified. <span class="task-id">AA-40</span></li>
               <li><b>Powered wrists and grippers</b>: the encoder-only servos were replaced, calibrated, and every first powered move was watched and confirmed. <span class="task-id">AA-43</span> <span class="task-id">AA-48</span></li>
@@ -173,6 +178,7 @@
               <li><b>Gripper lock checked on the real arms</b>: repeated lock trials on both arms, all inside the expected band. <span class="task-id">AA-49</span></li>
               <li><b>The full cycle on the real arms</b>: both arms replay the animated cycle together, smoothly, at animation speed, without the tube, first as a test and then in a supervised live run. <span class="task-id">AA-50</span> <span class="task-id">AA-51</span></li>
               <li><b>Touching fold</b>: at the printing pose each lower arm rests on its own shoulder, with the elbow torque capped. <span class="task-id">AA-52</span></li>
+              <li><b>Full-speed wrist cameras</b>: a small Windows program reads the cameras directly and streams them to the robot code, raising them from about 8 to about 16 new images per second in a real recording. <span class="task-id">AA-53</span></li>
             </ul>
           </div>
           <div class="panel done-group" style="grid-column:1 / -1">
@@ -198,6 +204,31 @@
       <section class="section" id="log">
         <div class="section-head"><span class="num">04</span><h2>Dated entries</h2></div>
         <p class="section-lead">Newest first. &ldquo;Work done&rdquo; is a plain summary; &ldquo;Notes&rdquo; are my own words, unedited.</p>
+        <article class="panel log-entry">
+          <header class="log-head">
+            <span class="phase code">Learned policy</span>
+            <time class="log-date">Nov 23, 2026</time>
+          </header>
+          <h3 class="log-title">A working walk after a hard week of training</h3>
+          <p class="log-tldr">After several rounds of policies that never inserted, both arms inserted on the first try and the robot completed a full crawl step with the tube.</p>
+          <div class="log-cols">
+            <section class="log-col">
+              <h4>Work done</h4>
+              <ul>
+              <li><b>Full-speed cameras</b>: the wrist cameras gave only about 8 new images per second through WSL. A Windows-side camera bridge now delivers about 16 in a real recording.<span class="task-id">AA-53</span></li>
+              <li><b>Two separate policies</b>, one per arm, each starting from a fixed training pose saved in the config.<span class="task-id">AA-54</span> <span class="task-id">AA-39</span></li>
+              <li><b>Several failed rounds</b>: policies trained on mostly moved-tube demos, mixed lighting, and demos that began up to 12&deg; away from the live start pose barely moved or went the wrong way.<span class="task-id">AA-25</span></li>
+              <li><b>What fixed it</b>: 30 demos per arm, all at the fixed pose, recorded from the moment I press record so each demo starts exactly where a live run starts, plus brightness and contrast augmentation.<span class="task-id">AA-55</span></li>
+              <li><b>First full crawl step</b>: both policies inserted on the first attempt (16 s and 17 s), both locks held, and both arms returned home, 2 min 23 s in total. The left policy also worked in daylight although it learned only from night demos.<span class="task-id">AA-55</span></li>
+              <li><b>Hands-free mode built</b>: the crawl can now run with no prompts between steps; its first supervised live run is next.<span class="task-id">AA-56</span></li>
+              </ul>
+            </section>
+            <section class="log-col">
+              <h4>Notes</h4>
+              <p class="notes">Had alot of issues with training the policy. Have a working walk now but plan to experiment a little more to make the system even more robust. The biggest issue is that I made a decision early on that ended up not being a good decision and then I got lucky on initial training so I thought I was on the right path. Had to reconsider that earlier decision to finally make something that worked better. In general, as well, I want to experiment using API's for CAD, simulation, and pcb development to do further improve the design. Probably should have started my work with that but jsut didn't know those tools exist.</p>
+            </section>
+          </div>
+        </article>
         <article class="panel log-entry">
           <header class="log-head">
             <span class="phase hw">Hardware</span>

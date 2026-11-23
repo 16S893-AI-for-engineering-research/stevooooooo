@@ -34,9 +34,9 @@
       </p>
       <div class="stat-row">
         <div class="stat"><b>3 arms</b><span>two SO-101 grippers and a DexArm print head</span></div>
-        <div class="stat"><b><!-- stats:ms-pct -->69%<!-- /stats --></b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
-        <div class="stat"><b><!-- stats:tests -->1,863<!-- /stats --></b><span>automated software tests</span></div>
-        <div class="stat"><b>~<!-- stats:cost -->$603<!-- /stats --></b><span>total AI agent cost so far</span></div>
+        <div class="stat"><b><!-- stats:ms-pct -->68%<!-- /stats --></b><span>of milestone acceptance criteria met (<a href="devlog.html#glance">progress</a>)</span></div>
+        <div class="stat"><b><!-- stats:tests -->1,960<!-- /stats --></b><span>automated software tests</span></div>
+        <div class="stat"><b>~<!-- stats:cost -->$704<!-- /stats --></b><span>total AI agent cost so far</span></div>
       </div>
     </div>
 
@@ -119,7 +119,7 @@
         <div class="section-head"><span class="num">03</span><h2>How AI agents were used</h2></div>
         <p class="section-lead">
           I did the systems design, hardware and robot model. The software, more
-          than <!-- stats:tests-floor -->1,800<!-- /stats --> tests' worth, was written by AI coding agents running in
+          than <!-- stats:tests-floor -->1,900<!-- /stats --> tests' worth, was written by AI coding agents running in
           <code>pi</code>. My job was to manage them like a small team.
         </p>
 
@@ -172,7 +172,7 @@
                 <li><strong>human_request / human_verify</strong>: propose a procedure for me, then close it only with evidence.</li>
                 <li><strong>walkthrough_record / walkthrough_write</strong>: record the commands behind a claim and write the walkthrough page.</li>
                 <li><strong>Backlog CLI</strong>: tasks, acceptance criteria, notes and the shared docs.</li>
-                <li><strong>uv and pytest</strong>: the robot package and its <!-- stats:tests -->1,863<!-- /stats --> tests.</li>
+                <li><strong>uv and pytest</strong>: the robot package and its <!-- stats:tests -->1,960<!-- /stats --> tests.</li>
                 <li><strong>git worktrees</strong>: one isolated checkout per sub-agent.</li>
               </ul>
             </div>
@@ -182,7 +182,7 @@
                 <li><strong>doc-1</strong>: hardware and system reference, the single source of hardware facts.</li>
                 <li><strong>doc-2</strong>: working agreement on requirement stability and change control.</li>
                 <li><strong>doc-3</strong>: live orchestrator state, with a START HERE section and the next action.</li>
-                <li><strong>Backlog.md</strong>: <!-- stats:tasks -->52<!-- /stats --> tasks (<!-- stats:tasks-done -->27<!-- /stats --> done) with <!-- stats:ac-total -->289<!-- /stats --> acceptance criteria, <!-- stats:ac-done -->206<!-- /stats --> met.</li>
+                <li><strong>Backlog.md</strong>: <!-- stats:tasks -->56<!-- /stats --> tasks (<!-- stats:tasks-done -->30<!-- /stats --> done) with <!-- stats:ac-total -->313<!-- /stats --> acceptance criteria, <!-- stats:ac-done -->224<!-- /stats --> met.</li>
                 <li><strong>Session discipline</strong>: a fresh session after each finished unit of work or past about 150k tokens; state goes into doc-3 and task notes first, not into compaction.</li>
                 <li><strong>Sub-agent discipline</strong>: one task each, a written brief, an early deliverable and a 15&ndash;30 minute cap, in its own worktree. Ask me after two hardware probes that explain nothing.</li>
                 <li><strong>Sandboxing</strong>: a nono sandbox profile limiting files, devices and network is drafted and tested, and is being adopted.</li>
@@ -195,12 +195,12 @@
         <div class="grid-2" style="margin-top:1.25rem">
           <div class="panel">
             <h3>Where the money went</h3>
-            <div class="big-number"><!-- stats:cost -->$603<!-- /stats --></div>
-            <p class="muted small">Recorded model cost across <!-- stats:sessions -->161<!-- /stats --> sessions, <!-- stats:cost-range -->9/15 to 11/17/26<!-- /stats -->.</p>
-            <div class="cost-bar" aria-hidden="true"><!-- stats:cost-bar --><span style="width:69%; background:var(--orange)"></span><span style="width:24%; background:var(--teal)"></span><span style="width:7%; background:var(--mustard)"></span><!-- /stats --></div>
+            <div class="big-number"><!-- stats:cost -->$704<!-- /stats --></div>
+            <p class="muted small">Recorded model cost across <!-- stats:sessions -->175<!-- /stats --> sessions, <!-- stats:cost-range -->9/15 to 11/23/26<!-- /stats -->.</p>
+            <div class="cost-bar" aria-hidden="true"><!-- stats:cost-bar --><span style="width:70%; background:var(--orange)"></span><span style="width:24%; background:var(--teal)"></span><span style="width:6%; background:var(--mustard)"></span><!-- /stats --></div>
             <ul class="legend">
-              <li><i style="background:var(--orange)"></i>Main sessions <!-- stats:cost-main -->$414<!-- /stats --></li>
-              <li><i style="background:var(--teal)"></i>Sub-agents <!-- stats:cost-sub -->$146<!-- /stats --></li>
+              <li><i style="background:var(--orange)"></i>Main sessions <!-- stats:cost-main -->$491<!-- /stats --></li>
+              <li><i style="background:var(--teal)"></i>Sub-agents <!-- stats:cost-sub -->$170<!-- /stats --></li>
               <li><i style="background:var(--mustard)"></i>Walkthrough guide <!-- stats:cost-guide -->$43<!-- /stats --></li>
             </ul>
             <p class="small muted" style="margin-top:0.9rem">Most of the cost came from long sessions that re-read a huge context on every call. Daily breakdown on the <a href="devlog.html#activity">Dev Log</a>.</p>
@@ -218,6 +218,7 @@
               <li><strong>Open-ended sub-agents</strong> explored for 30&ndash;45 minutes and wrote nothing. Now: one narrow task, an early deliverable, a time cap.</li>
               <li><strong>Long sessions</strong> are expensive. Now: save state, commit, and start fresh.</li>
               <li><strong>Too many checks:</strong> safety checks that blocked intended motion slowed progress. Now: the whole path is checked once before I confirm, and odd sensor readings are logged instead of stopping the run.</li>
+              <li><strong>Trusting an early lucky result:</strong> a first policy that seemed to work kept me on a weak early decision. Several training rounds failed before I went back and changed it. Now: question early choices when results stop improving.</li>
               <li><strong>Stuck in loops:</strong> agents and the orchestrator sometimes repeated the same steps without finishing. Now: every agent run has a time limit.</li>
             </ul>
           </div>
