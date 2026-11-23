@@ -19,6 +19,17 @@ launcher ``crawl_two_policy.sh`` runs both). Phases = ``inchworm.two_policy.PHAS
 9 home                  both arms (both LOCKED) to timeline frame 86 (fade-out plan, else a joint line).
    End: hold, owner supports, joints 1-5 of both arms OFF, grippers untouched (both stay LOCKED).
 
+AA-56 ``--autonomous`` (owner 2026-11-23, all recommended options): after the start replay's two
+typed YES nothing is asked until the end. Order = ``inchworm.two_policy.AUTO_PHASES``: each policy
+LOCKS by itself when finished by the rule or at ``--lock-s`` (25 s) if within 8 deg of its finish
+reference (else return + ONE automatic retry, then stop + hold); after the left lock (read back,
+refused > 8 deg from the finish reference) the LEFT goes on a 5 deg/s joint line to its train_right
+(regrip) ticks with BOTH grippers LOCKED, limits checked but NO cell-mesh check (owner: "just go
+to the known spot"; flex is OK); then the right unlocks (left reads LOCKED), comes straight out
+50 mm from where it actually is, goes to its train_right start (both planned from the actual
+pose, mesh-checked with the tube carried by the left), right policy, right lock, home. The end
+holds and asks Enter before joints off.
+
 Any stop (q, Ctrl-C, ``touch robot/out/STOP_TELEOP`` or /tmp/inchworm_stop_move, an error,
 a refused check) holds both arms, then the usual release prompt. Grippers only via GripperLockSM.
 
@@ -94,25 +105,76 @@ def load_policy(checkpoint: Path, device: str, follower: str):
     return base, meta.sha256
 
 
-def unlock_right(r, look: str, log) -> None:
-    """AC #3: the right unlocks only if the owner said y AND the left gripper reads inside its
-    LOCKED band (read-back) AND the state machine agrees (GripperLockSM refuses otherwise)."""
+def locked_readback(r, arm: str, what: str) -> float:
+    """The ``arm`` gripper must read inside its LOCKED band AND its state machine must be LOCKED."""
     from inchworm.gripper_lock import GripperState
-    if look != "y":
+    band = getattr(r.cfg.gripper_lock, f"arm_{arm}")
+    deg = r.arms[arm].bus.read_position_deg(6)
+    if not band.locked_low_deg <= deg <= band.locked_high_deg or r.arms[arm].sm.state != GripperState.LOCKED:
+        raise Stop(f"the {arm} gripper reads {deg:.1f} deg / {r.arms[arm].sm.state.name} (locked band "
+                   f"{band.locked_low_deg}..{band.locked_high_deg}); {what}")
+    return deg
+
+
+def unlock_right(r, look: str, log) -> None:
+    """AC #3: the right unlocks only if the owner said y (AA-56 ``--autonomous``: "auto", no owner
+    look) AND the left gripper reads inside its LOCKED band (read-back) AND the state machine
+    agrees (GripperLockSM refuses otherwise)."""
+    if look not in ("y", "auto"):
         raise Stop("the owner did not confirm the left key is in and locked; the right does not unlock")
-    band = r.cfg.gripper_lock.arm_left
-    deg = r.arms["left"].bus.read_position_deg(6)
-    if not band.locked_low_deg <= deg <= band.locked_high_deg or r.arms["left"].sm.state != GripperState.LOCKED:
-        raise Stop(f"the left gripper reads {deg:.1f} deg / {r.arms['left'].sm.state.name} (locked band "
-                   f"{band.locked_low_deg}..{band.locked_high_deg}); the right does not unlock")
-    log({"event": "left_lock_readback", "deg": round(deg, 2)})
+    deg = locked_readback(r, "left", "the right does not unlock")
+    log({"event": "left_lock_readback", "deg": round(deg, 2), "look": look})
     r._unlock("right")
 
 
-def stream(r, frames, segs, ui, log, name: str, what: str) -> None:
-    """One preflighted motion phase: typed YES, then the fluid stream (as replay_cycle)."""
+def auto_policy_phase(robot, policy, ui, trace, kw, log, retries: int = 1) -> None:
+    """AA-56: no owner choice. Lock (return) when finished by the rule, or at the lock timer
+    (kw max_s) if within FINISH_NEAR_DEG of the finish reference; otherwise return + retry up to
+    ``retries`` times, then Stop (the caller holds). Jump guard / owner stop key = Stop."""
+    robot.connect()                                          # config confirm=False: no typed YES
+    ui.start_keys()
+    arm = robot.config.follower
+    try:
+        for n in range(retries + 1):
+            print(f"{arm.upper()} ATTEMPT {n} (autonomous; s = stop + hold)")
+            trace.write(json.dumps({"arm": arm, "attempt": n}) + "\n")
+            res = ph.PolicyAttempt(robot, policy, keys=ui.keys, trace=trace, **kw).run()
+            far = float(np.abs(np.asarray(res["present_deg"]) - kw["finish_ref_deg"]).max())
+            if res["end"] == "finished" or (res["end"] == "time_cap" and far <= ph.FINISH_NEAR_DEG):
+                decision = "lock"
+            elif res["end"] in ("jump_guard", "owner_stop"):
+                decision = "stop"
+            else:
+                decision = "retry" if n < retries else "stop"
+            log({"event": "auto_choice", "arm": arm, "attempt": n, "end": res["end"], "s": res["s"],
+                 "deg_from_finish_ref": round(far, 2), "decision": decision})
+            if decision == "lock":
+                return
+            if decision == "stop":
+                raise Stop(f"{arm} policy: {res['end']}, {far:.1f} deg from the finish reference after "
+                           f"{n + 1} attempt(s); holding, nothing locks")
+            print(f"RETURN (automatic): {far:.1f} deg from the finish reference at {res['s']} s")
+            robot.handoff_return(confirm=False)
+    finally:
+        ui.stop_keys()
+
+
+def auto_lock(r, arm: str, log) -> None:
+    """AA-56: adopt both arms holding (this arm open, the other LOCKED), lock through GripperLockSM,
+    read it back (no owner look)."""
+    other = "right" if arm == "left" else "left"
+    r.adopt_holding(require={arm: "UNLOCKED", other: "LOCKED"})
+    print(f"locking the {arm} gripper (45-degree turn) ...")
+    r._lock(arm)
+    deg = locked_readback(r, arm, "stopping (holding)")
+    log({"event": "auto_lock_readback", "arm": arm, "deg": round(deg, 2)})
+
+
+def stream(r, frames, segs, ui, log, name: str, what: str, confirm: bool = True) -> None:
+    """One preflighted motion phase: typed YES (not with ``confirm`` False, AA-56 autonomous),
+    then the fluid stream (as replay_cycle)."""
     print(f"\nNEXT {name}: {what} ({sum(s.duration_s for s in segs):.1f} s). Ctrl-C = hold.")
-    if ui.text("Type YES to move: ").strip() != "YES":
+    if confirm and ui.text("Type YES to move: ").strip() != "YES":
         raise Stop(f"{name} not confirmed")
     log({"event": "phase", "name": name, "status": "start", "frames": [frames[0].index, frames[-1].index]})
     r.frames = frames
@@ -153,7 +215,12 @@ def main(argv=None, ui=None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="simulated servos, real checkpoints + cell mesh")
     ap.add_argument("--replay-episode", type=int, default=0, help="dry run: camera frames from this episode")
     ap.add_argument("--preview-port", type=int, default=8765, help="browser live view of the policy's frames (0 = off)")
+    ap.add_argument("--autonomous", action="store_true",
+                    help="AA-56: no prompts until the end, timed locks, left to the regrip pose before right out")
+    ap.add_argument("--lock-s", type=float, default=25.0, help="--autonomous: lock timer per policy attempt (s)")
     a = ap.parse_args(argv)
+    if a.autonomous and not 5.0 <= a.lock_s <= 60.0:
+        print("REFUSED: --lock-s 5..60"); return 2
     if not 0.5 <= a.max_deg_s <= 10.0 or not 0 < a.max_jump_deg <= 20.0:
         print("REFUSED: --max-deg-s 0.5..10, --max-jump-deg 0..20"); return 2
     logging.basicConfig(level=logging.WARNING)
@@ -203,8 +270,10 @@ def main(argv=None, ui=None) -> int:
     for arm, ck in (("left", a.left_checkpoint), ("right", a.right_checkpoint)):
         policies[arm] = load_policy(ck, a.device, arm)
         print(f"{arm} checkpoint {ck}  sha256 {policies[arm][1][:16]}")
-    kw = dict(fps=a.fps, max_deg_s=a.max_deg_s, max_jump_deg=a.max_jump_deg, max_s=a.max_s)
-    log({"event": "crawl_start", "dry_run": a.dry_run, "phases": list(tw.PHASE_NAMES),
+    kw = dict(fps=a.fps, max_deg_s=a.max_deg_s, max_jump_deg=a.max_jump_deg,
+              max_s=a.lock_s if a.autonomous else a.max_s)
+    log({"event": "crawl_start", "dry_run": a.dry_run, "autonomous": a.autonomous,
+         "phases": list(tw.AUTO_PHASE_NAMES if a.autonomous else tw.PHASE_NAMES),
          "checkpoints": {k: str(c) for k, c in (("left", a.left_checkpoint), ("right", a.right_checkpoint))},
          "sha256": {k: v[1] for k, v in policies.items()}, "handoff_state": str(a.handoff_state),
          "state_utc": st42["utc"], "finish_ref_ticks": {k: v.tolist() for k, v in refs.items()}, **kw})
@@ -220,12 +289,13 @@ def main(argv=None, ui=None) -> int:
     def make_robot(arm, state_path):
         r = InchwormFollower(InchwormFollowerConfig(
             id=arm, follower=arm, camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
+            confirm=not a.autonomous,
             handoff_state=str(state_path), allow_unverified_soft_limits=a.allow_unverified_soft_limits,
             control_hz=float(a.fps), log_dir=str(OUT_DIR) if a.dry_run else ""))
         if a.dry_run:
             st = ho.load_state(state_path)
             imgs = ph._replay_frames(LEFT_DATASET if arm == "left" else RIGHT_DATASET, a.replay_episode,
-                                     int(a.max_s * a.fps) + 5)
+                                     int(kw["max_s"] * a.fps) + 5)
             r._open_hardware = lambda c: ph._SimHW(cfg, st, imgs, follower=arm, buses=sim_buses)
         r.prompt = ui.text
         current["robot"] = r
@@ -249,6 +319,11 @@ def main(argv=None, ui=None) -> int:
         print(f"\n=== {arm.upper()} POLICY ({arm} checkpoint) from {state_path.name}")
         robot = make_robot(arm, state_path)
         try:
+            if a.autonomous:
+                auto_policy_phase(robot, policies[arm][0], ui, trace,
+                                  {**kw, "finish_ref_deg": refs[arm] * DEG_PER_TICK}, log)
+                robot.detach_holding()
+                return True
             lock = fpt.policy_phase(robot, policies[arm][0], ui, trace,
                                     {**kw, "finish_ref_deg": refs[arm] * DEG_PER_TICK}, log, warn_far=False)
         except BaseException:
@@ -283,6 +358,17 @@ def main(argv=None, ui=None) -> int:
             return 0
         buses, close = open_buses()
         r = runner(buses)
+        if a.autonomous:
+            auto_crawl(cfg, r, checker, chain_r, timeline, refs, st42, st_tr, log, ui)
+            close(); close, r = None, None
+            run_policy("right", st_tr)
+            buses, close = open_buses()
+            r = runner(buses)
+            auto_lock(r, "right", log)
+            now_t = {s: r._ticks(s) for s in ("left", "right")}
+            log_lock_offset("right", now_t["right"], refs["right"], log)
+            home(cfg, r, checker, timeline, now_t, st_tr, ui, log, confirm=False)
+            return 0
         # ---- 3 left lock + look -------------------------------------------------------------
         r.adopt_holding(require={"left": "UNLOCKED", "right": "LOCKED"})
         print("locking the left gripper (45-degree turn) ...")
@@ -334,18 +420,7 @@ def main(argv=None, ui=None) -> int:
         now_t = {s: r._ticks(s) for s in ("left", "right")}
         log_lock_offset("right", now_t["right"], refs["right"], log)     # owner 2026-11-21: logged, no 8 deg stop
         # ---- 9 home ---------------------------------------------------------------------------
-        now = {s: np.asarray(ticks_to_q(cfg, s, now_t[s])) for s in ("left", "right")}
-        try:
-            plan9 = tw.plan_home_timeline(timeline, now, tube)
-            segs9 = checked(cfg, checker, plan9, "home (timeline)")
-        except (Stop, tw.PlanRefused) as exc:
-            log({"event": "home_fallback", "reason": str(exc)})
-            plan9 = tw.plan_home_line(timeline, now, tube)
-            segs9 = checked(cfg, checker, plan9, "home (joint line)")
-        stream(r, plan9, segs9, ui, log, "home", f"both arms (both LOCKED) home: {plan9[0].step}")
-        log({"event": "crawl_done"})
-        print("\nCRAWL DONE: both grippers LOCKED, both arms at home, holding.")
-        fpt.hold_and_release(r, ui, log, "end of the crawl", done=True)
+        home(cfg, r, checker, timeline, now_t, st_tr, ui, log, tube=tube)
     except KeyboardInterrupt as exc:
         rc = _stopped(r, ui, log, "Ctrl-C", exc)
     except (Stop, Exception) as exc:  # noqa: BLE001
@@ -359,6 +434,88 @@ def main(argv=None, ui=None) -> int:
         logf.close()
         print(f"log: {logf.name}\ntrace: {trace.name}")
     return rc
+
+
+def home(cfg, r, checker, timeline, now_t, st_tr, ui, log, confirm: bool = True, tube=None) -> None:
+    """Step 9: both arms (both LOCKED) home, then hold + the Enter before joints off. ``tube``
+    None = the tube carried by the left from the train_right handoff state (autonomous)."""
+    from inchworm import handoff as ho
+    from inchworm import two_policy as tw
+    from inchworm.so101_pose_reader import ticks_to_q
+    now = {s: np.asarray(ticks_to_q(cfg, s, now_t[s])) for s in ("left", "right")}
+    if tube is None:
+        st = ho.load_state(st_tr)
+        tube = tw.CarriedTube(checker, "left", {s: np.asarray(ticks_to_q(cfg, s, st["present_ticks"][s]))
+                                                for s in ("left", "right")}, np.asarray(st["tube_pose"]))
+    try:
+        plan9 = tw.plan_home_timeline(timeline, now, tube)
+        segs9 = checked(cfg, checker, plan9, "home (timeline)")
+    except (Stop, tw.PlanRefused) as exc:
+        log({"event": "home_fallback", "reason": str(exc)})
+        plan9 = tw.plan_home_line(timeline, now, tube)
+        segs9 = checked(cfg, checker, plan9, "home (joint line)")
+    stream(r, plan9, segs9, ui, log, "home", f"both arms (both LOCKED) home: {plan9[0].step}", confirm=confirm)
+    log({"event": "crawl_done"})
+    print("\nCRAWL DONE: both grippers LOCKED, both arms at home, holding.")
+    fpt.hold_and_release(r, ui, log, "end of the crawl", done=True)
+
+
+def auto_crawl(cfg, r, checker, chain_r, timeline, refs, st42, st_tr, log, ui) -> None:
+    """AA-56 steps 3-6 (autonomous): left lock, left to the regrip pose (both LOCKED, no mesh
+    check), right unlock + out from where it is, right to its train_right start, then the
+    train_right gate and handoff state. Raises Stop (the caller holds) on any refusal."""
+    from inchworm import handoff as ho
+    from inchworm import training_poses as tp
+    from inchworm import two_policy as tw
+    from inchworm.so101_pose_reader import ticks_to_q
+    q_of = lambda t: {s: np.asarray(ticks_to_q(cfg, s, t[s])) for s in ("left", "right")}  # noqa: E731
+    # ---- 3 left lock (read back) + 8 deg guard for the both-LOCKED move ----------------------
+    auto_lock(r, "left", log)
+    now_t = {s: r._ticks(s) for s in ("left", "right")}
+    log_lock_offset("left", now_t["left"], refs["left"], log)
+    p = tw.lock_pose_problem(now_t["left"], refs["left"])
+    if p:
+        raise Stop(p)
+    now = q_of(now_t)
+    tube = tw.CarriedTube(checker, "left", now, np.asarray(st42["tube_pose"]))
+    # ---- 4 left to the regrip pose: both LOCKED, limits + speed only (owner: no collision check)
+    plan_f = tw.plan_left_to_train_right(cfg, now, tube, right_locked=True)
+    segs_f, probs = tw.forced_line_problems(cfg, plan_f)
+    if probs:
+        raise Stop("left_to_regrip fails its limits check: " + "; ".join(probs[:5]))
+    locked_readback(r, "left", "the left does not move")
+    locked_readback(r, "right", "the left does not move")
+    log({"event": "forced_move", "name": "left_to_regrip", "mesh_check": "skipped (owner 2026-11-23, AA-56)",
+         "frames": len(plan_f)})
+    stream(r, plan_f, segs_f, ui, log, "left_to_regrip",
+           "left (LOCKED) to its train_right pose, right LOCKED: no collision check (owner)", confirm=False)
+    # ---- 5 / 6 planned from where the arms actually are now ------------------------------------
+    now_t = {s: r._ticks(s) for s in ("left", "right")}
+    now = q_of(now_t)
+    plan_o = tw.plan_right_out(chain_r, timeline, now, tube)
+    plan_a = tw.plan_right_to_train_right(timeline, plan_o[-1].q["left"], tube)
+    segs_o = checked(cfg, checker, plan_o, "right_out")
+    segs_a = checked(cfg, checker, plan_a, "right_to_train_right")
+    mm, deg = tw.tube_offset(plan_a[-1].tube, tp.position("train_right")["tube_pose"])
+    log({"event": "plans_ok", "frames": [len(plan_o), len(plan_a)], "after_regrip_ticks": now_t,
+         "carried_tube_vs_frozen_train_right": {"mm": mm, "deg": deg}})
+    unlock_right(r, "auto", log)
+    stream(r, plan_o, segs_o, ui, log, "right_out", "right straight out of its key 50 mm, then clear", confirm=False)
+    stream(r, plan_a, segs_a, ui, log, "right_to_train_right", "right to its train_right start pose", confirm=False)
+    # ---- 7 gate + handoff state for the right policy ----------------------------------------
+    ticks = read_ticks({s: r.arms[s].bus for s in ("left", "right")})
+    probs = tw.training_pose_problems("train_right", ticks)
+    log({"event": "training_pose_gate", "pose": "train_right", "ticks": ticks, "problems": probs})
+    if probs:
+        raise Stop("train_right: " + "; ".join(probs) + ". The policy does not start")
+    goal = tp.joint_ticks("train_right")
+    q = q_of(ticks)
+    ho.write_state(st_tr, stop_frame=tp.position("train_right")["timeline_frame"], step="train_right (AA-56)",
+                   timeline_digest=fpt._digest(TIMELINE), tube_in_grippers=True, goal_ticks=goal, present_ticks=ticks,
+                   gripper_ticks={s: round(r.arms[s].bus.read_position_deg(6) * 4096 / 360) for s in ("left", "right")},
+                   locked={"left": True, "right": False},
+                   q_rad={s: ticks_to_q(cfg, s, goal[s]) for s in ("left", "right")},
+                   tube_pose=tube(q["left"], q["right"]))
 
 
 def _stopped(r, ui, log, why, exc) -> int:

@@ -52,6 +52,22 @@ PHASES: Tuple[Tuple[str, str], ...] = (
 )
 PHASE_NAMES = tuple(n for n, _ in PHASES)
 
+#: AA-56 (owner 2026-11-23) ``--autonomous``: no prompts after the start replay, timed locks, and the
+#: left goes to its train_right (regrip) pose with BOTH grippers LOCKED before the right un-inserts.
+AUTO_PHASES: Tuple[Tuple[str, str], ...] = (
+    ("replay_0_42", "cycle frames 0..42 with the tube (the start replay keeps its two typed YES)"),
+    ("left_policy", "LEFT policy; locks when finished by the rule or at the lock timer (else 1 retry)"),
+    ("left_lock", "left gripper LOCKS (AA-17), read back; refused > 8 deg from the finish reference"),
+    ("left_to_regrip", "left (LOCKED) joint line to its train_right ticks, right LOCKED too: limits only, "
+                       "NO cell-mesh check (owner: flex is OK)"),
+    ("right_out", "right UNLOCKS (left reads LOCKED), straight out 50 mm from where it is, then clear"),
+    ("right_to_train_right", "right to its train_right start pose (timeline frames 55..train_right frame)"),
+    ("right_policy", "RIGHT policy; locks when finished by the rule or at the lock timer (else 1 retry)"),
+    ("right_lock", "right gripper LOCKS (AA-17), read back"),
+    ("home", "both arms (both LOCKED) to the cycle home pose (timeline frame 86)"),
+)
+AUTO_PHASE_NAMES = tuple(n for n, _ in AUTO_PHASES)
+
 POSE_TOL_TICKS = 34                 # = inchworm.handoff.POSE_TOL_TICKS (~3 deg)
 LOCK_NEAR_DEG = 8.0                 # = policy_handoff.FINISH_NEAR_DEG
 RETRACT_MM = 50.0                   # = handoff_return.RETRACT_MM
@@ -177,11 +193,41 @@ def plan_right_out(chain_right, timeline: Sequence[cr.Frame], now: Dict[str, np.
     return _frames(out, "right straight out + clear", {"left": True, "right": False}, tube)
 
 
-def plan_left_to_train_right(cfg, now: Dict[str, np.ndarray], tube: TubeFn) -> List[cr.Frame]:
-    """Step 5: the left (with the tube) joint line to its frozen train_right ticks; right static."""
+def plan_left_to_train_right(cfg, now: Dict[str, np.ndarray], tube: TubeFn,
+                             right_locked: bool = False) -> List[cr.Frame]:
+    """Step 5: the left (with the tube) joint line to its frozen train_right ticks; right static.
+    ``right_locked`` (AA-56 autonomous): the same line with the right still LOCKED on the tube."""
     from inchworm.so101_pose_reader import ticks_to_q
     goal = {"left": np.asarray(ticks_to_q(cfg, "left", tp.joint_ticks("train_right")["left"])), "right": now["right"]}
-    return _frames(joint_line(now, goal), "left to train_right", {"left": True, "right": False}, tube)
+    step = "left to train_right (both LOCKED, forced)" if right_locked else "left to train_right"
+    return _frames(joint_line(now, goal), step, {"left": True, "right": right_locked}, tube)
+
+
+def forced_line_problems(cfg, frames: Sequence[cr.Frame]) -> Tuple[List[cr.Segment], List[str]]:
+    """AA-56 owner 2026-11-23: the both-LOCKED left move to the regrip pose has NO collision
+    check ("just go to the known spot; a little flex is OK"). Kept: soft limits and EEPROM
+    tick limits at every frame (1 deg apart on a joint line, so every streamed point lies
+    between two checked ones per joint) and the stream speed ceiling. Fails closed."""
+    from inchworm.inchworm_plan import configured_soft_limits
+    soft = configured_soft_limits(cfg)
+    if soft is None:
+        return [], ["soft limits not configured"]
+    probs: List[str] = []
+    for f in frames:
+        for a in ARMS:
+            lo, hi = soft[a]
+            for j, v, l, h in zip(J5, f.q[a], lo, hi):
+                if not (l - 1e-9 <= v <= h + 1e-9):
+                    probs.append(f"frame {f.index} {a} {j} {math.degrees(v):.1f} deg outside soft limits")
+            lim = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits or {}
+            for j, t in zip(J5, cr.q_to_ticks(cfg, a, f.q[a])):
+                if j in lim and not (lim[j][0] <= t <= lim[j][1]):
+                    probs.append(f"frame {f.index} {a} {j} tick {t} outside EEPROM {lim[j]}")
+    segs = cr.build_segments(frames, cr.DEFAULT_TEMPO)
+    peak = cr.peak_speed_ticks_s(segs)
+    if peak > cr.MAX_STREAM_SPEED_TICKS_S:
+        probs.append(f"planned joint speed {peak:.0f} ticks/s above the {cr.MAX_STREAM_SPEED_TICKS_S} ceiling")
+    return segs, probs
 
 
 def plan_right_to_train_right(timeline: Sequence[cr.Frame], left_q: np.ndarray, tube: TubeFn) -> List[cr.Frame]:
