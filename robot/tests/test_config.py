@@ -58,7 +58,7 @@ def test_config_describes_every_device_with_identity():
     # Both OV9281 cameras share serial 5423534724; neither is identified by serial.
     assert config.cameras.left_arm.identity.usb_serial is None
     assert config.cameras.left_arm.identity.identify_by is IdentifyBy.USBIP_BUSID
-    assert config.cameras.left_arm.identity.windows_busid == "9-4"
+    assert config.cameras.left_arm.identity.windows_busid == "6-4"   # owner 2026-11-23 (was 9-4)
     assert config.cameras.scanner.identity.usb_serial == "UC762"
     # Devices without a USB serial must be identified positionally.
     assert config.relay.identity.usb_serial is None

@@ -74,7 +74,7 @@ arms:
       usb_serial: "5B91030298"
       identify_by: usb_serial
       linux_by_id: usb-1a86_USB_Single_Serial_5B91030298-if00
-      windows_busid_observed: "9-3"
+      windows_busid_observed: "6-3"   # 2026-11-23 (was 9-3): its hub moved to another laptop port
     # Joint-to-servo-ID map for the SO-101 right arm.
     # Populated by a live bus scan (AA-8 scan_servos.py --live).
     # All null until the owner runs the scan and assigns joint names.
@@ -176,8 +176,12 @@ cameras:
     # have serial=5423534724). udev cannot distinguish them; /dev/v4l/by-id
     # is ambiguous. The only stable distinguisher is the Windows usbipd BusId,
     # which encodes the physical dock port.
-    # Identity: POSITIONAL via windows_busid (dock port 9-4). The dock port
-    # must not change; if it does, update windows_busid here.
+    # Identity: POSITIONAL via windows_busid (dock port 9-4 until 2026-11-23;
+    # now 6-4). The dock port must not change; if it does, update windows_busid here.
+    # OWNER 2026-11-23 (AA-56): the hub carrying the relay, the RIGHT arm adapter and this
+    # camera now enumerates as USB bus 6 (usbipd list: 6-2 CH340 relay, 6-3 CH343
+    # COM3 left arm, 6-4 openaicam; were 9-2 / 9-3 / 9-4): same hub ports, the hub
+    # is on another laptop root port. Owner: "use the new port".
     # Discovery resolves this via vhci_hcd.0/status -> sysfs -> /dev/videoN.
     spec_model: Waveshare OV9281
     observed_usb_product: openaicam
@@ -188,12 +192,12 @@ cameras:
       # (both cameras report the same serial 5423534724).
       usb_serial: null
       identify_by: usbip_busid
-      # windows_busid is the identity key: physical dock port 9-4.
+      # windows_busid is the identity key: physical dock port 6-4 (was 9-4).
       # POSITIONAL: dock port must not change.
-      windows_busid: "9-4"
+      windows_busid: "6-4"
       linux_by_id: null
       linux_by_path: null
-      windows_busid_observed: "9-4"
+      windows_busid_observed: "6-4"
   right_arm:
     spec_model: Waveshare OV9281
     observed_usb_product: openaicam
@@ -247,9 +251,11 @@ camera_bridge:
   # only the device at 9-4/10-2/11-4 (DEVPKEY_Device_PowerData D0).
   # POSITIONAL: cables must stay in these ports. dshow_index: N is a
   # diagnostic override only (unstable; not for data).
+  # 2026-11-23 (owner, AA-56): left_arm 9-4 -> 6-4 (its hub moved to another
+  # laptop port; bridge enumerated 1=6-4 openaicam, 3=10-2 openaicam, 0=11-4 Arducam).
   cameras:
     left_arm:
-      busid: "9-4"
+      busid: "6-4"
       vid_pid: "32e6:9251"
     right_arm:
       busid: "10-2"
@@ -274,7 +280,7 @@ relay:
     identify_by: vid_pid
     linux_by_id: usb-1a86_USB_Serial-if00-port0
     linux_by_path: platform-vhci_hcd.0-usb-0:4:1.0-port0
-    windows_busid_observed: "9-2"
+    windows_busid_observed: "6-2"   # 2026-11-23 (was 9-2): hub moved
   # --- serial-transport ---
   # Serial port settings for the relay (CH340 LCUS-1).
   # baudrate: 9600 — VERIFIED 2026-10-24 (owner-supervised laser_probe --live:

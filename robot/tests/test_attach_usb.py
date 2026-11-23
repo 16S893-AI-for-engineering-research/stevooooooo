@@ -46,7 +46,7 @@ _USBIPD_STATE: dict = {
     "Devices": [
         # arm_right: 1a86:55d3 serial 5B91030298, already attached
         {
-            "BusId": "9-3",
+            "BusId": "6-3",
             "ClientIPAddress": "172.26.80.62",
             "Description": "USB-Enhanced-SERIAL CH343 (COM3)",
             "InstanceId": "USB\\VID_1A86&PID_55D3\\5B91030298",
@@ -66,7 +66,7 @@ _USBIPD_STATE: dict = {
         },
         # relay: 1a86:7523 no serial (Windows path segment), already attached
         {
-            "BusId": "9-2",
+            "BusId": "6-2",
             "ClientIPAddress": "172.26.80.62",
             "Description": "USB-SERIAL CH340 (COM7)",
             "InstanceId": "USB\\VID_1A86&PID_7523\\7&165AD49D&0&2",
@@ -106,7 +106,7 @@ _USBIPD_STATE: dict = {
         },
         # cam_left: 32e6:9251 serial 5423534724, NOT yet attached
         {
-            "BusId": "9-4",
+            "BusId": "6-4",
             "ClientIPAddress": None,
             "Description": "openaicam",
             "InstanceId": "USB\\VID_32E6&PID_9251\\5423534724",
@@ -214,18 +214,18 @@ class TestResolveBusId:
     def test_resolves_arm_right_by_serial(self):
         spec = attach_usb._DeviceSpec("arm_right", "1a86", "55d3", "5B91030298")
         busid = attach_usb._resolve_busid(spec, self._devices())
-        assert busid == "9-3"
+        assert busid == "6-3"
 
     def test_resolves_relay_by_vid_pid_no_serial(self):
         """Relay has no USB serial; resolved by VID:PID alone."""
         spec = attach_usb._DeviceSpec("relay", "1a86", "7523", None)
         busid = attach_usb._resolve_busid(spec, self._devices())
-        assert busid == "9-2"
+        assert busid == "6-2"
 
     def test_resolves_cam_left_by_serial(self):
         spec = attach_usb._DeviceSpec("cam_left", "32e6", "9251", "5423534724")
         busid = attach_usb._resolve_busid(spec, self._devices())
-        assert busid == "9-4"
+        assert busid == "6-4"
 
     def test_resolves_cam_right_by_vid_pid_no_serial(self):
         """cam_right has no serial; should resolve to the openaicam with a path segment."""
@@ -357,7 +357,7 @@ class TestAttachAll:
 
 def _all_busids_vhci_status() -> str:
     from inchworm.vhci import _busid_to_dev_hex
-    busids = ["9-2", "9-3", "9-4", "10-2", "10-4", "11-3", "11-4"]
+    busids = ["6-2", "6-3", "6-4", "10-2", "10-4", "11-3", "11-4"]
     rows = [f"hs  {i:04d} 006 003 {_busid_to_dev_hex(b)} 000003 1-{i+1}" for i, b in enumerate(busids)]
     return "hub port sta spd dev      sockfd local_busid\n" + "\n".join(rows) + "\n"
 
@@ -563,14 +563,14 @@ class TestVhciVerification:
 # --- Orchestrator 2026-10-24: BusId-identified cameras resolve to THEIR port ---
 def test_busid_identified_cameras_resolve_to_configured_ports(config):
     devices = [
-        {"BusId": "9-4", "InstanceId": "USB\\\\VID_32E6&PID_9251\\\\5423534724"},
+        {"BusId": "6-4", "InstanceId": "USB\\\\VID_32E6&PID_9251\\\\5423534724"},
         {"BusId": "10-2", "InstanceId": "USB\\\\VID_32E6&PID_9251\\\\7&69F6256&0&2"},
     ]
     specs = {s.role: s for s in attach_usb._device_specs_from_config(config)}
-    assert attach_usb._resolve_busid(specs["cam_left"], devices) == "9-4"
+    assert attach_usb._resolve_busid(specs["cam_left"], devices) == "6-4"
     assert attach_usb._resolve_busid(specs["cam_right"], devices) == "10-2"
     # A different device on the configured port is refused.
-    wrong = [{"BusId": "9-4", "InstanceId": "USB\\\\VID_1A86&PID_7523\\\\X"}]
+    wrong = [{"BusId": "6-4", "InstanceId": "USB\\\\VID_1A86&PID_7523\\\\X"}]
     assert attach_usb._resolve_busid(specs["cam_left"], wrong) is None
 
 
@@ -602,7 +602,7 @@ def test_bridge_transport_skips_cameras_and_attaches_the_rest(bridge_config, tmp
         assert by_role[role].success and by_role[role].message.startswith("[SKIP]"), role
         assert "not attached to WSL" in by_role[role].message
     commands = " ".join(" ".join(c.args[0]) for c in mock_run.call_args_list)
-    for busid in ("9-4", "10-2", "11-4"):
+    for busid in ("6-4", "10-2", "11-4"):
         assert f"--busid {busid}" not in commands
     assert "--busid 11-3" in commands  # dexarm still attached
     assert by_role["dexarm"].success
@@ -614,19 +614,19 @@ def test_bridge_transport_reports_wsl_attached_camera_without_detaching(bridge_c
         results = attach_usb.attach_all(bridge_config, dry_run=False, state_json_path=state)
     mock_run.assert_not_called()  # nothing is detached (or attached) silently
     by_role = {r.role: r for r in results}
-    for role, busid in (("cam_left", "9-4"), ("cam_right", "10-2"), ("cam_scanner", "11-4")):
+    for role, busid in (("cam_left", "6-4"), ("cam_right", "10-2"), ("cam_scanner", "11-4")):
         res = by_role[role]
         assert not res.success and res.message.startswith("[ACTION]")
         assert f"usbipd detach --busid {busid}" in res.message
 
 
 def test_bridge_transport_main_exits_nonzero_while_camera_attached(bridge_config, tmp_path, capsys):
-    state = _state_file(tmp_path, attached_busids={"9-4"})
+    state = _state_file(tmp_path, attached_busids={"6-4"})
     with patch.object(attach_usb, "load_config", return_value=bridge_config):
         rc = attach_usb.main(["--dry-run", "--state-json", str(state)])
     out = capsys.readouterr().out
     assert rc == 1
-    assert "usbipd detach --busid 9-4" in out
+    assert "usbipd detach --busid 6-4" in out
     assert "[SKIP]    cam_right" in out
 
 
@@ -636,4 +636,4 @@ def test_usbip_transport_still_attaches_cameras(config, state_json_file):
     config = config.model_copy(update={"camera_transport": CameraTransportName.USBIP})
     results = attach_usb.attach_all(config, dry_run=True, state_json_path=state_json_file)
     by_role = {r.role: r for r in results}
-    assert "usbipd attach --wsl --busid 9-4" in by_role["cam_left"].message
+    assert "usbipd attach --wsl --busid 6-4" in by_role["cam_left"].message

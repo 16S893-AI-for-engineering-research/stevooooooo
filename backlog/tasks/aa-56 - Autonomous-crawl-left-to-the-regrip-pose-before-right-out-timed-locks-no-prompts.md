@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-23 16:25'
-updated_date: '2026-11-23 18:05'
+updated_date: '2026-11-23 22:04'
 labels: []
 dependencies: []
 priority: high
@@ -53,4 +53,6 @@ Owner 2026-11-23 after the first successful live two-policy crawl (AA-55): make 
 2026-11-23 implemented (owner chose all recommended options). Files: robot/src/inchworm/two_policy.py (AUTO_PHASES, plan_left_to_train_right right_locked, forced_line_problems), robot/lerobot_env/crawl_two_policy.py (--autonomous, --lock-s 25; locked_readback, auto_policy_phase, auto_lock, auto_crawl, home). Supervised mode untouched (its 7 tests pass unchanged). New tests (5): autonomous end to end with only the final Enter prompt and the phase/gripper order; far at the 25 s timer -> 1 retry then hold (nothing locks, right stays LOCKED); left locked 12 deg off -> forced move refused, both stay LOCKED; stop file in the right policy holds with the left LOCKED; forced line checks limits (not the mesh) at ~5 deg/s. Suites: lerobot_env 106 passed, robot 1960 passed. Dry run with insert_*_v5nom 016000, --max-deg-s 8 (log robot/out/rollout/crawl_two_policy_dry_20261123T170834Z.jsonl): exit 0, 0 'Type YES' after the start replay; left finished 14.8 s (4.2 deg) -> lock read back 178.2 deg; forced left_to_regrip 13 frames, left ended within 1 tick of train_right; right out + approach re-planned from the actual pose, mesh OK; right finished 15.5 s -> lock; home; crawl_done. Before the live run: owner-measured (previous live run) the forced move drags the right gripper point ~21 mm if the tube were perfectly rigid; the owner accepted flex. Live run pending, owner-supervised.
 
 Correction to the note above: the ~21 mm is the AGENT's model estimate from the 2026-11-23 14:04Z live log (rigid tube, left lock ticks -> train_right ticks; right gripper point displacement), not an owner measurement. Shown to the owner before the first live run.
+
+2026-11-23 21:33Z first live --autonomous attempt stopped before any policy motion (after the start replay; right LOCKED on the tube, left open at train_left): camera bridge 'camera_left_arm: 0 DirectShow cameras at BusId 9-4'. usbipd list: the hub with the relay (CH340), the right arm adapter (CH343 5B91030298) and the left camera now enumerates as bus 6 (6-2 / 6-3 / 6-4; were 9-2 / 9-3 / 9-4). OWNER: use the new port. hardware.yaml left camera windows_busid + camera_bridge left_arm busid = 6-4 (observed relay 6-2, right arm 6-3); tests pinned to the committed config updated (test_config, test_camera_bridge, test_attach_usb, test_discovery fixtures); attach_usb --dry-run 8/8 OK (cam_left SKIP at 6-4); robot suite 1960 passed; doc-1 updated.
 <!-- SECTION:NOTES:END -->

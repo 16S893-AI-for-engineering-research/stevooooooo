@@ -133,7 +133,7 @@ def _make_vhci_sysfs(
       - v4l_class_dir/{videoN}/index with value "0" for capture nodes, "1" for others
 
     The vhci status maps:
-      dev=00090004 (9-4) -> local_busid 1-5  (cam_left)
+      dev=00060004 (6-4) -> local_busid 1-5  (cam_left)
       dev=000a0002 (10-2) -> local_busid 1-6  (cam_right)
     """
     # vhci status file
@@ -192,7 +192,7 @@ hs  0000 006 002 000a0004 000003 1-1
 hs  0001 006 002 00090003 000003 1-2
 hs  0002 006 002 000b0003 000003 1-3
 hs  0003 006 002 00090002 000003 1-4
-hs  0004 006 003 00090004 000003 1-5
+hs  0004 006 003 00060004 000003 1-5
 hs  0005 006 003 000a0002 000003 1-6
 hs  0006 006 003 000b0004 000003 1-7
 hs  0007 004 000 00000000 000000 0-0
@@ -209,7 +209,7 @@ _CAM_SCANNER_BY_ID = (
     "usb-Arducam_Technology_Co.__Ltd._Arducam_OV9281_USB_Camera_UC762-video-index0"
 )
 # cam_left and cam_right are identified by windows_busid, not by-id names.
-_CAM_LEFT_BUSID = "9-4"
+_CAM_LEFT_BUSID = "6-4"   # owner 2026-11-23: the left hub enumerates as bus 6 (was 9-4)
 _CAM_RIGHT_BUSID = "10-2"
 _RELAY_BY_PATH = "platform-vhci_hcd.0-usb-0:4:1.0-port0"
 
@@ -669,7 +669,7 @@ class TestDuplicateInvariant:
         assert "cam_right" in err.roles
 
     def test_duplicate_usb_device_raises_error(self, tmp_path: Path, config):
-        """If two roles have the same windows_busid (cam_left and cam_right both 9-4),
+        """If two roles have the same windows_busid (cam_left and cam_right both 6-4),
         DuplicateUsbDeviceError is raised.
         """
         import copy
@@ -677,8 +677,8 @@ class TestDuplicateInvariant:
         from inchworm.config import parse_config, DEFAULT_CONFIG_PATH
 
         raw = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text())
-        # Set cam_right to the same BusId as cam_left (9-4).
-        raw["cameras"]["right_arm"]["identity"]["windows_busid"] = "9-4"
+        # Set cam_right to the same BusId as cam_left (6-4).
+        raw["cameras"]["right_arm"]["identity"]["windows_busid"] = _CAM_LEFT_BUSID
         raw["camera_transport"] = "usbip"   # usbip discovery path (bridge mode cross-checks busids, AA-53)
         bad_config = parse_config(raw)
 
