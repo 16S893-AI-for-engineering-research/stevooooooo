@@ -89,6 +89,9 @@ _DRY_RUN_ARGV: dict[str, list[str]] = {
     # replay_cycle.py dry-run runs a ~1.5 min preflight plus a full simulated cycle
     # (covered by tests/test_cycle_replay.py); smoke-test --help.
     "replay_cycle.py": ["--help"],
+    # blender_crawl_export.py exports every cell link pose and visual mesh
+    # (~25 s, close to the 30 s smoke timeout); smoke-test --help.
+    "blender_crawl_export.py": ["--help"],
 }
 
 #: Scripts that need special arguments to reach a clean dry-run exit.
