@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-23 16:25'
-updated_date: '2026-11-23 22:04'
+updated_date: '2026-11-24 02:05'
 labels: []
 dependencies: []
 priority: high
@@ -55,4 +55,6 @@ Owner 2026-11-23 after the first successful live two-policy crawl (AA-55): make 
 Correction to the note above: the ~21 mm is the AGENT's model estimate from the 2026-11-23 14:04Z live log (rigid tube, left lock ticks -> train_right ticks; right gripper point displacement), not an owner measurement. Shown to the owner before the first live run.
 
 2026-11-23 21:33Z first live --autonomous attempt stopped before any policy motion (after the start replay; right LOCKED on the tube, left open at train_left): camera bridge 'camera_left_arm: 0 DirectShow cameras at BusId 9-4'. usbipd list: the hub with the relay (CH340), the right arm adapter (CH343 5B91030298) and the left camera now enumerates as bus 6 (6-2 / 6-3 / 6-4; were 9-2 / 9-3 / 9-4). OWNER: use the new port. hardware.yaml left camera windows_busid + camera_bridge left_arm busid = 6-4 (observed relay 6-2, right arm 6-3); tests pinned to the committed config updated (test_config, test_camera_bridge, test_attach_usb, test_discovery fixtures); attach_usb --dry-run 8/8 OK (cam_left SKIP at 6-4); robot suite 1960 passed; doc-1 updated.
+
+2026-11-24 02:05Z STATE FOR NEXT SESSION. Live --autonomous runs: 22:23Z left failed (2x25 s, 22 deg off) -> stop/hold OK; 22:27Z COMPLETED (left retry finished 4.4 deg, forced regrip move, right finished 14.9 s / 7.8 deg, home, crawl_done); 01:46Z left failed (18.3 deg) -> stop; 02:01Z COMPLETED (left locked at the 25 s timer 6.8 deg off, forced left_to_regrip 4.8 s peak load left [56,84,124,100,44] right [0,48,28,36,0] (low), right out, right finished 13.1 s / 3.4 deg, home, crawl_done; log robot/out/rollout/crawl_two_policy_20261124T020111Z.jsonl). Owner has NOT yet said whether the keys were really inserted on the completed runs or how much the tube flexed. Left-policy unreliability tonight: loop 26-27.5 Hz and mesh check ~6 ms/step, holds 0 on every attempt (not the cause). Camera check (robot/out/camchk/*.jpg, git-ignored): brightness/contrast/position identical to the v5nom demos, but live vs pose-matched demo frames differ 8-10 (demo vs demo 2.4), concentrated in the top-left quarter (tube end / right gripper); owner: 'the arm is a slightly different angle, barely anything'. Likely the tube seating in the right gripper. Owner options offered: re-seat tube; record ~15 more nominal demos/arm + retrain; small shift/rotation augmentation (needs owner choice, changes the recipe). OWNER 2026-11-24 ~02:05Z: GOES BACK on option (forced move): wants the autonomous crawl to use the ORIGINAL order again (right unlocks + comes out first, then the left (with tube) to train_right, mesh-checked), keeping no prompts + timed locks. NOT YET IMPLEMENTED: next session = add that (e.g. --autonomous keeps AA-55 order; the forced move only behind an explicit flag or removed), update AC #2 with owner approval recorded, tests, dry run, owner-supervised live run.
 <!-- SECTION:NOTES:END -->
