@@ -11,6 +11,9 @@ import time
 
 import pytest
 
+# flagged AA-59/doc-4 F12, excluded by default (owner 2026-11-24); run: pytest -m flagged (all tests in this file)
+pytestmark = pytest.mark.flagged
+
 HERE = pathlib.Path(__file__).resolve().parents[1]
 
 

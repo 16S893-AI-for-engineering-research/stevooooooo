@@ -564,6 +564,9 @@ class TestFactories:
 # ---------------------------------------------------------------------------
 
 
+# AA-60: script-subprocess tests share one xdist worker so they do not starve each other
+# of CPU and hit their subprocess timeouts.
+@pytest.mark.xdist_group("script_subprocess")
 class TestJogAA9Integration:
     """Verify that scripts/jog.py uses the AA-9 collision guard."""
 
@@ -594,6 +597,7 @@ class TestJogAA9Integration:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.xdist_group("script_subprocess")
 class TestMeasureLimitsDryRun:
     def test_dry_run_exits_zero(self):
         """measure_limits.py dry-run prints instructions and exits 0."""

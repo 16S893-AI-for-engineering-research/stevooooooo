@@ -34,6 +34,7 @@ dev = [
     "matplotlib>=3.7",
     # AA-40 stage 2: mesh collision checking (system_model/collision.py).
     "python-fcl>=0.7",
+    "pytest-xdist>=3.8.0",
 ]
 
 [build-system]
@@ -56,9 +57,13 @@ model = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# AA-60 (owner 2026-11-24): the AA-59/doc-4 removal candidates carry the `flagged`
+# marker and are excluded by default (run them with `uv run pytest -m flagged`);
+# the suite runs in parallel with pytest-xdist.
+addopts = "-q -m 'not flagged' -n 4 --dist loadgroup"
 markers = [
     "model: tests that require the model optional-extra (trimesh etc.)",
+    "flagged: AA-59/doc-4 removal candidates, excluded by default (owner 2026-11-24); run: pytest -m flagged",
 ]
 
 [project.scripts]

@@ -284,6 +284,9 @@ class TestTrajectoryGeneration:
 # ---------------------------------------------------------------------------
 
 
+# AA-60: script-subprocess tests share one xdist worker so they do not starve each other
+# of CPU and hit their subprocess timeouts.
+@pytest.mark.xdist_group("script_subprocess")
 class TestJogDryRun:
     """
     AC#4 (dry-run half): jog CLI prints plan without moving.
@@ -299,6 +302,8 @@ class TestJogDryRun:
     def test_jog_script_exists(self):
         assert self.JOG_SCRIPT.exists(), f"jog.py not found at {self.JOG_SCRIPT}"
 
+    # flagged AA-59/doc-4 F1, excluded by default (owner 2026-11-24); run: pytest -m flagged
+    @pytest.mark.flagged
     def test_jog_dry_run_delta(self):
         """jog.py --dry-run --arm left --delta prints plan without erroring."""
         result = subprocess.run(
@@ -316,6 +321,8 @@ class TestJogDryRun:
             f"Expected dry-run indicator in output:\n{output}"
         )
 
+    # flagged AA-59/doc-4 F2, excluded by default (owner 2026-11-24); run: pytest -m flagged
+    @pytest.mark.flagged
     def test_jog_dry_run_abs(self):
         """jog.py --dry-run --abs prints absolute-pose plan."""
         result = subprocess.run(

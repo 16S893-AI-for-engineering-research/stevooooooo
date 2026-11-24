@@ -62,6 +62,8 @@ def _grip(buses, arm):
     return buses[arm].pos[6]
 
 
+# flagged AA-59/doc-4 F11, excluded by default (owner 2026-11-24); run: pytest -m flagged
+@pytest.mark.flagged
 def test_full_test_left_policy_lock_cycle_right_policy_lock(tmp_path, monkeypatch):
     rc, log, buses = _run(tmp_path, monkeypatch)
     ev = [e["event"] for e in log]
@@ -87,6 +89,8 @@ def test_owner_says_the_left_key_is_not_in_nothing_unlocks(tmp_path, monkeypatch
     assert not any(buses[a].torque[s] for a in ("left", "right") for s in range(1, 6))
 
 
+# flagged AA-59/doc-4 F11, excluded by default (owner 2026-11-24); run: pytest -m flagged
+@pytest.mark.flagged
 def test_quit_after_the_left_attempt_locks_nothing(tmp_path, monkeypatch):
     rc, log, buses = _run(tmp_path, monkeypatch, answers={"left_choice": "q"})
     assert rc == 0 and [e["event"] for e in log if e["event"].startswith("gripper")] == []
@@ -102,6 +106,8 @@ def test_lock_far_from_the_demo_end_stops_before_the_right_unlocks(tmp_path, mon
     assert all(2013 <= _grip(buses, a) <= 2066 for a in ("left", "right"))           # both LOCKED
 
 
+# flagged AA-59/doc-4 F11, excluded by default (owner 2026-11-24); run: pytest -m flagged
+@pytest.mark.flagged
 def test_refuses_a_state_that_is_not_frame_42(tmp_path, monkeypatch):
     from inchworm import handoff as ho
     p = _state42(tmp_path)

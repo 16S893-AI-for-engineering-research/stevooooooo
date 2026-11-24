@@ -27,6 +27,10 @@ import pytest
 # Paths
 # ---------------------------------------------------------------------------
 
+# AA-60: script-subprocess tests share one xdist worker so they do not starve each other
+# of CPU and hit their subprocess timeouts.
+pytestmark = pytest.mark.xdist_group("script_subprocess")
+
 _ROBOT_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS_DIR = _ROBOT_ROOT / "scripts"
 _SCRIPT = _SCRIPTS_DIR / "fault_inject_hw.py"

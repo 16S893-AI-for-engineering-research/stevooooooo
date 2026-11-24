@@ -38,5 +38,15 @@ lerobot-robot-inchworm = { path = "../lerobot_plugins/lerobot_robot_inchworm", e
 dev = [
     "pytest>=7.0",
     "inchworm-robot",
+    "pytest-xdist>=3.8.0",
 ]
 # --- AA-22 end ---
+
+[tool.pytest.ini_options]
+# AA-60 (owner 2026-11-24): the AA-59/doc-4 removal candidates carry the `flagged`
+# marker and are excluded by default (run them with `uv run pytest tests/ -m flagged`);
+# the suite runs in parallel with pytest-xdist.
+addopts = "-q -m 'not flagged' -n 3 --dist load"
+markers = [
+    "flagged: AA-59/doc-4 removal candidates, excluded by default (owner 2026-11-24); run: pytest -m flagged",
+]

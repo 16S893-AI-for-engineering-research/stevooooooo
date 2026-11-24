@@ -415,6 +415,9 @@ class TestFaultMonitor:
 # ---------------------------------------------------------------------------
 
 
+# AA-60: script-subprocess tests share one xdist worker so they do not starve each other
+# of CPU and hit their subprocess timeouts.
+@pytest.mark.xdist_group("script_subprocess")
 class TestEstopCLI:
     def test_cli_dry_run_exits_zero(self, tmp_path):
         """AC#5: CLI script (scripts/estop.py) exits 0 in dry-run mode."""

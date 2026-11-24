@@ -6,7 +6,15 @@ Tests must NEVER be able to touch hardware, whatever a single test patches,
 so this autouse fixture replaces the real serial and V4L2 open paths with
 functions that fail the test immediately.
 """
+import os
+
 import pytest
+
+# AA-60: the suite runs on 4 xdist workers; uncapped BLAS/OpenMP pools in each worker
+# and in each script subprocess oversubscribe the CPUs and push the 30 s script smoke
+# tests past their timeout. One thread per process (inherited by subprocesses).
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
 
 
 class HardwareAccessInTest(AssertionError):

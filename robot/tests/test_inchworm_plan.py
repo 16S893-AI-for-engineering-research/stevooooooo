@@ -263,6 +263,8 @@ def test_printing_pose_unreachable_stops(cfg, checker, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+# flagged AA-59/doc-4 F6, excluded by default (owner 2026-11-24); run: pytest -m flagged
+@pytest.mark.flagged
 def test_matching_start_pose_and_return(cfg, checker):
     """Both arms start in ONE shared pose, and the cycle returns them to it.
 
@@ -296,6 +298,8 @@ def test_soft_limit_violation_is_reported(kin):
     assert any(r.startswith("soft limit: left shoulder_lift") for r in reasons), reasons
 
 
+# flagged AA-59/doc-4 F7, excluded by default (owner 2026-11-24); run: pytest -m flagged
+@pytest.mark.flagged
 def test_per_arm_start_reaches_each_point(cfg, checker):
     """Per-arm IK (matching_start=False) still puts each gripper on its point within 1 mm."""
     plan = plan_cycle(cfg, checker, start_from_fold=False, matching_start=False, steps=2)

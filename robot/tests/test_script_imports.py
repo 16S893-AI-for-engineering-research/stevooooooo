@@ -11,6 +11,10 @@ import sys
 
 import pytest
 
+# AA-60: script-subprocess tests share one xdist worker so they do not starve each other
+# of CPU and hit their subprocess timeouts.
+pytestmark = pytest.mark.xdist_group("script_subprocess")
+
 SCRIPTS = sorted((pathlib.Path(__file__).resolve().parents[1] / "scripts").glob("*.py"))
 
 
@@ -18,6 +22,16 @@ SCRIPTS = sorted((pathlib.Path(__file__).resolve().parents[1] / "scripts").glob(
 # Remove each name from this set as it is fixed; the set must reach empty.
 # --- ALL FIXED: set is intentionally empty ---
 KNOWN_BROKEN: set[str] = set()
+
+
+def _is_submodule(name: str) -> bool:
+    """`from pkg import sub` resolves a submodule even before anything imported it
+    (AA-60: under xdist this file can run before the module was imported elsewhere)."""
+    try:
+        importlib.import_module(name)
+    except ModuleNotFoundError:
+        return False
+    return True
 
 
 @pytest.mark.parametrize(
@@ -33,7 +47,8 @@ def test_script_inchworm_imports_resolve(script):
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("inchworm"):
             mod = importlib.import_module(node.module)
             for alias in node.names:
-                if alias.name != "*" and not hasattr(mod, alias.name):
+                if alias.name != "*" and not hasattr(mod, alias.name) \
+                        and not _is_submodule(f"{node.module}.{alias.name}"):
                     missing.append(f"{node.module}.{alias.name}")
     assert not missing, f"{script.name} imports non-existent names: {missing}"
 
@@ -117,9 +132,19 @@ def test_script_help_exits_zero(script: pathlib.Path, extra_argv: list[str]):
     )
 
 
-@pytest.mark.parametrize("script,extra_argv", [
-    p for p in list(_smoke_scripts()) if p.values[1] == []
-])
+def _dry_run_default_params():
+    """Bare-invocation params; the view_pose.py id carries the `flagged` marker."""
+    for p in _smoke_scripts():
+        if p.values[1] != []:
+            continue
+        if p.id == "view_pose.py":
+            # flagged AA-59/doc-4 F8, excluded by default (owner 2026-11-24); run: pytest -m flagged
+            yield pytest.param(*p.values, id=p.id, marks=pytest.mark.flagged)
+        else:
+            yield p
+
+
+@pytest.mark.parametrize("script,extra_argv", list(_dry_run_default_params()))
 def test_script_dry_run_default_exits_zero(script: pathlib.Path, extra_argv: list[str]):
     """Default invocation (no flags) must exit 0: dry-run is always the default."""
     result = subprocess.run(
