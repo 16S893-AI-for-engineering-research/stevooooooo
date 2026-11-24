@@ -17,6 +17,10 @@ to the frozen placement first (AA-54 AC). A DISCARDED
 episode keeps its placement (the next take repeats it), so the saved episodes hold exactly the
 schedule. Keys as record_handoff.py: r record, s save, d discard, q quit.
 
+AA-58 ``--profile v6`` (owner 2026-11-24): instead, per episode the holding arm's wrist_roll is
+offset by U[-1, +1] deg and the attachment point translated by U[-5, +5] mm per x/y/z (uniform over
+the whole range), default 0 nominal (every episode differs). The default profile stays AA-54.
+
 Per episode the requested + achieved (FK) perturbation and the measured holding ticks go to
 ``<dataset>/perturbations.json`` (and the robot log). Grippers are never commanded.
 """
@@ -105,7 +109,8 @@ class TrainSession(rh.Session):
             self.say(f"TUBE: episode {i} placement NOMINAL (frozen)")
             return True
         self.say(f"TUBE: episode {i} placement " + ("NOMINAL (frozen)" if e.nominal else
-                 f"rotated {e.achieved['rot_deg']:.2f} deg, moved {e.achieved['trans_mm']} mm"))
+                 (f"roll {e.achieved['roll_deg']:+.2f} deg, " if "roll_deg" in e.achieved else "")
+                 + f"rotated {e.achieved['rot_deg']:.2f} deg, moved {e.achieved['trans_mm']} mm"))
         self.robot.move_holding(e.holding_ticks, e.tube_pose,
                                 confirm=getattr(self.robot, "holding_moves_done", 0) == 0,
                                 clock=self.clock, sleep=self.sleep)
@@ -151,17 +156,19 @@ class TrainSession(rh.Session):
             self.out.write_text(json.dumps(d, indent=1))
 
 
-def plan(cfg, arm: str, seed: int, n: int, n_nominal: int, timeline: Path = TIMELINE, say=print):
+def plan(cfg, arm: str, seed: int, n: int, n_nominal: int, timeline: Path = TIMELINE, say=print,
+         profile: str = "aa54"):
     from inchworm import perturb as pb
     t0 = time.time()
-    say(f"planning {n} placements for {arm} ({n_nominal} nominal, seed {seed}) with the cell mesh ...")
+    say(f"planning {n} placements for {arm} (profile {profile}, {n_nominal} nominal, seed {seed}) "
+        "with the cell mesh ...")
     pl = pb.build_planner(cfg, arm, timeline)
-    eps = pb.plan_schedule(pl, seed, n, n_nominal)
+    eps = pb.plan_schedule(pl, seed, n, n_nominal, profile=profile)
     say(f"  done in {time.time() - t0:.0f} s: {pb.summary(eps)}")
     return pl, eps
 
 
-def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> int:
+def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None, profile: str = "aa54") -> int:
     """No hardware: plan the schedule, then plan + mesh-check, per placement, the tube move to it
     from the frozen placement (and the same line back), and the inserting arm's return from the
     perturbed inserted pose."""
@@ -170,7 +177,7 @@ def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> in
     from inchworm.config import load_config
     from inchworm.kinematics import build_chain, with_soft_limits
     cfg = load_config()
-    pl, eps = plan(cfg, arm, seed, n, n_nominal)
+    pl, eps = plan(cfg, arm, seed, n, n_nominal, profile=profile)
     chain = with_soft_limits(build_chain(cfg.so101_kinematics), getattr(cfg.motion_guard, f"{arm}_arm_limits"))
     bad = 0
     for e in eps:
@@ -183,13 +190,14 @@ def dry_run(arm: str, seed: int, n: int, n_nominal: int, out: Path = None) -> in
                 if p is not None:
                     raise hr.ReturnRefused(f"tube move: {p}")
             p = hr.plan_return(cfg, model, chain, pl.limits, {arm: e.insert_ticks, pl.hold: e.holding_ticks})
-            print(f"  episode {e.index:2d} {'nominal  ' if e.nominal else 'perturbed'} rot {e.achieved['rot_deg']:.2f} "
+            roll = f"roll {e.achieved['roll_deg']:+.2f} " if "roll_deg" in e.achieved else ""
+            print(f"  episode {e.index:2d} {'nominal  ' if e.nominal else 'perturbed'} {roll}rot {e.achieved['rot_deg']:.2f} "
                   f"deg trans {e.achieved['trans_mm']} mm: move + return OK ({p.checks} return checks)")
         except hr.ReturnRefused as exc:
             bad += 1
             print(f"  episode {e.index:2d}: REFUSED: {exc}")
     if out is not None:
-        pb.write(out, pl, seed, eps, {"dry_run": True})
+        pb.write(out, pl, seed, eps, {"dry_run": True}, profile=profile)
         print(f"schedule: {out}")
     print(f"dry run {arm}: " + ("all placements, tube moves and returns plan clean" if not bad else f"{bad} refused"))
     return 1 if bad else 0
@@ -200,7 +208,11 @@ def main(argv=None) -> int:
     ap.add_argument("--arm", choices=("left", "right"), required=True, help="the INSERTING arm (its policy)")
     ap.add_argument("--seed", type=int, default=None, help="schedule seed (default: from the clock, saved)")
     ap.add_argument("--episodes", type=int, default=None, help="saved episodes (default 50)")
-    ap.add_argument("--nominal", type=int, default=None, help="of them at the frozen pose (default 10)")
+    ap.add_argument("--nominal", type=int, default=None,
+                    help="of them at the frozen pose (default: 10 for aa54, 0 for v6)")
+    ap.add_argument("--profile", choices=("aa54", "v6"), default="aa54",
+                    help="perturbation profile: aa54 (2 deg / 20 mm, default) or v6 (AA-58: holding "
+                         "wrist_roll +-1 deg, attachment point +-5 mm per axis)")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--allow-unverified-soft-limits", default="owner 2026-11-21 - AA-54 training recording")
     ap.add_argument("--no-camera", action="store_true", help="joints only (rehearsal)")
@@ -210,10 +222,11 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     from inchworm import perturb as pb
     n = pb.N_EPISODES if a.episodes is None else a.episodes
-    n_nom = pb.N_NOMINAL if a.nominal is None else a.nominal
+    n_nom = pb.default_nominal(a.profile) if a.nominal is None else a.nominal
     seed = int(time.time()) % 100000 if a.seed is None else a.seed
     if a.dry_run:
-        return dry_run(a.arm, seed, n, n_nom, ROBOT / "out" / f"sim_perturbations_{a.arm}.json")
+        sfx = "" if a.profile == "aa54" else f"_{a.profile}"
+        return dry_run(a.arm, seed, n, n_nom, ROBOT / "out" / f"sim_perturbations_{a.arm}{sfx}.json", profile=a.profile)
     logging.basicConfig(level=logging.INFO)
     from inchworm import handoff as ho
     from inchworm.config import load_config
@@ -222,7 +235,7 @@ def main(argv=None) -> int:
         pos = preflight(cfg, a.arm, ho.load_state(a.state))
     except (Refused, ho.HandoffRefused) as exc:
         print(f"REFUSED: {exc}"); return 2
-    pl, eps = plan(cfg, a.arm, seed, n, n_nom)
+    pl, eps = plan(cfg, a.arm, seed, n, n_nom, profile=a.profile)
     from lerobot.utils.import_utils import register_third_party_plugins
     register_third_party_plugins()
     from lerobot.utils.keyboard_input import create_key_listener
@@ -232,7 +245,7 @@ def main(argv=None) -> int:
         id=a.arm, follower=a.arm, camera=not a.no_camera, tube_support="handoff", handoff_state=str(a.state),
         allow_unverified_soft_limits=a.allow_unverified_soft_limits, control_hz=float(a.fps)))
     teleop = InchwormLeader(InchwormLeaderConfig(id="leader", follower=a.arm))
-    name = f"insert_{a.arm}_v2"
+    name = f"insert_{a.arm}_v2" if a.profile == "aa54" else f"insert_{a.arm}_{a.profile}"
     root = ROBOT / "datasets" / f"{name}_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
     task = f"insert the {a.arm} gripper into the next attachment point (before lock)"
     keys: "queue.Queue[str]" = queue.Queue()
@@ -267,7 +280,7 @@ def main(argv=None) -> int:
         robot.connect()
         dataset = rh.make_dataset(robot, root, f"local/{name}", a.fps)
         out = root / "perturbations.json"
-        pb.write(out, pl, seed, eps, {"dataset": str(root), "training_position": pos})
+        pb.write(out, pl, seed, eps, {"dataset": str(root), "training_position": pos}, profile=a.profile)
         listener = start_listener()
         if listener is None:
             print("REFUSED: no keyboard listener (run in an interactive terminal)"); return 2

@@ -7,23 +7,27 @@
 #      the holding arm, <= 2 deg / <= 20 mm), keys r/s/d/q as record_handoff.
 #   bash ~/893/robot/lerobot_env/record_train.sh --arm left --dry-run   # no hardware at all
 #   bash ~/893/robot/lerobot_env/record_train.sh --arm left             # live, owner supervising
+# AA-58: --profile v6 = holding wrist_roll +-1 deg, attachment point +-5 mm per axis, 0 nominal
+#   (default profile aa54 = the AA-54 schedule above).
 # Extra arguments after -- go to record_train.py (e.g. -- --seed 7).
 # Start state (live): every servo torque OFF, grippers open and EMPTY (bash ~/893/robot/reset_start.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROBOT="$(dirname "$HERE")"
-DRY=0 ARM="" EXTRA=()
+DRY=0 ARM="" PROFILE="aa54" EXTRA=()
 APPROVAL="owner 2026-11-21 - AA-54 training recording"
 while [ $# -gt 0 ]; do
   case "$1" in
     --arm) ARM="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
+    --profile) PROFILE="${2:-}"; shift 2 ;;
     --allow-unverified-soft-limits) APPROVAL="${2:-}"; shift 2 ;;
     --) shift; EXTRA=("$@"); break ;;
-    *) echo "REFUSED: unknown argument $1 (usage: --arm left|right [--dry-run] [-- record_train args])"; exit 2 ;;
+    *) echo "REFUSED: unknown argument $1 (usage: --arm left|right [--dry-run] [--profile aa54|v6] [-- record_train args])"; exit 2 ;;
   esac
 done
 case "$ARM" in left|right) ;; *) echo "REFUSED: --arm left|right"; exit 2 ;; esac
+case "$PROFILE" in aa54|v6) ;; *) echo "REFUSED: --profile aa54|v6"; exit 2 ;; esac
 FRAME=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['positions']['train_$ARM']['timeline_frame'])" \
         "$ROBOT/config/training_poses.json")
 STATE="$ROBOT/out/handoff_state.json"
@@ -68,7 +72,7 @@ uv run python scripts/place_training_tube.py "${ARGS[@]}" || exit 4
 echo "== 3/3 record_train: episodes from train_$ARM"
 cd "$HERE"
 if [ "$DRY" = 1 ]; then
-  exec uv run python record_train.py --arm "$ARM" --dry-run ${EXTRA[@]+"${EXTRA[@]}"}
+  exec uv run python record_train.py --arm "$ARM" --profile "$PROFILE" --dry-run ${EXTRA[@]+"${EXTRA[@]}"}
 fi
-exec uv run python record_train.py --arm "$ARM" --state "$STATE" --allow-unverified-soft-limits "$APPROVAL" \
+exec uv run python record_train.py --arm "$ARM" --profile "$PROFILE" --state "$STATE" --allow-unverified-soft-limits "$APPROVAL" \
   ${EXTRA[@]+"${EXTRA[@]}"}

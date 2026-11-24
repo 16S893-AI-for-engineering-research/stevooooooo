@@ -19,6 +19,16 @@ frozen pose every episode.
 * Schedule: N_EPISODES = N_NOMINAL exact (zero perturbation, frozen ticks) + the rest perturbed,
   order shuffled by the seed. Deterministic for a seed.
 
+AA-58 profile ``v6`` (owner 2026-11-24, selectable; AA-54 above stays the default ``aa54``):
+per episode the HOLDING arm's wrist_roll (servo 5) is offset from its frozen tick by
+U[-V6_ROLL_MAX_DEG, +V6_ROLL_MAX_DEG] and the attachment point is translated by
+U[-V6_TRANS_MAX_MM, +V6_TRANS_MAX_MM] per x/y/z (cell frame), each uniform over the whole range
+(owner: values near zero as likely as near the limits). The roll tick is held fixed and the other
+four holding joints are fitted (same Gauss-Newton) so that P0, carried by the rolled gripper, lands
+at P0 + t. Kept only if the FK roll (about the holding wrist_roll axis) and the FK translation of
+P0 are inside the bounds, plus every AA-54 check (limits, reach, mesh-clean holding line).
+Default V6_N_NOMINAL = 0 (every episode differs).
+
 Nothing here opens a port.
 """
 from __future__ import annotations
@@ -46,6 +56,12 @@ LINE_STEP_DEG = 1.0
 SOLVE_STEP_MAX_TICKS = 45.0      # Gauss-Newton step cap (~4 deg)
 SCHEMA = "inchworm.perturbations/1"
 ARMS = ("left", "right")
+DEG_PER_TICK = 360.0 / 4096
+V6_ROLL_MAX_DEG = 1.0             # owner 2026-11-24 (AA-58): holding wrist_roll offset
+V6_TRANS_MAX_MM = 5.0             # owner 2026-11-24 (AA-58): per axis
+V6_N_NOMINAL = 0                  # owner 2026-11-24 (AA-58): every episode differs
+PROFILES = ("aa54", "v6")         # aa54 = the AA-54 default
+ROLL_JOINT = 4                    # wrist_roll (servo 5) in the J5 order
 
 
 class PerturbError(RuntimeError):
@@ -154,16 +170,20 @@ class Planner:
     def _grip(self, arm, ticks) -> np.ndarray:
         return np.asarray(self._poses(*self._q_pair(arm, ticks))[f"{arm}_gripper"], float)
 
-    def _solve(self, arm, x0, target, P, iters: int = 30):
+    def _solve(self, arm, x0, target, P, iters: int = 30, free=(0, 1, 2, 3, 4),
+               w_mm: float = TRANS_MAX_MM, w_deg: float = ROT_MAX_DEG):
         """Weighted Gauss-Newton in ticks: pose error of the point P carried by ``arm``'s gripper
-        (P = G(x0)-relative), normalised by the bounds. Returns float ticks inside the limits."""
+        (P = G(x0)-relative), normalised by the bounds (``w_mm`` / ``w_deg``). Only the joints in
+        ``free`` move (AA-58 v6 holds wrist_roll). Returns float ticks inside the limits."""
         lim = self.limits[arm]
         lo = np.array([lim[j][0] for j in lim], float)
         hi = np.array([lim[j][1] for j in lim], float)
         x = np.clip(np.asarray(x0, float), lo, hi)
         rel = np.linalg.inv(self._grip(arm, x0)) @ P            # P in the gripper frame
         tp_, tR = target[:3, 3], target[:3, :3]
-        w = np.array([1 / TRANS_MAX_MM] * 3 + [1 / ROT_MAX_DEG] * 3)
+        w = np.array([1 / w_mm] * 3 + [1 / w_deg] * 3)
+        free = list(free)
+        nf = len(free)
 
         def res(xx):
             Q = self._grip(arm, xx) @ rel
@@ -172,11 +192,12 @@ class Planner:
 
         r = res(x)
         for _ in range(iters):
-            J = np.empty((6, 5))
-            for k in range(5):
+            J = np.empty((6, nf))
+            for c, k in enumerate(free):
                 d = np.zeros(5); d[k] = 1.0
-                J[:, k] = res(x + d) - r
-            dx = np.linalg.solve(J.T @ J + 1e-4 * np.eye(5), -J.T @ r)
+                J[:, c] = res(x + d) - r
+            dx = np.zeros(5)
+            dx[free] = np.linalg.solve(J.T @ J + 1e-4 * np.eye(nf), -J.T @ r)
             step = float(np.abs(dx).max())
             if step > SOLVE_STEP_MAX_TICKS:
                 dx *= SOLVE_STEP_MAX_TICKS / step
@@ -197,6 +218,40 @@ class Planner:
         ht = [int(round(v)) for v in x]
         D_ach = self._grip(self.hold, ht) @ np.linalg.inv(self.G0)
         return ht, D_ach
+
+    def roll_axis(self) -> np.ndarray:
+        """Unit axis (cell frame) of the holding wrist_roll at the frozen pose, from FK."""
+        if getattr(self, "_roll_axis", None) is None:
+            x = np.asarray(self.ticks[self.hold], float)
+            d = np.zeros(5); d[ROLL_JOINT] = 10.0
+            rv = _rotvec(self._grip(self.hold, x + d)[:3, :3] @ self.G0[:3, :3].T)
+            self._roll_axis = rv / np.linalg.norm(rv)
+        return self._roll_axis
+
+    def realise_v6(self, roll_deg: float, t_mm: Sequence[float]):
+        """AA-58 v6: holding wrist_roll at frozen + round(roll_deg) ticks (held), the other four
+        joints fitted so P0 (carried by the rolled gripper) lands at P0 + t. (ticks, D_ach)."""
+        h = self.hold
+        x0 = np.asarray(self.ticks[h], float)
+        x0[ROLL_JOINT] += round(roll_deg / DEG_PER_TICK)
+        Pr = self._grip(h, x0) @ np.linalg.inv(self.G0) @ self.P0      # P0 carried by the rolled gripper
+        target = Pr.copy()
+        target[:3, 3] = self.P0[:3, 3] + np.asarray(t_mm, float) / 1000.0
+        x = self._solve(h, x0, target, Pr, free=(0, 1, 2, 3), w_mm=V6_TRANS_MAX_MM, w_deg=V6_ROLL_MAX_DEG)
+        ht = [int(round(v)) for v in x]
+        ht[ROLL_JOINT] = int(x0[ROLL_JOINT])
+        return ht, self._grip(h, ht) @ np.linalg.inv(self.G0)
+
+    def measure_v6(self, ht: Sequence[int], D_ach: np.ndarray) -> Dict[str, object]:
+        """measure() + the servo roll offset, the FK roll about the wrist_roll axis and the rest
+        of the FK rotation (tilt), all deg."""
+        m = measure(D_ach, self.P0)
+        rv = np.degrees(_rotvec(np.asarray(D_ach)[:3, :3]))
+        roll = float(rv @ self.roll_axis())
+        m.update({"roll_offset_deg": round((ht[ROLL_JOINT] - self.ticks[self.hold][ROLL_JOINT]) * DEG_PER_TICK, 4),
+                  "roll_deg": round(roll, 4),
+                  "tilt_deg": round(float(np.linalg.norm(rv - roll * self.roll_axis())), 4)})
+        return m
 
     def reach(self, D_ach) -> Dict[str, float]:
         """Inserting arm: best fit to the perturbed inserted pose (residual mm / deg)."""
@@ -269,6 +324,63 @@ class Planner:
         raise PerturbError(f"episode {index}: no usable perturbation in {MAX_TRIES} tries (last: {last})")
 
 
+    def sample_v6(self, index: int, rng: np.random.Generator) -> Episode:
+        """AA-58 v6: roll U[-1, 1] deg and t U[-5, 5] mm per axis, each uniform over the whole
+        range (rejection only by the checks, never by magnitude)."""
+        last = None
+        for k in range(1, MAX_TRIES + 1):
+            roll, t_mm = draw_v6(rng)
+            ht, D_ach = self.realise_v6(roll, t_mm)
+            m = self.measure_v6(ht, D_ach)
+            if not within_bounds_v6(m):
+                last = f"achieved {m} outside the bounds"; continue
+            out = [j for j, t in zip(self.limits[self.hold], ht)
+                   if not self.limits[self.hold][j][0] <= t <= self.limits[self.hold][j][1]]
+            if out:
+                last = f"outside the limits on {out}"; continue
+            rch = self.reach(D_ach)
+            if rch["pos_mm"] > REACH_POS_MM or rch["rot_deg"] > REACH_ROT_DEG:
+                last = f"inserting arm cannot reach the perturbed point ({rch})"; continue
+            c0 = self.line_checks
+            p = self.line_problem(ht)
+            if p is not None:
+                last = f"holding line: {p}"; continue
+            return Episode(index, False, ht, self.tube_after(ht).tolist(),
+                           requested={"roll_offset_deg": round(roll, 4),
+                                      "trans_mm": [round(float(x), 3) for x in t_mm]},
+                           achieved=m, insert_reach=rch, insert_ticks=list(self.last_reach_ticks), tries=k,
+                           line_checks=self.line_checks - c0)
+        raise PerturbError(f"episode {index}: no usable perturbation in {MAX_TRIES} tries (last: {last})")
+
+
+def draw_v6(rng: np.random.Generator):
+    """One requested v6 perturbation: (roll offset deg, translation mm [3]), each uniform over
+    the whole range."""
+    roll = float(rng.uniform(-V6_ROLL_MAX_DEG, V6_ROLL_MAX_DEG))
+    return roll, rng.uniform(-V6_TRANS_MAX_MM, V6_TRANS_MAX_MM, size=3)
+
+
+def within_bounds_v6(m: Dict[str, object]) -> bool:
+    return (abs(m["roll_deg"]) <= V6_ROLL_MAX_DEG + 1e-9
+            and all(abs(x) <= V6_TRANS_MAX_MM + 1e-9 for x in m["trans_mm"]))
+
+
+def default_nominal(profile: str = "aa54") -> int:
+    return {"aa54": N_NOMINAL, "v6": V6_N_NOMINAL}[_profile(profile)]
+
+
+def bounds(profile: str = "aa54") -> Dict[str, float]:
+    if _profile(profile) == "v6":
+        return {"roll_max_deg": V6_ROLL_MAX_DEG, "trans_max_mm_per_axis": V6_TRANS_MAX_MM}
+    return {"rot_max_deg": ROT_MAX_DEG, "trans_max_mm_per_axis": TRANS_MAX_MM}
+
+
+def _profile(profile: str) -> str:
+    if profile not in PROFILES:
+        raise PerturbError(f"unknown perturbation profile {profile!r} (want one of {PROFILES})")
+    return profile
+
+
 def schedule_flags(seed: int, n: int = N_EPISODES, n_nominal: int = N_NOMINAL) -> List[bool]:
     """True = nominal. Exactly ``n_nominal`` of ``n``, order shuffled by the seed."""
     if not 0 <= n_nominal <= n:
@@ -278,10 +390,12 @@ def schedule_flags(seed: int, n: int = N_EPISODES, n_nominal: int = N_NOMINAL) -
     return flags
 
 
-def plan_schedule(planner: Planner, seed: int, n: int = N_EPISODES, n_nominal: int = N_NOMINAL) -> List[Episode]:
+def plan_schedule(planner: Planner, seed: int, n: int = N_EPISODES, n_nominal: int = N_NOMINAL,
+                  profile: str = "aa54") -> List[Episode]:
+    sample = planner.sample_v6 if _profile(profile) == "v6" else planner.sample
     flags = schedule_flags(seed, n, n_nominal)
     rng = np.random.default_rng([seed, 1])
-    return [planner.nominal(i) if nom else planner.sample(i, rng) for i, nom in enumerate(flags)]
+    return [planner.nominal(i) if nom else sample(i, rng) for i, nom in enumerate(flags)]
 
 
 def summary(eps: Sequence[Episode]) -> Dict[str, object]:
@@ -294,14 +408,19 @@ def summary(eps: Sequence[Episode]) -> Dict[str, object]:
             "mean_rot_deg": round(float(np.mean([e.achieved["rot_deg"] for e in pert])), 3),
             "max_reach_pos_mm": max(e.insert_reach["pos_mm"] for e in pert),
             "tries_total": sum(e.tries for e in pert)})
+        if all("roll_deg" in e.achieved for e in pert):          # AA-58 v6
+            out.update({"max_abs_roll_deg": max(abs(e.achieved["roll_deg"]) for e in pert),
+                        "max_tilt_deg": max(e.achieved["tilt_deg"] for e in pert)})
     return out
 
 
-def write(path: Path, planner: Planner, seed: int, eps: Sequence[Episode], extra: Optional[dict] = None) -> dict:
+def write(path: Path, planner: Planner, seed: int, eps: Sequence[Episode], extra: Optional[dict] = None,
+          profile: str = "aa54") -> dict:
     rec = {"schema": SCHEMA, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+           "profile": _profile(profile),
            "inserting_arm": planner.arm, "holding_arm": planner.hold, "seed": int(seed),
            "training_position": f"train_{planner.arm}", "frozen_ticks": planner.ticks,
-           "bounds": {"rot_max_deg": ROT_MAX_DEG, "trans_max_mm_per_axis": TRANS_MAX_MM},
+           "bounds": bounds(profile),
            "attachment_point_P0": planner.P0.tolist(), "summary": summary(eps),
            "episodes": [asdict(e) for e in eps], **(extra or {})}
     path = Path(path)

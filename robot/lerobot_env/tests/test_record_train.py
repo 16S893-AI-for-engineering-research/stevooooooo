@@ -191,3 +191,34 @@ def test_place_refuses_off_the_frozen_pose():
     buses["right"].pos[2] += 60
     with pytest.raises(pt.Stop, match="not at the frozen training position"):
         pt.place(tp_.CFG, r, "right", pos, lambda m: "YES", say=lambda *_: None)
+
+
+# --- AA-58: --profile selection (default stays AA-54) ------------------------------------------
+@pytest.mark.parametrize("argv, profile, nominal, name", [
+    (["--arm", "left", "--dry-run", "--seed", "3"], "aa54", 10, "sim_perturbations_left.json"),
+    (["--arm", "right", "--dry-run", "--seed", "3", "--profile", "v6"], "v6", 0, "sim_perturbations_right_v6.json"),
+    (["--arm", "left", "--dry-run", "--seed", "3", "--profile", "v6", "--nominal", "2"], "v6", 2,
+     "sim_perturbations_left_v6.json"),
+])
+def test_main_profile_selects_the_schedule(monkeypatch, argv, profile, nominal, name):
+    got = {}
+
+    def fake(arm, seed, n, n_nominal, out=None, profile="aa54"):
+        got.update(arm=arm, seed=seed, n=n, nominal=n_nominal, out=out, profile=profile); return 0
+    monkeypatch.setattr(rt, "dry_run", fake)
+    assert rt.main(argv) == 0
+    assert (got["profile"], got["nominal"], got["n"], got["seed"]) == (profile, nominal, 50, 3)
+    assert got["out"].name == name
+
+
+def test_main_rejects_an_unknown_profile():
+    with pytest.raises(SystemExit):
+        rt.main(["--arm", "left", "--dry-run", "--profile", "v5"])
+
+
+def test_launcher_refuses_an_unknown_profile_before_anything_runs():
+    import subprocess
+    p = subprocess.run(["bash", str(ROBOT / "lerobot_env" / "record_train_left.sh"), "--dry-run", "--profile", "v5"],
+                       capture_output=True, text=True, timeout=30)
+    assert p.returncode == 2 and "REFUSED: --profile aa54|v6" in p.stdout
+    assert 'record_train.py --arm "$ARM" --profile "$PROFILE"' in (ROBOT / "lerobot_env" / "record_train.sh").read_text()

@@ -82,3 +82,83 @@ def test_unreachable_bounds_raise(planners, monkeypatch):
     monkeypatch.setattr(pb, "REACH_POS_MM", -1.0)            # nothing can pass
     with pytest.raises(pb.PerturbError, match="no usable perturbation"):
         pl.sample(0, np.random.default_rng(0))
+
+
+# --- AA-58 profile v6 (owner 2026-11-24): holding wrist_roll +-1 deg, attachment point +-5 mm ------
+def test_v6_draw_uniform_over_the_whole_range():
+    rng = np.random.default_rng(58)
+    d = [pb.draw_v6(rng) for _ in range(pb.N_EPISODES)]
+    roll = np.array([r for r, _ in d])
+    t = np.array([x for _, x in d])
+    assert np.all(np.abs(roll) <= pb.V6_ROLL_MAX_DEG) and np.all(np.abs(t) <= pb.V6_TRANS_MAX_MM)
+    # spread: values in the inner AND outer half of each bound, both signs (not only the extremes)
+    for v, b in [(roll, pb.V6_ROLL_MAX_DEG)] + [(t[:, k], pb.V6_TRANS_MAX_MM) for k in range(3)]:
+        assert np.any(np.abs(v) < b / 2) and np.any(np.abs(v) > b / 2)
+        assert np.any(v > 0) and np.any(v < 0)
+        assert 0.25 < np.mean(np.abs(v) < b / 2) < 0.75
+    assert len(set(np.round(roll, 6))) == len(roll)
+    rng2 = np.random.default_rng(58)
+    assert all(r == pb.draw_v6(rng2)[0] for r, _ in d)
+
+
+def test_v6_bounds_and_profile_defaults():
+    assert pb.within_bounds_v6({"roll_deg": -1.0, "trans_mm": [5.0, -5.0, 0.0]})
+    assert not pb.within_bounds_v6({"roll_deg": 1.01, "trans_mm": [0, 0, 0]})
+    assert not pb.within_bounds_v6({"roll_deg": 0.0, "trans_mm": [0, 0, -5.01]})
+    assert pb.default_nominal("aa54") == pb.N_NOMINAL == 10 and pb.default_nominal("v6") == pb.V6_N_NOMINAL == 0
+    assert pb.bounds("aa54") == {"rot_max_deg": 2.0, "trans_max_mm_per_axis": 20.0}
+    assert pb.bounds("v6") == {"roll_max_deg": 1.0, "trans_max_mm_per_axis": 5.0}
+    f = pb.schedule_flags(7, n=50, n_nominal=pb.V6_N_NOMINAL)
+    assert len(f) == 50 and not any(f)
+    with pytest.raises(pb.PerturbError, match="unknown perturbation profile"):
+        pb.default_nominal("v5")
+
+
+@pytest.mark.parametrize("arm", ["left", "right"])
+def test_v6_samples_hold_the_servo_roll_offset_and_pass_the_checks(planners, arm):
+    pl = planners[arm]
+    rng = np.random.default_rng(11)
+    for i in range(3):
+        e = pl.sample_v6(i, rng)
+        assert not e.nominal and pb.within_bounds_v6(e.achieved)
+        # servo 5 (wrist_roll) of the HOLDING arm = frozen + the tick-rounded requested offset
+        want = pl.ticks[pl.hold][pb.ROLL_JOINT] + round(e.requested["roll_offset_deg"] / pb.DEG_PER_TICK)
+        assert e.holding_ticks[pb.ROLL_JOINT] == want
+        assert e.achieved["roll_offset_deg"] == pytest.approx(
+            (want - pl.ticks[pl.hold][pb.ROLL_JOINT]) * pb.DEG_PER_TICK, abs=1e-4)
+        lim = pl.limits[pl.hold]
+        assert all(lim[j][0] <= t <= lim[j][1] for j, t in zip(lim, e.holding_ticks))
+        assert e.insert_reach["pos_mm"] <= pb.REACH_POS_MM and e.insert_reach["rot_deg"] <= pb.REACH_ROT_DEG
+        assert pl.line_problem(e.holding_ticks) is None
+        D = pl._grip(pl.hold, e.holding_ticks) @ np.linalg.inv(pl.G0)
+        assert pl.measure_v6(e.holding_ticks, D) == e.achieved
+
+
+def test_v6_schedule_deterministic_for_a_seed(planners, tmp_path):
+    pl = planners["left"]
+    a = pb.plan_schedule(pl, seed=9, n=3, n_nominal=0, profile="v6")
+    b = pb.plan_schedule(pl, seed=9, n=3, n_nominal=0, profile="v6")
+    assert [(e.holding_ticks, e.requested, e.achieved) for e in a] == [(e.holding_ticks, e.requested, e.achieved) for e in b]
+    rec = pb.write(tmp_path / "p.json", pl, 9, a, profile="v6")
+    assert rec["profile"] == "v6" and rec["bounds"] == pb.bounds("v6")
+    assert all("roll_offset_deg" in e["requested"] and "roll_deg" in e["achieved"] for e in rec["episodes"])
+    assert pb.write(tmp_path / "q.json", pl, 9, a)["profile"] == "aa54"          # default unchanged
+
+
+def test_v6_full_schedule_counts_variation_and_spread(planners):
+    """The whole 50-episode v6 schedule for one arm (right, the faster plan): all perturbed, inside
+    the bounds, every requested roll different, and requested + achieved values in both the inner
+    and outer half of each bound (not all near the limits)."""
+    pl = planners["right"]
+    eps = pb.plan_schedule(pl, seed=58, n=pb.N_EPISODES, n_nominal=pb.default_nominal("v6"), profile="v6")
+    assert len(eps) == 50 and not any(e.nominal for e in eps)
+    assert all(pb.within_bounds_v6(e.achieved) for e in eps)
+    assert len({e.requested["roll_offset_deg"] for e in eps}) == 50
+    assert len({tuple(e.holding_ticks) for e in eps}) == 50
+    req = [("roll", [e.requested["roll_offset_deg"] for e in eps], pb.V6_ROLL_MAX_DEG)] + \
+          [(k, [e.requested["trans_mm"][i] for e in eps], pb.V6_TRANS_MAX_MM) for i, k in enumerate("xyz")]
+    ach = [("roll", [e.achieved["roll_deg"] for e in eps], pb.V6_ROLL_MAX_DEG)] + \
+          [(k, [e.achieved["trans_mm"][i] for e in eps], pb.V6_TRANS_MAX_MM) for i, k in enumerate("yz", 1)]
+    for name, v, b in req + ach:
+        v = np.abs(v)
+        assert np.any(v < b / 2) and np.any(v > b / 2), name
