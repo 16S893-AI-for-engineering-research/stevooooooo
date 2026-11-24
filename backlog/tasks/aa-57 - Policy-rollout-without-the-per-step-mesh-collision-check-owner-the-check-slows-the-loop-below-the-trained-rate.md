@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@agent'
 created_date: '2026-11-24 03:32'
-updated_date: '2026-11-24 06:36'
+updated_date: '2026-11-24 15:53'
 labels:
   - safety
   - policy
@@ -49,4 +49,6 @@ Owner 2026-11-24: while a learned policy drives an arm (inchworm_follower tube_s
 2026-11-24 commit 423049b. Full suites before commit: robot EXIT 0 (sequential), lerobot_env EXIT 0. ACs #1-#3 by tests/test_policy_handoff.py (25 passed incl. 9 new). Follow-up investigation (sub-agent, AGENT_REPORT_AA-57b): (1) the after-run train_right gate stop was NOT caused by AA-57. The right_to_train_right planned stream ran late under CPU load (3.64 s for a 2.59 s plan, 89 vs ~126 loops); the stream does not catch up after a host stall, so the arm ended short (lift -52 ticks) and the gate refused (the safe outcome). A repro with the change passed the gate (exit 0). Live risk: a host stall > ~0.3 s in a planned phase stops at the gate (owner decision whether the stream should catch up). (2) Loop rate with the mesh check off: 27.3-27.7 Hz uncontended (repro under 1 suite: left 24.7 Hz / 95 overruns, right 27.3 Hz / 20 overruns; infer p50 9-12 ms, p95 39-79, max ~195). Remaining limiter = ACT chunk inference every 20th step (n_action_steps=20) at ~80-96 ms vs the 33 ms budget, giving ~28 Hz max. Camera replay 1.1 ms, send_action 0.1 ms. AC #4 open (the rate is still below 30 fps; limiter identified with numbers). Proposed, not implemented: compute the next chunk in the background before the queue empties; log the device and chunk vs step inference times. AC #5 (live) open.
 
 2026-11-24 owner question: is background chunk computation what LeRobot does? Design note = doc-5 (sub-agent, quotes the installed lerobot). Answer: no. ACT select_action is synchronous by default (refills the 20-action queue on the caller's thread when it is empty), and lerobot-rollout's default sync engine does the same. LeRobot's background options: RTC (refuses ACT: supports_rtc False) and async_inference (a gRPC policy server + robot client, requests the next chunk at half the queue, blends overlaps 0.3/0.7). async_inference would bypass PolicyAttempt (jump guard, speed cap, finish rule, keys, handoff checks). Recommended: a small background thread in LeRobotBackend (~40-70 lines) mirroring async_inference's threshold, with PolicyAttempt and the safety layers unchanged. Zero-code alternative: n_action_steps 20 -> 100 gives ~29.8 Hz but changes policy behaviour (open loop 3.3 s). Not built; waiting for the owner.
+
+OWNER 2026-11-24: hold off on the background chunk thread, because LeRobot does not do it by default (doc-5). AC #4 stays open with the limiter identified (ACT chunk every 20th step, ~80-96 ms, ~28 Hz). Owner gave the commands for the live runs for later (first live policy run = the AA-56 autonomous crawl).
 <!-- SECTION:NOTES:END -->
