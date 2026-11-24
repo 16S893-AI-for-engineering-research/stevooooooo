@@ -7,6 +7,7 @@
 #      crawl_two_policy.py (lerobot_env) in the same terminal. Every phase keeps its YES prompts.
 #   bash ~/893/robot/lerobot_env/crawl_two_policy.sh --dry-run   # no hardware at all
 #   bash ~/893/robot/lerobot_env/crawl_two_policy.sh             # live, owner supervising
+# -- --autonomous: no prompts after the start replay, timed locks, same order (AA-56, owner 2026-11-24).
 # Extra arguments after -- go to crawl_two_policy.py (e.g. -- --max-s 15, -- --left-checkpoint DIR --right-checkpoint DIR, -- --device cpu).
 # Start state (live): every servo torque OFF, grippers open and empty (bash ~/893/robot/reset_start.sh).
 set -euo pipefail

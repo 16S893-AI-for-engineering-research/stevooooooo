@@ -52,9 +52,26 @@ PHASES: Tuple[Tuple[str, str], ...] = (
 )
 PHASE_NAMES = tuple(n for n, _ in PHASES)
 
-#: AA-56 (owner 2026-11-23) ``--autonomous``: no prompts after the start replay, timed locks, and the
-#: left goes to its train_right (regrip) pose with BOTH grippers LOCKED before the right un-inserts.
+#: AA-56 ``--autonomous`` (owner 2026-11-24 02:05Z): no prompts after the start replay, timed locks,
+#: and the ORIGINAL AA-55 order (right unlocks + out first, then the left with the tube to
+#: train_right; every move mesh-checked with the carried tube).
 AUTO_PHASES: Tuple[Tuple[str, str], ...] = (
+    ("replay_0_42", "cycle frames 0..42 with the tube (the start replay keeps its two typed YES)"),
+    ("left_policy", "LEFT policy; locks when finished by the rule or at the lock timer (else 1 retry)"),
+    ("left_lock", "left gripper LOCKS (AA-17), read back; offset from the finish reference logged"),
+    ("right_out", "right UNLOCKS (left reads LOCKED), straight out of its key 50 mm, then clear"),
+    ("left_to_train_right", "left (LOCKED, with the tube) to its train_right holding pose (mesh-checked)"),
+    ("right_to_train_right", "right to its train_right start pose (timeline frames 55..train_right frame)"),
+    ("right_policy", "RIGHT policy; locks when finished by the rule or at the lock timer (else 1 retry)"),
+    ("right_lock", "right gripper LOCKS (AA-17), read back"),
+    ("home", "both arms (both LOCKED) to the cycle home pose (timeline frame 86)"),
+)
+AUTO_PHASE_NAMES = tuple(n for n, _ in AUTO_PHASES)
+
+#: AA-56 first version (owner 2026-11-23, REVERSED 2026-11-24 02:05Z; now only with the explicit
+#: ``--regrip-first`` flag): the left goes to its train_right (regrip) pose with BOTH grippers
+#: LOCKED before the right un-inserts.
+REGRIP_FIRST_PHASES: Tuple[Tuple[str, str], ...] = (
     ("replay_0_42", "cycle frames 0..42 with the tube (the start replay keeps its two typed YES)"),
     ("left_policy", "LEFT policy; locks when finished by the rule or at the lock timer (else 1 retry)"),
     ("left_lock", "left gripper LOCKS (AA-17), read back; refused > 8 deg from the finish reference"),
@@ -66,7 +83,7 @@ AUTO_PHASES: Tuple[Tuple[str, str], ...] = (
     ("right_lock", "right gripper LOCKS (AA-17), read back"),
     ("home", "both arms (both LOCKED) to the cycle home pose (timeline frame 86)"),
 )
-AUTO_PHASE_NAMES = tuple(n for n, _ in AUTO_PHASES)
+REGRIP_FIRST_PHASE_NAMES = tuple(n for n, _ in REGRIP_FIRST_PHASES)
 
 POSE_TOL_TICKS = 34                 # = inchworm.handoff.POSE_TOL_TICKS (~3 deg)
 LOCK_NEAR_DEG = 8.0                 # = policy_handoff.FINISH_NEAR_DEG
