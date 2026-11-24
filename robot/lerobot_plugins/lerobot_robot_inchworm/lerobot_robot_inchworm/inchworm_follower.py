@@ -27,7 +27,9 @@ Safety (same as ``scripts/teleop_live.py``):
   collision check is ON (tube where the cycle left it, other arm where it reads). The first
   actions CATCH UP slowly (catchup_deg_s, default 5 deg/s) from the stop pose to the leader
   (replaces the 10 deg start gate); a goal that touches anything is not sent (the arm holds,
-  then catches up again). disconnect(): support the tube and both arms, Enter, joints 1-5 of
+  then catches up again). ``policy_no_mesh_check`` (AA-57, policy runners only, owner
+  2026-11-24): goals after the catch-up are not mesh-checked (logged at connect).
+  disconnect(): support the tube and both arms, Enter, joints 1-5 of
   BOTH arms torque OFF; the grippers are never touched (the other one stays LOCKED).
 * Camera: the arm's wrist camera through the AA-6 arbiter (global one-camera lock held for the
   whole connection); damaged frames are skipped (grab_valid), never raised.
@@ -256,6 +258,8 @@ class InchwormFollower(Robot):
                 out.append("catchup_deg_s must be 0.5..10")
         elif not c.no_collision_check:
             out.append("this path has no mesh collision check; set --robot.no_collision_check=\"<owner reason>\"")
+        if c.policy_no_mesh_check and c.tube_support != "handoff":
+            out.append("policy_no_mesh_check applies to tube_support=handoff only")
         lim = getattr(cfg.motion_guard, f"{c.follower}_arm_limits")
         if getattr(lim, "unverified", True) and not c.allow_unverified_soft_limits:
             out.append("soft limits are unverified; set --robot.allow_unverified_soft_limits=\"<owner approval>\"")
@@ -331,7 +335,12 @@ class InchwormFollower(Robot):
                        "follower_ticks": self.core.follower_ticks(),
                        "limits": {j: [round(x) for x in v] for j, v in limits.items()},
                        "soft_limits_override": c.allow_unverified_soft_limits,
-                       "no_collision_check": c.no_collision_check, **tube})
+                       "no_collision_check": c.no_collision_check,
+                       "policy_no_mesh_check": c.policy_no_mesh_check, **tube})
+            if handoff and c.policy_no_mesh_check:
+                self._log({"event": "mesh_check_skipped_policy", "reason": c.policy_no_mesh_check,
+                           "scope": "policy goals after the start catch-up; catch-up, returns and "
+                                    "planned moves stay mesh-checked"})
             if c.confirm and handoff:
                 print("\nCONFIRM before anything moves (demo start, both arms are holding now):\n"
                       "  - the other arm is LOCKED on the tube, torque on; it will not be commanded\n"
@@ -400,12 +409,15 @@ class InchwormFollower(Robot):
         return CollisionGate(cfg, follower, other_q, tube)
 
     def _handoff_goal(self, raw: list) -> Optional[list]:
-        """Handoff mode: rate-limited catch-up, then the leader target; every step mesh-checked.
+        """Handoff mode: rate-limited catch-up, then the leader target; every step mesh-checked,
+        except with ``policy_no_mesh_check`` (AA-57) after the catch-up is done.
         Returns the follower-tick goal to command, or None = hold the last goal."""
         from inchworm import handoff as ho
         h, tl, c = self._handoff, self._tl, self.config
         target, _ = self.core.target_from_follower_ticks(raw, self.core.last_goal)
         goal = target
+        if not h["catching_up"] and c.policy_no_mesh_check:
+            return goal                          # AA-57: owner-approved, logged at connect
         if h["catching_up"]:
             step = c.catchup_deg_s / c.control_hz / tl.DEG_PER_TICK
             goal, done = ho.catch_up_target(self.core.last_goal, target, step)

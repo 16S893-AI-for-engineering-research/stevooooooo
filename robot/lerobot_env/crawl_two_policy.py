@@ -295,6 +295,7 @@ def main(argv=None, ui=None) -> int:
     def make_robot(arm, state_path):
         r = InchwormFollower(InchwormFollowerConfig(
             id=arm, follower=arm, camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
+            policy_no_mesh_check=ph.POLICY_NO_MESH_CHECK,
             confirm=not a.autonomous,
             handoff_state=str(state_path), allow_unverified_soft_limits=a.allow_unverified_soft_limits,
             control_hz=float(a.fps), log_dir=str(OUT_DIR) if a.dry_run else ""))

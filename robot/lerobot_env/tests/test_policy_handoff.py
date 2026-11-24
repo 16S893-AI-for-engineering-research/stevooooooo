@@ -256,3 +256,150 @@ def test_finish_rule_on_the_three_live_attempts():
                 hit = round(t, 1); break
         fired.append(hit)
     assert fired == [13.7, 12.4, None]
+
+
+# --- AA-57 (owner 2026-11-24): no per-goal mesh check on policy steps after the start catch-up ------
+class CountingGate(Gate):
+    """Gate that records whether the follower was still catching up when each check ran."""
+
+    def __init__(self, robot_ref, hit_above=None):
+        super().__init__(hit_above)
+        self.robot_ref, self.phases = robot_ref, []
+
+    def step_problem(self, a, b):
+        r = self.robot_ref.get("r")
+        self.phases.append(None if r is None or r._handoff is None else bool(r._handoff["catching_up"]))
+        return super().step_problem(a, b)
+
+
+def _policy_robot(tmp_path, monkeypatch, skip=ph.POLICY_NO_MESH_CHECK, hit_above=None):
+    clock = sim.SimClock()
+    hw = HandoffHW(clock)
+    ref = {}
+    gate = CountingGate(ref, hit_above)
+    r, _ = _handoff_robot(tmp_path, monkeypatch, hw, gate=gate, policy_no_mesh_check=skip)
+    ref["r"] = r
+    r.connect()
+    return r, hw, gate, clock
+
+
+def _run_policy(r, clock, fn, **kw):
+    return ph.PolicyAttempt(r, Policy(fn), clock=clock, sleep=clock.sleep, say=lambda *_: None, **kw).run()
+
+
+def test_policy_steps_after_the_catch_up_are_not_mesh_checked(tmp_path, monkeypatch):
+    goal = F_DEG + np.array([0, 4.0, 0, 0, 0])
+    r, hw, gate, clock = _policy_robot(tmp_path, monkeypatch)
+    checks_at_connect = gate.checks                                     # present-pose start check (kept)
+    assert checks_at_connect == 1
+    res = _run_policy(r, clock, lambda p, i: goal, max_deg_s=5.0, max_s=3.0)
+    assert res["steps"] >= 85 and not r._handoff["catching_up"]
+    # the catch-up (already at the stop pose: one step, the one that ends it) is the only checked step
+    assert gate.checks - checks_at_connect == 1 and len(gate.phases) == 1
+    assert max(abs(hw.bus.pos[i + 1] - g / tl.DEG_PER_TICK) for i, g in enumerate(goal)) <= 3
+    ev = _log(tmp_path)
+    skip = [e for e in ev if e["event"] == "mesh_check_skipped_policy"]
+    assert len(skip) == 1 and skip[0]["reason"] == ph.POLICY_NO_MESH_CHECK and "owner 2026-11-24" in skip[0]["reason"]
+    assert [e for e in ev if e["event"] == "connect"][0]["policy_no_mesh_check"] == ph.POLICY_NO_MESH_CHECK
+    r.disconnect()
+
+
+def test_policy_skip_still_clamps_to_the_joint_limits(tmp_path, monkeypatch):
+    r, hw, gate, clock = _policy_robot(tmp_path, monkeypatch)
+    lim = r.core.limits["shoulder_lift"]
+    r.send_action({f"{j}.pos": float(v) for j, v in zip(tl.J5, F_DEG)})   # catch-up done (already there)
+    assert not r._handoff["catching_up"]
+    beyond = list(F_DEG); beyond[1] = (lim[1] + 200) * tl.DEG_PER_TICK    # past the soft/EEPROM limit
+    for _ in range(200):
+        sent = r.send_action({f"{j}.pos": float(v) for j, v in zip(tl.J5, beyond)}); clock.sleep(1 / 30)
+    assert sent["shoulder_lift.pos"] / tl.DEG_PER_TICK <= lim[1] + 1e-6
+    assert hw.bus.goal[2] <= lim[1] + 1
+    r.disconnect()
+
+
+def test_policy_skip_keeps_the_jump_guard_speed_cap_and_stop_file(tmp_path, monkeypatch):
+    far = F_DEG + np.array([0, 0, 15.0, 0, 0])
+    r, hw, gate, clock = _policy_robot(tmp_path, monkeypatch)
+    res = _run_policy(r, clock, lambda p, i: far if i >= 5 else p, max_s=3.0)
+    assert res["end"] == "jump_guard" and abs(hw.bus.goal[3] - F_TICKS[2]) <= 1
+    sent = []
+    orig = r.send_action
+    r.send_action = lambda a: sent.append(a) or orig(a)
+    goal = F_DEG + np.array([0, 9.0, 0, 0, 0])
+    _run_policy(r, clock, lambda p, i: goal, max_deg_s=5.0, max_s=2.5)
+    lift = [a["shoulder_lift.pos"] for a in sent]
+    assert np.abs(np.diff([F_DEG[1]] + lift)).max() <= 5.0 / 30 + 1e-6
+    import lerobot_robot_inchworm.inchworm_follower as fmod
+    fmod.STOP_FILE.write_text("stop")
+    with pytest.raises(KeyboardInterrupt):
+        r.send_action({f"{j}.pos": float(v) for j, v in zip(tl.J5, F_DEG)})
+    fmod.STOP_FILE.unlink()
+    r.disconnect()
+
+
+def test_policy_skip_keeps_the_mesh_check_on_the_catch_up(tmp_path, monkeypatch):
+    """A catch-up into a contact still holds; once clear the policy steps are unchecked."""
+    limit = F_TICKS[1] + 30
+    r, hw, gate, clock = _policy_robot(tmp_path, monkeypatch, hit_above=limit)
+    r._handoff["catching_up"] = True
+    tgt = list(F_DEG); tgt[1] += 8.0                                    # catch-up target beyond the contact
+    for _ in range(120):
+        r.send_action({f"{j}.pos": float(v) for j, v in zip(tl.J5, tgt)}); clock.sleep(1 / 30)
+    assert hw.bus.goal[2] <= limit and r._handoff["held"] > 0 and r._handoff["catching_up"]
+    assert all(gate.phases)                                             # every check ran during the catch-up
+    assert "collision_hold" in [e["event"] for e in _log(tmp_path)]
+    r.disconnect()
+
+
+def test_policy_skip_return_is_still_mesh_checked(tmp_path, monkeypatch):
+    from inchworm.handoff_return import ReturnRefused
+    from tests.test_inchworm_plugin import FreeModel, LinChain, ReturnHW
+    clock = sim.SimClock()
+    hw = ReturnHW(clock)
+    r, _ = _handoff_robot(tmp_path, monkeypatch, hw, answers=("YES", "YES", ""),
+                          policy_no_mesh_check=ph.POLICY_NO_MESH_CHECK)
+    model = FreeModel({"left": F_TICKS, "right": [2063, 1730, 1941, 1865, 2055]},
+                      hit="mesh collision: left_gripper intersects tube_1")
+    r._make_return_model = lambda cfg: model
+    r._make_chain = lambda cfg: LinChain()
+    r.connect()
+    _run_policy(r, clock, lambda p, i: F_DEG + np.array([0, 3.0, 0, 0, 0]), max_s=2.0)
+    before = (dict(hw.bus.goal), dict(hw.other_bus.goal))
+    with pytest.raises(ReturnRefused, match="mesh collision"):
+        r.handoff_return(confirm=True, clock=clock, sleep=clock.sleep)
+    assert model.checks > 0 and (dict(hw.bus.goal), dict(hw.other_bus.goal)) == before
+    model.hit = None
+    r.handoff_return(confirm=True, clock=clock, sleep=clock.sleep)
+    assert r._handoff["catching_up"]                                    # next attempt: checked catch-up again
+    r.disconnect()
+
+
+def test_teleop_default_checks_every_goal(tmp_path, monkeypatch):
+    """Without the field (record_handoff / record_train / teleop): every goal mesh-checked, nothing logged."""
+    from lerobot_robot_inchworm import InchwormFollowerConfig
+    assert InchwormFollowerConfig().policy_no_mesh_check == ""
+    goal = F_DEG + np.array([0, 4.0, 0, 0, 0])
+    r, hw, gate, clock = _policy_robot(tmp_path, monkeypatch, skip="")
+    res = _run_policy(r, clock, lambda p, i: goal, max_deg_s=5.0, max_s=3.0)
+    assert gate.checks >= res["steps"] + 1 and False in gate.phases     # post-catch-up goals checked
+    assert "mesh_check_skipped_policy" not in [e["event"] for e in _log(tmp_path)]
+    r.disconnect()
+
+
+def test_policy_skip_is_refused_outside_handoff(tmp_path, monkeypatch):
+    from lerobot_robot_inchworm import InchwormRefused
+    from tests.test_inchworm_plugin import _robot
+    r, _ = _robot(tmp_path, monkeypatch, policy_no_mesh_check="x")
+    with pytest.raises(InchwormRefused, match="policy_no_mesh_check"):
+        r.connect()
+
+
+@pytest.mark.parametrize("script", ["policy_handoff.py", "full_policy_test.py", "crawl_two_policy.py"])
+def test_policy_runners_pass_the_owner_reason(script):
+    src = (ROBOT / "lerobot_env" / script).read_text()
+    assert "policy_no_mesh_check=" in src and "POLICY_NO_MESH_CHECK" in src
+
+
+@pytest.mark.parametrize("script", ["record_handoff.py", "record_train.py"])
+def test_recording_paths_keep_the_mesh_check(script):
+    assert "policy_no_mesh_check" not in (ROBOT / "lerobot_env" / script).read_text()

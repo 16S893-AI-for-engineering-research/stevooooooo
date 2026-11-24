@@ -3,7 +3,8 @@
 The trained ACT checkpoint drives the LEFT arm instead of the leader, through the same
 ``inchworm_follower`` plugin in ``tube_support=handoff`` mode that records the demos, so every
 existing safety layer stays in force: handoff checks + typed YES at connect, the mesh
-collision check of every goal (tube where the cycle left it; a hit = hold), soft / EEPROM /
+collision check of the start catch-up (tube where the cycle left it; a hit = hold; policy steps
+after it are NOT mesh-checked, owner 2026-11-24, AA-57, logged), soft / EEPROM /
 hardware.yaml limits, the stop file, joints 1-5 only (the gripper is never in the action
 space and is never commanded), and the release prompt at the end.
 
@@ -48,6 +49,9 @@ import numpy as np
 ROBOT = Path(__file__).resolve().parents[1]
 DEFAULT_CKPT = ROBOT / "out/train/insert_left_20261119T221003Z/checkpoints/020000/pretrained_model"
 DEFAULT_REPLAY = ROBOT / "datasets/insert_left_20261119T221003Z"
+#: AA-57 owner approval, passed as InchwormFollowerConfig.policy_no_mesh_check by every policy runner:
+#: no per-goal mesh check on policy steps after the start catch-up (logged at connect).
+POLICY_NO_MESH_CHECK = "owner 2026-11-24: mesh check slows the policy loop below the trained 30 fps (AA-57)"
 #: Median final pose of the 29 episodes of insert_left_20261119T221003Z (left arm, ticks),
 #: measured 2026-11-20 (AA-39 notes). The finish rule compares against it.
 DEMO_END_LEFT_TICKS = (1977, 2195, 1930, 1396, 1988)
@@ -336,7 +340,7 @@ def main(argv=None) -> int:
 
     robot = InchwormFollower(InchwormFollowerConfig(
         id=a.arm, follower=a.arm, camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
-        handoff_state=str(state_path),
+        handoff_state=str(state_path), policy_no_mesh_check=POLICY_NO_MESH_CHECK,
         allow_unverified_soft_limits=a.allow_unverified_soft_limits, control_hz=float(a.fps),
         log_dir=str(ROBOT / "out" / "rollout") if a.dry_run else ""))
     utc = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())

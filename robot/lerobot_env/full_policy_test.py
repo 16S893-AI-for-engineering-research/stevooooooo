@@ -3,7 +3,8 @@
 Starts AFTER ``scripts/replay_cycle.py --stop-after-frame 42 --tube-in-grippers`` (the launcher
 ``full_policy_test.sh`` runs both). Phases (plan F2-F7 in AA-39):
 
-F2  LEFT policy (inchworm_follower, tube_support=handoff: mesh gate with the tube, speed cap,
+F2  LEFT policy (inchworm_follower, tube_support=handoff: mesh gate with the tube on the start
+    catch-up only (policy steps unchecked, owner 2026-11-24, AA-57), speed cap,
     jump guard, time cap, finish rule). After each attempt the owner chooses (decision 2a):
     l = lock (anyway), r = return to the stop pose + retry, q = quit (release prompt).
 F3  The follower DETACHES HOLDING (no torque cut). Both ports reopen in the cycle runner, which
@@ -383,6 +384,7 @@ def main(argv=None, ui=None) -> int:
     def make_robot(arm, state_path):
         r = InchwormFollower(InchwormFollowerConfig(
             id=arm, follower=arm, camera=True, tube_support="handoff", catchup_deg_s=a.max_deg_s,
+            policy_no_mesh_check=ph.POLICY_NO_MESH_CHECK,
             handoff_state=str(state_path), allow_unverified_soft_limits=a.allow_unverified_soft_limits,
             control_hz=float(a.fps), log_dir=str(tdir) if a.dry_run else ""))
         if a.dry_run:

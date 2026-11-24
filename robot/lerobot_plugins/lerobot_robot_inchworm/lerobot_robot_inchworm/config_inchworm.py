@@ -33,6 +33,10 @@ class InchwormFollowerConfig(RobotConfig):
     handoff_state: str = ""
     #: handoff: catch-up speed from the stop pose to the leader (deg/s per joint; max 10).
     catchup_deg_s: float = 5.0
+    #: handoff, policy runners only (AA-57, owner 2026-11-24): owner reason (logged) to skip the
+    #: per-goal mesh check once the start catch-up is done. The catch-up stays mesh-checked;
+    #: limits, stop file and the runner's jump guard / speed cap stay. Empty = every goal checked.
+    policy_no_mesh_check: str = ""
     speed_ticks_s: int = 250
     smooth_alpha: float = 1.0
     #: Wrist camera through the AA-6 arbiter. False = joints only (e.g. a first teleoperate run).
