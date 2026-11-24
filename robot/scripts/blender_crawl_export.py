@@ -81,14 +81,16 @@ def main() -> int:
             "right_locked": fr["right_locked"],
             "poses": {l: (W @ P).tolist() for l, P in poses.items() if l != TUBE_LINK},
         })
-    tube_pose = M0 @ chk.link_poses(state(frames[0]))[TUBE_LINK]
+    # link_poses already places the tube at M0 @ P_cad (frame 0, W_0 = I).
+    tube_pose = chk.link_poses(state(frames[0]))[TUBE_LINK]
 
     # Visual meshes in link frames (vertices merged so smooth shading works).
     arrays = {}
     links = []
     for link in model.links:
         gs = model.visuals.get(link, [])
-        if not gs:
+        # Owner 2026-11-24: no DexArm claw gripper in the render (print head only).
+        if not gs or link.startswith(("GripperMount", "GripperAxis", "GripperFinger")):
             continue
         parts = [load_geometry_mesh(gm) for gm in gs]
         m = trimesh.util.concatenate(parts) if len(parts) > 1 else parts[0]
@@ -99,11 +101,14 @@ def main() -> int:
 
     # Extended tube: model tube = 3 sections; older sections lie on the side
     # away from the DexArm (+axis), the newest end stays at the DexArm.
+    # The displayed tube is rotated by M0 (its start placement on the grippers,
+    # ~1 deg yaw from CAD), so the copies must step along the ROTATED axis.
+    disp_axis = M0[:3, :3] @ axis
     n_copies = max(1, int(np.ceil(args.sections / 3)))
     tube_sections = []
     for k in range(n_copies):
         S = np.eye(4)
-        S[:3, 3] = axis * (3 * pitch * k)
+        S[:3, 3] = disp_axis * (3 * pitch * k)
         tube_sections.append((S @ tube_pose).tolist())
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -112,7 +117,7 @@ def main() -> int:
         "links": links,
         "tube_link": TUBE_LINK,
         "tube_sections": tube_sections,
-        "tube_axis": axis.tolist(),
+        "tube_axis": disp_axis.tolist(),
         "pitch_m": pitch,
         "frames": out_frames,
     }
@@ -120,7 +125,7 @@ def main() -> int:
     base0 = np.array(out_frames[0]["poses"]["baseforreal"])[:3, 3]
     base1 = np.array(out_frames[-1]["poses"]["baseforreal"])[:3, 3]
     print(f"{len(out_frames)} frames, {len(links)} links, {n_copies * 3} tube sections")
-    print(f"robot base travel along the tube: {(base1 - base0) @ axis * 1000:+.1f} mm "
+    print(f"robot base travel along the tube: {(base1 - base0) @ disp_axis * 1000:+.1f} mm "
           f"(pitch {pitch * 1000:.1f} mm)")
     print(f"wrote {args.out}")
     return 0

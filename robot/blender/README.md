@@ -3,7 +3,7 @@
 Renders the validated AA-45 crawl cycle (`out/inchworm/timeline.jsonl`) from the
 cell URDF, shown from the tube's point of view: the tube stays still (extended
 with older printed sections) and the robot crawls one pitch along it. All parts
-are white plastic on a starfield; a 3/4 camera orbits the robot.
+are white plastic on a starfield; a fixed 3/4 camera; no DexArm claw gripper.
 
 ```bash
 cd robot

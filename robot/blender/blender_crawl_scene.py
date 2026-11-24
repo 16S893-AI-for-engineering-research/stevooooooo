@@ -3,7 +3,7 @@
 Input: ``out/blender/crawl_data.npz`` + ``crawl_frames.json`` from
 ``blender_crawl_export.py``. Builds the cell (all links in white plastic), a
 long stationary tube (older printed sections behind the robot), a procedural
-starfield world, a 3/4 elevated camera orbiting the crawling robot, and keys
+starfield world, a fixed 3/4 elevated camera, and keys
 the robot motion from the validated AA-45 timeline. Saves a .blend and,
 unless --no-render, renders an MP4 (EEVEE, 1280x720, 30 fps).
 
@@ -135,9 +135,7 @@ def centre(fr):
 c0, c1 = centre(frames[0]), centre(frames[-1])
 target = bpy.data.objects.new("CamTarget", None)
 scene.collection.objects.link(target)
-for t, c in ((1, c0), (DURATION, c1)):
-    target.location = c
-    target.keyframe_insert("location", frame=t)
+target.location = c0  # owner 2026-11-24: fixed camera at the starting view
 
 pivot = bpy.data.objects.new("CamPivot", None)
 scene.collection.objects.link(pivot)
@@ -154,10 +152,8 @@ trk = cam.constraints.new("TRACK_TO")
 trk.target = target
 trk.track_axis, trk.up_axis = "TRACK_NEGATIVE_Z", "UP_Y"
 scene.camera = cam
-az0 = math.radians(-35)  # start: front 3/4, DexArm side visible
-for t, az in ((1, az0), (DURATION, az0 + math.pi)):
-    pivot.rotation_euler = (0, 0, az)
-    pivot.keyframe_insert("rotation_euler", frame=t)
+az0 = math.radians(-35)  # front 3/4, DexArm side visible; no orbit
+pivot.rotation_euler = (0, 0, az0)
 
 # --- lights ---------------------------------------------------------------
 def light(name, kind, energy, loc, size=1.0, color=(1, 1, 1)):
