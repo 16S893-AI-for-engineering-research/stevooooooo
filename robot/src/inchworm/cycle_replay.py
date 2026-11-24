@@ -444,6 +444,8 @@ STREAM_ACCEL = 100              # servo ramp (x100 ticks/s^2): smooths the speed
 STREAM_SPEED_CAP_TICKS_S = 1000 # Goal_Speed ceiling while streaming
 SETTLE_S = 1.0                  # at the end of a piece: wait at most this long for the last frame
 PREFLIGHT_STREAM_DT_S = 0.02    # offline check of the streamed path at the stream rate (every 20 ms)
+CATCH_UP_BRIDGE_TICKS_S = APPROACH_TICKS_S   # AA-61: the bridge back onto the path is slow
+CATCH_UP_DEG_PER_SAMPLE = 1.0   # mesh samples along the bridge: at least one per degree
 
 
 @dataclass
@@ -607,6 +609,43 @@ def stream_preflight(cfg, segs: Sequence[Segment], checker, frames: Optional[Seq
                 problems.append(bad)
                 break
     return problems
+
+
+def catch_up_bridge_problems(cfg, checker, q_from: Dict[str, np.ndarray], q_to: Dict[str, np.ndarray],
+                             tube: Optional[np.ndarray]) -> List[str]:
+    """AA-61: the joint line (both arms together) from the present pose back onto a
+    preflighted path point, checked as :func:`stream_preflight` checks the path: soft
+    limits, EEPROM tick limits and the cell mesh model (per-arm pairs with ``tube``, all
+    pairs without), at both ends and at least once per degree. Fails closed."""
+    from inchworm.inchworm_plan import configured_soft_limits
+    soft = configured_soft_limits(cfg)
+    if soft is None:
+        return ["soft limits not configured"]
+    if checker is None:
+        return ["mesh collision model unavailable"]
+    span = max(float(np.abs(q_to[a] - q_from[a]).max()) for a in ARMS)
+    n = max(1, int(math.ceil(math.degrees(span) / CATCH_UP_DEG_PER_SAMPLE)))
+    for k in range(n + 1):
+        t = k / n
+        q = {a: (1 - t) * q_from[a] + t * q_to[a] for a in ARMS}
+        where = f"catch-up bridge t={t:.2f}"
+        for a in ARMS:
+            lo, hi = soft[a]
+            for j, v, l, h in zip(JOINTS, q[a], lo, hi):
+                if not (l - 1e-9 <= v <= h + 1e-9):
+                    return [f"{where}: {a} {j} {math.degrees(v):.1f} deg outside soft limits"]
+            lim = getattr(cfg.motion_guard, f"{a}_arm_limits").servo_tick_limits or {}
+            for j, tk in zip(JOINTS, q_to_ticks(cfg, a, q[a])):
+                if j in lim and not (lim[j][0] <= tk <= lim[j][1]):
+                    return [f"{where}: {a} {j} tick {tk} outside EEPROM {lim[j]}"]
+        try:
+            st = cell_state(q["left"], q["right"], tube)
+            hits = checker.check(st) if tube is None else [c for a in ARMS for c in checker.check(st, arm=a)]
+        except Exception as exc:  # noqa: BLE001 - fail closed
+            hits = [f"collision check failed: {exc}"]
+        if hits:
+            return [f"{where}: {hits[0]}"]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -878,16 +917,39 @@ class ReplayRunner:
     def _stream_segment(self, seg: Segment):
         """Stream the confirmed path: both arms get the path point for the CURRENT time every
         20 ms (one sync-write packet per arm). No per-point checks (the whole path was checked
-        before the owner's YES). Read-back is for the log only and never stops the motion."""
-        from inchworm.servo_bus import ServoError
+        before the owner's YES). Read-back is for the log only and never stops the motion.
+        AA-61: a stream that ends outside the arrival tolerance gets ONE :meth:`_catch_up`."""
         for h in self.arms.values():
             for j in JOINTS:
                 h.bus.set_acceleration(h.ids[j], STREAM_ACCEL)
+        t0 = self.clock()
+        n, lag, hot, peak_load, read_errors = self._stream_path(seg, 0.0)
+        end = self.frames[seg.last - self.frames[0].index]
+        goals = {a: q_to_ticks(self.cfg, a, end.q[a]) for a in ARMS}
+        strict, self.abort_on_faults = self.abort_on_faults, False
+        try:
+            final, peak2, _ = self._wait_arrival(goals, SETTLE_S, seg.last)
+            short = {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS}
+            if any(abs(e) > REACH_TOL_TICKS for a in ARMS for e in short[a]):
+                final, peak3 = self._catch_up(seg, goals, short)
+                peak2 = {a: [max(x, y) for x, y in zip(peak2[a], peak3[a])] for a in ARMS}
+        finally:
+            self.abort_on_faults = strict
+        self.log({"event": "segment", "frames": [seg.first, seg.last], "step": end.step,
+                  "planned_s": round(seg.duration_s, 2), "took_s": round(self.clock() - t0, 2),
+                  "loops": n, "worst_path_error_ticks": lag, "max_temp_read_c": hot,
+                  "read_errors": read_errors,
+                  "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS},
+                  "peak_abs_load": {a: [max(x, y) for x, y in zip(peak_load[a], peak2[a])] for a in ARMS}})
+
+    def _stream_path(self, seg: Segment, t_start: float):
+        """The stream loop of :meth:`_stream_segment` from path time ``t_start`` to the end."""
+        from inchworm.servo_bus import ServoError
         lag = {a: 0 for a in ARMS}
         hot = {a: 0 for a in ARMS}
         peak_load = {a: [0] * 5 for a in ARMS}
         read_errors, n = 0, 0
-        t0 = self.clock()
+        t0 = self.clock() - t_start
         while True:
             if self.should_abort():
                 raise ReplayAborted("stop requested")
@@ -919,19 +981,53 @@ class ReplayRunner:
             rest = STREAM_PERIOD_S - (self.clock() - now)
             if rest > 0:
                 self.sleep(rest)
-        end = self.frames[seg.last - self.frames[0].index]
-        goals = {a: q_to_ticks(self.cfg, a, end.q[a]) for a in ARMS}
-        strict, self.abort_on_faults = self.abort_on_faults, False
-        try:
-            final, peak2, _ = self._wait_arrival(goals, SETTLE_S, seg.last)
-        finally:
-            self.abort_on_faults = strict
-        self.log({"event": "segment", "frames": [seg.first, seg.last], "step": end.step,
-                  "planned_s": round(seg.duration_s, 2), "took_s": round(self.clock() - t0, 2),
-                  "loops": n, "worst_path_error_ticks": lag, "max_temp_read_c": hot,
-                  "read_errors": read_errors,
-                  "final_error_ticks": {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS},
-                  "peak_abs_load": {a: [max(x, y) for x, y in zip(peak_load[a], peak2[a])] for a in ARMS}})
+        return n, lag, hot, peak_load, read_errors
+
+    def _catch_up(self, seg: Segment, goals: Dict[str, List[int]], short: Dict[str, List[int]]):
+        """AA-61: ONE catch-up after a stream that ended outside the arrival tolerance (a host
+        stall leaves the servos on slow end-of-path speeds). The rest of the SAME preflighted
+        path is streamed again at the planned tempo, from the planned stream sample nearest the
+        present pose. The short bridge from the present pose to that sample is a joint line,
+        checked before it moves (soft + EEPROM limits, the cell mesh model as the stream
+        preflight); any problem = no catch-up. Returns (final ticks, peak loads)."""
+        from inchworm.so101_pose_reader import ticks_to_q
+        lag_ticks = {a: max(abs(e) for e in short[a]) for a in ARMS}
+        present = {a: self._ticks(a) for a in ARMS}
+        ts = stream_samples(seg)
+        planned = [{a: q_to_ticks(self.cfg, a, seg.q(t)[a]) for a in ARMS} for t in ts]
+        dist = [max(abs(p - c) for a in ARMS for p, c in zip(pt[a], present[a])) for pt in planned]
+        k = int(np.argmin(dist))
+        t_join = float(ts[k])
+        q_now = {a: np.asarray(ticks_to_q(self.cfg, a, present[a]), dtype=np.float64) for a in ARMS}
+        q_join = seg.q(t_join)
+        tube = None
+        seg_frames = self.frames[seg.first - self.frames[0].index: seg.last - self.frames[0].index + 1]
+        if seg.s_at is not None and seg_frames and all(f.tube is not None for f in seg_frames):
+            tube = tube_at(seg_frames, seg.s_at(t_join))
+        checker = self.arms[ARMS[0]].guarded.guard.mesh.checker
+        problems = catch_up_bridge_problems(self.cfg, checker, q_now, q_join, tube)
+        rec = {"event": "stream_catch_up", "frames": [seg.first, seg.last], "lag_ticks": lag_ticks,
+               "error_ticks": short, "t_join_s": round(t_join, 2), "bridge_ticks": int(dist[k])}
+        if problems:
+            self.log({**rec, "status": "refused", "problems": problems[:3]})
+            return present, {a: [0] * 5 for a in ARMS}
+        self.log({**rec, "status": "start"})
+        if dist[k] > 0:
+            sp_t = {}
+            exp = 0.0
+            for a in ARMS:
+                sp, t = frame_speeds(q_now[a], q_join[a], CATCH_UP_BRIDGE_TICKS_S)
+                sp_t[a] = sp
+                exp = max(exp, t)
+            for a in ARMS:
+                self.arms[a].guarded.write_preflighted_ticks(planned[k][a], sp_t[a])
+            self._wait_arrival(planned[k], exp, seg.last)
+        self._stream_path(seg, t_join)
+        final, peak, _ = self._wait_arrival(goals, SETTLE_S, seg.last)
+        err = {a: [f - g for f, g in zip(final[a], goals[a])] for a in ARMS}
+        self.log({**rec, "status": "done", "final_error_ticks": err,
+                  "within_tolerance": all(abs(e) <= REACH_TOL_TICKS for a in ARMS for e in err[a])})
+        return final, peak
 
     # -- AA-52 touching fold ---------------------------------------------
     def _elbow_state(self, arm: str):

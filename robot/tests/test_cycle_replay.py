@@ -573,3 +573,128 @@ def test_fold_press_move_passes_the_cell_preflight():
     mesh = build_mesh_collision_guard(cfg, "left")
     assert cr.fold_press_preflight(cfg, fr[0], mesh.checker, samples=5) == []
     assert cr.fold_press_preflight(cfg, fr[-1], mesh.checker, samples=5) == []
+
+
+# -- AA-61: one catch-up after a host stall ----------------------------------
+def _catch_up_plan(cfg):
+    """One 1.2 s segment (both arms LOCKED): long enough for a stall to leave the arms short."""
+    from inchworm.so101_pose_reader import ticks_to_q
+    q = {a: np.array(ticks_to_q(cfg, a, [2048, 1500, 2800, 1100, 2048])) for a in cr.ARMS}
+    step = np.array([0, 0.08, -0.08, 0.04, 0])
+    return [cr.Frame(k, "move", {a: v + k * step for a, v in q.items()}, {"left": True, "right": True})
+            for k in range(6)]
+
+
+def _stalled_stream(cfg, stall_s, at_frac=0.3, should_abort=lambda: False, stall=None, recs=None, writes=None):
+    """Stream the catch-up plan once; the host 'stalls' ``stall_s`` (sim clock jump inside a
+    sleep) at ``at_frac`` of the planned time. Returns (records, writes, segment, buses)."""
+    plan = _catch_up_plan(cfg)
+    seg = cr.build_segments(plan, 1.0)[0]
+    clock = sim.SimClock()
+    buses = {a: sim.SimArmBus(f"arm_{a}", cr.q_to_ticks(cfg, a, plan[0].q[a]) + [1600], clock,
+                              stall=(stall or {}).get(a)) for a in cr.ARMS}
+    writes = [] if writes is None else writes
+    for a, b in buses.items():
+        w = b.sync_write_goal_ticks
+        b.sync_write_goal_ticks = (lambda t, s=None, w=w, a=a:
+                                   (writes.append((a, round(clock(), 6), dict(t), dict(s or {}))), w(t, s))[1])
+    st = {"t0": None, "done": False}
+
+    def sleep(dt):
+        if st["t0"] is not None and not st["done"] and clock.t - st["t0"] >= at_frac * seg.duration_s:
+            st["done"] = True
+            clock.t += stall_s
+        clock.sleep(dt)
+    recs = [] if recs is None else recs
+    r = cr.build_runner(cfg, plan, buses, live=False, clock=clock, sleep=sleep, log=recs.append,
+                        abort_on_faults=False, should_abort=should_abort)
+    r.energise(); r.lock_both()
+    st["t0"] = clock.t
+    r._stream_segment(seg)
+    return recs, writes, seg, buses
+
+
+@pytest.mark.parametrize("stall_s", [0.3, 0.45, 0.6])
+def test_stream_catch_up_after_a_host_stall_ends_within_tolerance(stall_s):
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        recs, _, seg, buses = _stalled_stream(cfg, stall_s)
+    finally:
+        logging.disable(logging.NOTSET)
+    cu = [x for x in recs if x["event"] == "stream_catch_up"]
+    assert [x["status"] for x in cu] == ["start", "done"]
+    assert max(cu[0]["lag_ticks"].values()) > cr.REACH_TOL_TICKS       # the stall left it short
+    assert 0 <= cu[0]["t_join_s"] <= seg.duration_s                      # rejoins the SAME path
+    assert cu[1]["within_tolerance"]
+    end = [x for x in recs if x["event"] == "segment"][-1]["final_error_ticks"]
+    assert all(abs(e) <= cr.REACH_TOL_TICKS for a in cr.ARMS for e in end[a])
+    assert all(b.max_speed_seen[s] <= cr.STREAM_SPEED_CAP_TICKS_S for b in buses.values() for s in range(1, 6))
+
+
+def test_stream_without_a_stall_never_catches_up_and_writes_only_the_planned_stream(monkeypatch):
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        monkeypatch.setattr(cr.ReplayRunner, "_catch_up", lambda *a, **k: pytest.fail("catch-up without a stall"))
+        recs, writes, seg, _ = _stalled_stream(cfg, 0.0)
+    finally:
+        logging.disable(logging.NOTSET)
+    assert not any(x["event"] == "stream_catch_up" for x in recs)
+    t0 = writes[0][1]
+    n = len(writes) // 2
+    # one write per arm every 20 ms from t=0 to the planned end: the planned point 60 ms ahead
+    assert [w[0] for w in writes] == ["left", "right"] * n
+    assert n == int(math.ceil(round(seg.duration_s / cr.STREAM_PERIOD_S, 6))) + 1
+    for k in range(n):
+        a, t, ticks, _ = writes[2 * k]
+        assert abs(t - t0 - k * cr.STREAM_PERIOD_S) < 1e-6
+        assert list(ticks.values()) == cr.q_to_ticks(cfg, a, seg.q(t - t0 + cr.STREAM_LEAD_S)[a])
+
+
+def test_stop_file_holds_during_the_catch_up():
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        recs, writes, seen = [], [], {}
+
+        def stop():
+            # the stop file appears once the catch-up has started and written a few points
+            if any(x["event"] == "stream_catch_up" for x in recs):
+                seen.setdefault("n", len(writes))
+                return len(writes) >= seen["n"] + 4
+            return False
+        with pytest.raises(cr.ReplayAborted, match="stop requested"):
+            _stalled_stream(cfg, 0.45, should_abort=stop, recs=recs, writes=writes)
+    finally:
+        logging.disable(logging.NOTSET)
+    assert [x["status"] for x in recs if x["event"] == "stream_catch_up"] == ["start"]
+    assert len(writes) == seen["n"] + 4                      # nothing written after the stop
+    assert not any(x["event"] == "segment" for x in recs)
+
+
+def test_catch_up_is_attempted_at_most_once_per_segment():
+    """An obstruction keeps the arm short: one catch-up, then the pose goes to the gates."""
+    logging.disable(logging.WARNING)
+    try:
+        cfg = load_config()
+        plan = _catch_up_plan(cfg)
+        a0, a1 = (cr.q_to_ticks(cfg, "left", plan[k].q["left"])[1] for k in (0, -1))
+        recs, *_ = _stalled_stream(cfg, 0.45, stall={"left": {2: (a0 + a1) // 2}})
+    finally:
+        logging.disable(logging.NOTSET)
+    cu = [x for x in recs if x["event"] == "stream_catch_up"]
+    assert [x["status"] for x in cu] == ["start", "done"] and not cu[1]["within_tolerance"]
+    assert [x["event"] for x in recs].count("segment") == 1
+
+
+def test_catch_up_bridge_is_limit_and_mesh_checked():
+    cfg = load_config()
+    plan = _catch_up_plan(cfg)
+    q0, q1 = plan[0].q, plan[1].q
+    assert cr.catch_up_bridge_problems(cfg, _Checker(), q0, q1, None) == []
+    assert "chassis" in cr.catch_up_bridge_problems(cfg, _Checker(hit=True), q0, q1, None)[0]
+    assert cr.catch_up_bridge_problems(cfg, None, q0, q1, None) == ["mesh collision model unavailable"]
+    bad = {a: v.copy() for a, v in q1.items()}
+    bad["left"][3] = cfg.motion_guard.left_arm_limits.wrist_flex_upper_rad + 0.05
+    assert "soft limits" in cr.catch_up_bridge_problems(cfg, _Checker(), q0, bad, None)[0]
