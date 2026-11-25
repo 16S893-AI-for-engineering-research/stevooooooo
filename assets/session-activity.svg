@@ -3,7 +3,7 @@
 <desc id="desc">Daily totals from all persisted pi sessions for this repository, including sub-agent workers and the walkthrough guide. The first chart compares user messages and agent tool calls; the second shows recorded model cost in US dollars, split by session type.</desc>
 <rect width="100%" height="100%" rx="18" fill="#120f24"/>
 <text x="550.0" y="44.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="28" text-anchor="middle">Agent activity and cost by day</text>
-<text x="550.0" y="72.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="15" text-anchor="middle">175 sessions through 11/23/26 · total recorded cost $704</text>
+<text x="550.0" y="72.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="15" text-anchor="middle">175 sessions through 11/23/26 · total recorded cost $705</text>
 <rect x="82" y="112" width="984" height="300" rx="8" fill="#17132e" stroke="#2a2450"/>
 <line x1="82" y1="412.0" x2="1066" y2="412.0" stroke="#2a2450" stroke-width="1" stroke-dasharray="3 5"/>
 <text x="72.0" y="417.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="13" text-anchor="end">0</text>
@@ -261,10 +261,11 @@
 <rect x="1013.9" y="701.3" width="17.4" height="8.9" fill="#3ec1b4"/>
 <text x="1022.6" y="694.3" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$47</text>
 <text x="1022.6" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/21</text>
-<rect x="1042.0" y="411.9" width="8.7" height="0.1" rx="2" fill="#ff5c8a"/>
-<rect x="1052.4" y="411.3" width="8.7" height="0.7" rx="2" fill="#3ec1b4"/>
+<rect x="1042.0" y="411.8" width="8.7" height="0.2" rx="2" fill="#ff5c8a"/>
+<rect x="1052.4" y="408.5" width="8.7" height="3.5" rx="2" fill="#3ec1b4"/>
 <text x="1051.5" y="434.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/23</text>
-<rect x="1042.8" y="747.6" width="17.4" height="0.4" fill="#ff7a45"/>
+<rect x="1042.8" y="746.0" width="17.4" height="2.0" fill="#ff7a45"/>
+<text x="1051.5" y="739.0" fill="#f3e9d2" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">$2</text>
 <text x="1051.5" y="770.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">11/23</text>
 <text x="550.0" y="808.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">Sessions are dated by the day they started. Sub-agent cost is dated by its own start day. $0 days had little or no paid model usage.</text>
 <text x="550.0" y="830.0" fill="#b9b0c9" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="12" text-anchor="middle">Generated 11/23/26 from local pi session metadata only; prompt and tool contents are not included.</text>

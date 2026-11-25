@@ -2,9 +2,14 @@
 
 Renders the validated AA-45 crawl cycle (`out/inchworm/timeline.jsonl`) from the
 cell URDF, from the tube's point of view: the tube stays still (extended with
-older printed sections) and the robot crawls one pitch along it. All parts are
-white plastic; no DexArm claw gripper. A fixed 3/4 side camera zooms in over the
-first 2 s. Backdrop: low Earth orbit (star map, textured Earth, clouds, blue limb).
+older printed sections) and the robot crawls one pitch along it. Storyline: the
+DexArm finishes the final layer on the tube's newest face (during the 2 s
+zoom-in), stows, the arms regrip-crawl one pitch, then the DexArm starts the next
+section on the same face. The prints are pretend spiral beads followed by DexArm
+position IK (visual only: no G-code, not collision-checked). Printed parts are
+white plastic, STS3215 servos black; no DexArm claw gripper. Fixed 3/4 side
+camera. Backdrop: orbit (star map, textured Earth on the left of the frame,
+clouds, thin limb band on the sunlit side).
 
 ## Textures (not committed; download once into `out/blender/tex/`)
 
@@ -25,7 +30,8 @@ cd robot
 uv run python scripts/blender_crawl_export.py            # -> out/blender/crawl_*.{npz,json}
 B="/mnt/c/Program Files/Blender Foundation/Blender 5.3/blender.exe"
 "$B" -b --python "$(wslpath -w blender/blender_crawl_scene.py)" -- --data "$(wslpath -w out/blender)"
-# -> out/blender/inchworm_crawl.blend + inchworm_crawl.mp4 (~6 min, EEVEE 1280x720 30 fps, 11.5 s)
+# -> out/blender/inchworm_crawl.blend + inchworm_crawl.mp4 (EEVEE 1280x720 30 fps, 13.4 s)
 # --still N renders one PNG frame; --no-render only saves the .blend;
-# --earth-yaw / --earth-tilt (deg) choose which part of the globe is in view.
+# --earth-lat / --earth-lon (deg, default 12 / -25 = tropical Atlantic) choose the
+# region shown next to the limb.
 ```
